@@ -1,0 +1,40 @@
+{
+    "compilerOptions": {
+        "typeRoots": [
+            "./src/types",
+            "./node_modules/@types"
+        ],
+        "target": "ES2022",
+        "allowJs": true,
+        "checkJs": true,
+        "module": "NodeNext",
+        "moduleResolution": "NodeNext",
+        "lib": [
+            "ES2022"
+        ],
+        "outDir": "./dist",
+        "rootDir": "./",
+        "strict": true,
+        "esModuleInterop": true,
+        "skipLibCheck": true,
+        "allowSyntheticDefaultImports": true,
+        "forceConsistentCasingInFileNames": true,
+        "resolveJsonModule": true,
+        "declaration": true,
+        "declarationMap": true,
+        "sourceMap": true,
+        "noImplicitAny": true,
+        "strictNullChecks": true,
+        "noUnusedLocals": false,
+        "noUnusedParameters": false
+    },
+    "include": [
+        "**/*.ts",
+        "**/*.js",
+        "src/shared/validators/user.schemas.jts"
+    ],
+    "exclude": [
+        "node_modules",
+        "dist"
+    ]
+}
