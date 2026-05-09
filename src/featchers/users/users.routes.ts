@@ -1,22 +1,26 @@
-import { getUser, getAll, deleteUser, updateUser, promoteToAdmin, addAddress, addToCart, removeFromCart, getCart, deleteMyUser, deleteAddress } from "./users.controller.js"
 import { Router } from "express"
 import { authMiddleware } from "../../shared/middlewares/shared.middlewares.js"
-import { checkPermissions } from "../../shared/middlewares/shared.permissions.js"
 import { isAdmin } from "../../shared/middlewares/shared.admin.js"
-import { validateRequest } from "../../shared/middlewares/validateRequst.js"
-import { userIdParamsSchema, addressIdParamsSchema, productIdParamsSchema, updateUserSchema, addAddressSchema, addToCartSchema, deleteMyUserSchema } from "../../shared/validators/user.schemas.js"
+import { getUser, getAll, deleteUser, updateUser, promoteToAdmin, deleteMyUser } from "./users.controller.js"
+
 const userRouter: Router = Router()
 
+// Admin: get all users
 userRouter.get("/admin", authMiddleware, isAdmin, getAll)
-userRouter.get("/cart", authMiddleware, getCart)
-userRouter.get("/:id", validateRequest(userIdParamsSchema, "params"), getUser)
-userRouter.delete("/admin/:id", authMiddleware, isAdmin, validateRequest(userIdParamsSchema, "params"), deleteUser)
-userRouter.delete("/:id", authMiddleware, checkPermissions, validateRequest(userIdParamsSchema, "params"), validateRequest(deleteMyUserSchema, "body"), deleteMyUser)
-userRouter.patch("/role/:id", authMiddleware, isAdmin, validateRequest(userIdParamsSchema, "params"), promoteToAdmin)
 
-userRouter.patch("/:id", authMiddleware, checkPermissions, validateRequest(userIdParamsSchema, "params"), validateRequest(updateUserSchema, "body"), updateUser)
-userRouter.post("/address", authMiddleware, validateRequest(addAddressSchema, "body"), addAddress)
-userRouter.delete("/address/:addressId", authMiddleware, validateRequest(addressIdParamsSchema, "params"), deleteAddress)
-userRouter.post("/cart", authMiddleware, validateRequest(addToCartSchema, "body"), addToCart)
-userRouter.delete("/cart/:productId", authMiddleware, validateRequest(productIdParamsSchema, "params"), removeFromCart)
-export default userRouter    
+// Get user by id (public)
+userRouter.get("/:id", getUser)
+
+// Admin: delete any user
+userRouter.delete("/admin/:id", authMiddleware, isAdmin, deleteUser)
+
+// User: delete own account (requires password confirmation)
+userRouter.delete("/:id", authMiddleware, deleteMyUser)
+
+// Admin: promote user to admin
+userRouter.patch("/role/:id", authMiddleware, isAdmin, promoteToAdmin)
+
+// User: update own profile
+userRouter.patch("/:id", authMiddleware, updateUser)
+
+export default userRouter

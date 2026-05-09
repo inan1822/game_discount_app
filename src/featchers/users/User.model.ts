@@ -1,34 +1,24 @@
 import mongoose from "mongoose"
 import bcrypt from "bcrypt"
 import { Model } from "mongoose"
-import { cartItemSchema } from "../cart/cart.model.js"
 
-
-
-
-
-
-export interface IAddress extends mongoose.Document {
+export interface IUser extends mongoose.Document {
     _id: mongoose.Types.ObjectId
-    street: string
-    city: string
-    country: string
-    zipCode: string
+    name: string
+    email: string
+    password: string
+    token: string | null
+    isVerified: boolean
+    sendVerificationCode?: string
+    sendVerificationCodeExpiry?: Date
+    twoFactorCode?: string
+    twoFactorExpiry?: Date
+    resetPasswordToken?: string
+    resetPasswordExpiry?: Date
+    role: "user" | "admin"
 }
 
-const addressSchema = new mongoose.Schema<IAddress>({
-    _id: { type: mongoose.Schema.Types.ObjectId },
-    street: { type: String, required: true },
-    city: { type: String, required: true },
-    country: { type: String, required: true },
-    zipCode: { type: String, required: true }
-})
-
-
-
 const userSchema = new mongoose.Schema<IUser>({
-
-
     token: { type: String, default: null },
     name: {
         type: String,
@@ -36,12 +26,10 @@ const userSchema = new mongoose.Schema<IUser>({
         trim: true,
         minlength: 2
     },
-
     email: {
-
         type: String,
         required: true,
-        unique: true,// is index already
+        unique: true,
         lowercase: true
     },
     sendVerificationCode: String,
@@ -50,14 +38,12 @@ const userSchema = new mongoose.Schema<IUser>({
         default: false
     },
     sendVerificationCodeExpiry: Date,
-
     password: {
         select: false,
         type: String,
         required: true,
         validate: {
-            validator: function (value) {
-                // Only validate raw password (not hashed)
+            validator: function (value: string) {
                 return value.length >= 8
             },
             message: "Password must be at least 8 characters long"
@@ -67,30 +53,18 @@ const userSchema = new mongoose.Schema<IUser>({
     twoFactorExpiry: Date,
     resetPasswordToken: String,
     resetPasswordExpiry: Date,
-
     role: {
         type: String,
-        enum: ["customer", "admin"],
-        default: "customer"
-    },
-
-    addresses: {
-        type: [addressSchema],
-        default: []
-    },
-
-    cart: {
-        type: [cartItemSchema],
-        default: []
+        enum: ["user", "admin"],
+        default: "user"
     }
-
 }, { timestamps: true })
 
 userSchema.index({ role: 1 })
 
 userSchema.set("toJSON", {
     transform: (_doc, ret) => {
-        const { password: _p, verificationCode: verificationCode, ...rest } =
+        const { password: _p, sendVerificationCode: _v, twoFactorCode: _t, ...rest } =
             ret as unknown as Record<string, unknown>
         return rest
     }

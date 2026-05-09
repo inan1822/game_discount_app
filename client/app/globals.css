@@ -1,0 +1,153 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+@import url('https://fonts.googleapis.com/css2?family=Nunito:wght@300;400;600;700;800&display=swap');
+
+@custom-variant dark (&:is(.dark *));
+
+/* ─── DisLow Design Tokens (from Figma) ──────────────────────────────────── */
+:root {
+  /* Backgrounds */
+  --bg-primary:          #12131a;
+  --bg-card:             #1c1e2a;
+  --bg-surface:          #2a2d32;
+  --bg-input:            rgba(255,255,255,0.07);
+
+  /* Brand / Accents */
+  --color-purple:        #AE3BD6;
+  --color-purple-light:  #999FFA;
+  --color-blue:          #6475D1;
+  --color-cyan:          #2ab7e6;
+  --color-green:         #44d62c;
+
+  /* Text */
+  --text-primary:        #FFFFFF;
+  --text-secondary:      #b3bade;
+  --text-muted:          #9fa0a1;
+
+  /* Borders */
+  --border-subtle:       rgba(188,188,201,0.25);
+
+  /* Shadows */
+  --shadow-card:         6px 4px 49px 0px rgba(0,0,0,0.7);
+  --shadow-purple:       0px 0px 20px 0px rgba(165,33,211,0.69);
+  --shadow-blue:         0px 0px 20px 0px rgba(100,117,209,0.69);
+
+  /* Radii */
+  --radius-card:         20px;
+  --radius-btn:          50px;
+
+  /* shadcn overrides → map to DisLow tokens */
+  --background:          #12131a;
+  --foreground:          #FFFFFF;
+  --card:                #1c1e2a;
+  --card-foreground:     #FFFFFF;
+  --popover:             #1c1e2a;
+  --popover-foreground:  #FFFFFF;
+  --primary:             #AE3BD6;
+  --primary-foreground:  #FFFFFF;
+  --secondary:           #2a2d32;
+  --secondary-foreground:#b3bade;
+  --muted:               #2a2d32;
+  --muted-foreground:    #9fa0a1;
+  --accent:              #6475D1;
+  --accent-foreground:   #FFFFFF;
+  --destructive:         #ef4444;
+  --border:              rgba(188,188,201,0.25);
+  --input:               rgba(255,255,255,0.07);
+  --ring:                #AE3BD6;
+  --radius:              0.75rem;
+}
+
+@theme inline {
+  --color-background:    var(--background);
+  --color-foreground:    var(--foreground);
+  --font-sans:           var(--font-nunito);
+
+  /* DisLow custom colors available as Tailwind classes */
+  --color-brand-purple:  var(--color-purple);
+  --color-brand-light:   var(--color-purple-light);
+  --color-brand-blue:    var(--color-blue);
+  --color-brand-cyan:    var(--color-cyan);
+  --color-brand-green:   var(--color-green);
+  --color-bg-card:       var(--bg-card);
+  --color-bg-surface:    var(--bg-surface);
+  --color-text-secondary:var(--text-secondary);
+  --color-text-muted:    var(--text-muted);
+
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-card: var(--radius-card);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-family: 'Nunito', sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  html {
+    @apply font-sans;
+  }
+
+  /* Scrollbar styling for dark theme */
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-track { background: var(--bg-primary); }
+  ::-webkit-scrollbar-thumb { background: var(--color-purple); border-radius: 4px; }
+}
+
+/* ─── Utility classes ─────────────────────────────────────────────────────── */
+@layer utilities {
+  /* Glow effects */
+  .glow-purple { box-shadow: var(--shadow-purple); }
+  .glow-blue   { box-shadow: var(--shadow-blue); }
+
+  /* Background blobs for atmospheric effect */
+  .blob-purple {
+    background: var(--color-purple);
+    filter: blur(315px);
+    opacity: 0.25;
+    border-radius: 50%;
+    position: absolute;
+    pointer-events: none;
+  }
+  .blob-blue {
+    background: var(--color-blue);
+    filter: blur(352px);
+    opacity: 0.2;
+    border-radius: 50%;
+    position: absolute;
+    pointer-events: none;
+  }
+
+  /* Gradient text */
+  .text-gradient {
+    background: linear-gradient(135deg, var(--color-purple), var(--color-purple-light));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  /* Glass card */
+  .glass {
+    background: rgba(28, 30, 42, 0.8);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    border: 1px solid var(--border-subtle);
+  }
+
+  /* Discount badge — always green */
+  .discount-badge {
+    background: var(--color-green);
+    color: #000;
+    font-weight: 700;
+    border-radius: 6px;
+    padding: 2px 6px;
+    font-size: 12px;
+  }
+}
