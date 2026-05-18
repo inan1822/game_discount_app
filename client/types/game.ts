@@ -9,6 +9,7 @@ export interface Game {
   released: string
   metacritic: number | null
   description?: string
+  steamAppId?: string        // extracted from RAWG store URLs — used for exact ITAD lookup
 }
 
 export interface WishlistItem {
@@ -44,6 +45,31 @@ export interface CheapSharkStore {
     logo: string
     icon: string
   }
+}
+
+export interface GiveawayItem {
+  id:           number
+  title:        string
+  worth:        string       // e.g. "$14.99" or "$0.00"
+  thumbnail:    string
+  description:  string
+  instructions: string
+  claimUrl:     string
+  endDate:      string       // "N/A" when no expiry
+  platforms:    string       // e.g. "PC, Steam"
+  users:        number
+}
+
+/** A Steam news/events item from ISteamNews GetNewsForApp */
+export interface GameEvent {
+  id:         string
+  title:      string
+  url:        string
+  author:     string
+  summary:    string    // plain-text excerpt ~200 chars
+  date:       number    // Unix timestamp (seconds)
+  feedLabel:  string    // e.g. "Community Announcements", "Game Updates"
+  isExternal: boolean
 }
 
 export interface PriceResult {

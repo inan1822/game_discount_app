@@ -64,15 +64,20 @@ export const verifyEmailService = async ({ email, code }: { email: string, code:
     return "Email verified successfully"
 }
 
+// Pre-computed dummy hash — used to keep response time constant when user is not found.
+// Prevents timing attacks that reveal whether an email exists in the DB.
+const DUMMY_HASH = "$2b$12$invalidhashpadding00000000000000000000000000000000000000"
+
 export const loginService = async ({ email, password }: { email: string, password: string }): Promise<TwoFactorResponse | LoginResponse> => {
     const user = await userModel.findOne({ email }).select("+password")
-    if (!user) {
-        throw new AppError(`User with ${email} not found`, 401)
-    }
 
-    const isPasswordCorrect = await bcrypt.compare(password, user.password)
-    if (!isPasswordCorrect) {
-        throw new AppError("Invalid password", 401)
+    // Always run bcrypt.compare — even when user not found — to prevent timing attacks
+    const isPasswordCorrect = user
+        ? await bcrypt.compare(password, user.password)
+        : await bcrypt.compare(password, DUMMY_HASH)
+
+    if (!user || !isPasswordCorrect) {
+        throw new AppError("Invalid credentials", 401)
     }
 
     if (!user.isVerified) {

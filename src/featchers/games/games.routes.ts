@@ -15,6 +15,9 @@ import {
     getHiddenGems,
     getDealOfDay,
     getByGenre,
+    batchPrices,
+    getGameGiveaways,
+    getGameEvents,
 } from "./games.controller.js"
 
 const gamesRouter = Router()
@@ -39,6 +42,9 @@ gamesRouter.get("/for-you", authMiddleware, getForYou)
 // GET /api/v1/games/price?title=TITLE  → cheapest single price (home cards)
 gamesRouter.get("/price", getGamePrice)
 
+// POST /api/v1/games/batch-prices  → body: { titles: string[] } → { [title]: price | null }
+gamesRouter.post("/batch-prices", authMiddleware, batchPrices)
+
 // GET /api/v1/games/deals?title=TITLE  → all store deals (game detail page)
 gamesRouter.get("/deals", getGameDeals)
 
@@ -53,6 +59,12 @@ gamesRouter.get("/deal-of-day", getDealOfDay)
 
 // GET /api/v1/games/by-genre?genre=action&page=1
 gamesRouter.get("/by-genre", getByGenre)
+
+// GET /api/v1/games/giveaways?title=TITLE → GamerPower free giveaways matching the game
+gamesRouter.get("/giveaways", getGameGiveaways)
+
+// GET /api/v1/games/events?steamAppId=570 → Steam news/events feed for the game
+gamesRouter.get("/events", getGameEvents)
 
 // ── Legacy ────────────────────────────────────────────────────────────────────
 // GET /api/v1/games/trending

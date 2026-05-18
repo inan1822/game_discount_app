@@ -44,7 +44,7 @@ function BigCard({
         {game.cover ? (
           <img src={game.cover} alt={game.name} loading="lazy" className="absolute inset-0 w-full h-full object-cover" />
         ) : (
-          <div className="absolute inset-0" style={{ background: "linear-gradient(135deg,#1c2a3a,#2a1c3a)" }} />
+          <div className="absolute inset-0" style={{ background: "linear-gradient(135deg,#1c2533,#22182e)" }} />
         )}
 
         {/* Gradient overlay */}
@@ -113,7 +113,7 @@ function MedCard({
         {game.cover ? (
           <img src={game.cover} alt={game.name} loading="lazy" className="absolute inset-0 w-full h-full object-cover" />
         ) : (
-          <div className="absolute inset-0" style={{ background: "linear-gradient(135deg,#1c2a3a,#2a1c3a)" }} />
+          <div className="absolute inset-0" style={{ background: "linear-gradient(135deg,#1c2533,#22182e)" }} />
         )}
 
         <div className="absolute inset-0" style={{ background: "linear-gradient(to top, rgba(0,0,0,0.88) 0%, transparent 55%)" }} />
@@ -175,7 +175,7 @@ function SmallCard({
         {game.cover ? (
           <img src={game.cover} alt={game.name} loading="lazy" className="absolute inset-0 w-full h-full object-cover" />
         ) : (
-          <div className="absolute inset-0" style={{ background: "linear-gradient(135deg,#1c2a3a,#2a1c3a)" }} />
+          <div className="absolute inset-0" style={{ background: "linear-gradient(135deg,#1c2533,#22182e)" }} />
         )}
 
         <div className="absolute inset-0" style={{ background: "linear-gradient(to top, rgba(0,0,0,0.92) 0%, transparent 60%)" }} />

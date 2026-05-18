@@ -14,9 +14,10 @@ export function SectionHeading({
   right?:     React.ReactNode
 }) {
   return (
+    <div style={{ perspective: 600 }}>
     <motion.div
       className="flex items-end justify-between"
-      style={{ paddingTop: 12, marginBottom: 20, perspective: 600 }}
+      style={{ paddingTop: 12, marginBottom: 20 }}
       initial={{ opacity: 0, y: 18, rotateX: -22, scale: 0.95 }}
       animate={{ opacity: 1, y: 0,  rotateX: 0,   scale: 1    }}
       transition={{ delay, duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
@@ -36,7 +37,7 @@ export function SectionHeading({
             height:          3,
             width:           "100%",
             borderRadius:    2,
-            originX:         0,
+            transformOrigin: "left center",
             background:      "linear-gradient(to right, #48BCF9, #AE3BD6, transparent)",
           }}
         />
@@ -55,5 +56,6 @@ export function SectionHeading({
       )}
       {right}
     </motion.div>
+    </div>
   )
 }

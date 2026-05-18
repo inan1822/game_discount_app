@@ -1,5 +1,5 @@
 import api from "./axios"
-import type { Game } from "@/types/game"
+import type { Game, GiveawayItem, GameEvent } from "@/types/game"
 
 export const searchGames = async (q: string, page = 1): Promise<Game[]> => {
   const { data } = await api.get("/games/search", { params: { q, page } })
@@ -46,10 +46,19 @@ export const getGamePrice = async (title: string): Promise<string | null> => {
   }
 }
 
-/** Deals — all store deals for the game detail page */
-export const getGameDeals = async (title: string): Promise<import("@/types/game").PriceResult[]> => {
+/**
+ * Deals — all store deals for the game detail page.
+ * Passes steamAppId when available → backend uses ITAD for exact matching.
+ * Falls back to CheapShark title search (exact → prefix → acronym → Fuse.js).
+ */
+export const getGameDeals = async (
+  title: string,
+  steamAppId?: string,
+): Promise<import("@/types/game").PriceResult[]> => {
   try {
-    const { data } = await api.get("/games/deals", { params: { title } })
+    const params: Record<string, string> = { title }
+    if (steamAppId) params.steamAppId = steamAppId
+    const { data } = await api.get("/games/deals", { params })
     return data.data ?? []
   } catch {
     return []
@@ -93,6 +102,51 @@ export const getDealOfDay = async (): Promise<DealOfDay | null> => {
 export const getByGenreGames = async (genre: string, page = 1): Promise<Game[]> => {
   const { data } = await api.get("/games/by-genre", { params: { genre, page } })
   return data.data ?? []
+}
+
+/**
+ * Batch price fetch — POST /games/batch-prices
+ * Requires: user must be logged in (Bearer token injected by axios interceptor).
+ * Fetches prices for up to 20 game titles in a single round-trip.
+ * Returns a map of { title → price | null }.
+ */
+export const batchGetPrices = async (
+  titles: string[],
+): Promise<Record<string, string | null>> => {
+  if (titles.length === 0) return {}
+  try {
+    const { data } = await api.post("/games/batch-prices", { titles })
+    return data.data ?? {}
+  } catch {
+    return {}
+  }
+}
+
+/**
+ * Game Events — Steam news/events feed for a specific game.
+ * Requires the game's Steam AppID. Returns [] for non-Steam games.
+ * No auth required — uses the free public Steam ISteamNews API.
+ */
+export const getGameEvents = async (steamAppId: string): Promise<GameEvent[]> => {
+  try {
+    const { data } = await api.get("/games/events", { params: { steamAppId } })
+    return data.data ?? []
+  } catch {
+    return []
+  }
+}
+
+/**
+ * Giveaways — GamerPower free game giveaways matching the given title.
+ * Returns up to 3 active giveaways (keys / free-to-claim offers).
+ */
+export const getGameGiveaways = async (title: string): Promise<GiveawayItem[]> => {
+  try {
+    const { data } = await api.get("/games/giveaways", { params: { title } })
+    return data.data ?? []
+  } catch {
+    return []
+  }
 }
 
 // Legacy — kept for any existing pages that import these

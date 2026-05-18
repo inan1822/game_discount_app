@@ -12,6 +12,14 @@ import hpp from "hpp"
 import errorHandler from "./src/shared/middlewares/errorHandler.js"
 import morgan from "morgan"
 
+// ── Validate critical secrets at startup — fail fast before accepting traffic ──
+if (!process.env.JWT_SECRET || process.env.JWT_SECRET.length < 32) {
+    throw new Error("JWT_SECRET must be set and at least 32 characters long")
+}
+if (!process.env.RAWG_API) {
+    console.warn("[Startup] RAWG_API key is not set — game data endpoints will fail")
+}
+
 const app = express()
 
 app.use(helmet())
@@ -59,7 +67,8 @@ const authLimiter = rateLimit({
 
 const globalLimiter = rateLimit({
     windowMs: 60 * 1000,
-    limit: 100,
+    limit: 2000,          // per-IP — raised from 500: 2 tabs × 6 sections × infinite scroll
+                          // easily exceeds 500 for a real user. 2000 still blocks bots.
     standardHeaders: true,
     legacyHeaders: false,
     message: {

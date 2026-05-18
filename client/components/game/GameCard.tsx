@@ -25,54 +25,27 @@ function platformLabel(platform: string): string {
 }
 
 /**
- * Corner-shaped purple rank badge — top-left of the card.
- * Uses the exact SVG from eventbackgroundNumbers.svg.
- * Container offset -7 so the purple shape sits flush with the card corner.
+ * Side-tab rank badge — flush with the left edge of the card.
+ * A narrow purple pill that sticks out from the left side with the rank number.
  */
 export function RankBadge({ rank }: { rank: number }) {
   return (
     <div
-      className="absolute z-10"
-      style={{ top: -7, left: -7, width: 51, height: 47, pointerEvents: "none" }}
+      className="absolute z-10 flex items-center justify-center font-bold text-white"
+      style={{
+        top:          14,
+        left:         0,
+        width:        28,
+        height:       36,
+        background:   "linear-gradient(180deg, #C652F0 0%, #8B2FB3 100%)",
+        borderRadius: "0 10px 10px 0",
+        boxShadow:    "2px 0 12px rgba(174,59,214,0.50)",
+        fontSize:     13,
+        letterSpacing: "-0.5px",
+        pointerEvents: "none",
+      }}
     >
-      <svg
-        width="51" height="47" viewBox="0 0 51 47" fill="none"
-        xmlns="http://www.w3.org/2000/svg"
-        className="absolute inset-0"
-      >
-        <g filter="url(#filter0_d_3523_2959)">
-          <path
-            d="M5.5 15.5C5.5 9.97715 9.97715 5.5 15.5 5.5H44.9098C45.2358 5.5 45.5 5.76423 45.5 6.09016V6.09016C45.5 25.6465 29.6465 41.5 10.0902 41.5H6.15574C5.79359 41.5 5.5 41.2064 5.5 40.8443V15.5Z"
-            fill="#AE3BD6"
-          />
-        </g>
-        <defs>
-          <filter
-            id="filter0_d_3523_2959" x="0" y="0" width="51" height="47"
-            filterUnits="userSpaceOnUse" colorInterpolationFilters="sRGB"
-          >
-            <feFlood floodOpacity="0" result="BackgroundImageFix" />
-            <feColorMatrix in="SourceAlpha" type="matrix"
-              values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0" result="hardAlpha" />
-            <feMorphology radius="1" operator="dilate" in="SourceAlpha" result="effect1_dropShadow_3523_2959" />
-            <feOffset />
-            <feGaussianBlur stdDeviation="2.25" />
-            <feComposite in2="hardAlpha" operator="out" />
-            <feColorMatrix type="matrix"
-              values="0 0 0 0 0.682353 0 0 0 0 0.231373 0 0 0 0 0.839216 0 0 0 0.4 0" />
-            <feBlend mode="normal" in2="BackgroundImageFix" result="effect1_dropShadow_3523_2959" />
-            <feBlend mode="normal" in="SourceGraphic" in2="effect1_dropShadow_3523_2959" result="shape" />
-          </filter>
-        </defs>
-      </svg>
-
-      {/* Number — +7 offset to compensate for the container's -7 shift */}
-      <span
-        className="absolute text-white font-bold"
-        style={{ fontSize: 13, top: 17, left: 18, lineHeight: 1, textShadow: "0 1px 4px rgba(0,0,0,0.5)" }}
-      >
-        {rank}
-      </span>
+      {rank}
     </div>
   )
 }
@@ -87,7 +60,7 @@ export function StarButton({
 }) {
   return (
     <motion.button
-      onClick={onToggle}
+      onClick={(e) => { e.stopPropagation(); onToggle(e) }}
       whileHover={{ scale: 1.2 }}
       whileTap={{ scale: 0.85 }}
       className="absolute z-10 flex items-center justify-center"
@@ -153,7 +126,7 @@ export default function GameCard({
       {/* Card body */}
       <div
         className="relative overflow-hidden"
-        style={{ height: 380, background: "#16101F", borderRadius: 10 }}
+        style={{ height: 380, background: "#1C1E2A", borderRadius: 10 }}
       >
         {game.cover ? (
           <img
@@ -165,21 +138,21 @@ export default function GameCard({
         ) : (
           <div
             className="absolute inset-0"
-            style={{ background: "linear-gradient(135deg, #1c2a3a, #2a1c3a)" }}
+            style={{ background: "linear-gradient(135deg, #1c2533, #22182e)" }}
           />
         )}
 
-        {/* Gradient overlay */}
+        {/* Gradient overlay — dark bottom so info bar stays readable */}
         <div
           className="absolute inset-0"
           style={{
-            background: "linear-gradient(to top, rgba(0,0,0,0.80) 0%, rgba(0,0,0,0.10) 55%, transparent 100%)",
+            background: "linear-gradient(to top, rgba(0,0,0,0.75) 0%, rgba(0,0,0,0.05) 50%, transparent 100%)",
           }}
         />
 
-        {/* Info bar — overlays the image */}
+        {/* Info bar — glassmorphic strip over the image */}
         <div
-          className="absolute bottom-0 left-0 right-0 px-3 py-3"
+          className="absolute bottom-0 left-0 right-0 px-3 py-2.5"
           style={{
             background:           "rgba(28,30,42,0.70)",
             backdropFilter:       "blur(8px)",
@@ -189,11 +162,11 @@ export default function GameCard({
         >
           {/* Name + rating */}
           <div className="flex items-start justify-between gap-1">
-            <p className="text-white text-[18px] font-semibold leading-tight truncate flex-1">
+            <p className="text-white text-[14px] font-semibold leading-tight truncate flex-1">
               {game.name}
             </p>
             {game.rating > 0 && (
-              <p className="text-[#AE3BD6] text-[15px] font-bold flex-shrink-0">
+              <p className="text-[#AE3BD6] text-[12px] font-bold flex-shrink-0">
                 ★ {game.rating.toFixed(1)}
               </p>
             )}
@@ -201,7 +174,7 @@ export default function GameCard({
 
           {/* Genre */}
           {game.genres.length > 0 && (
-            <p className="text-[15px] mt-0.5 truncate" style={{ color: "rgba(255,255,255,0.4)" }}>
+            <p className="text-[11px] mt-0.5 truncate" style={{ color: "rgba(255,255,255,0.4)" }}>
               {game.genres.slice(0, 2).join(", ")}
             </p>
           )}
@@ -213,7 +186,7 @@ export default function GameCard({
                 platforms.map(p => (
                   <span
                     key={p}
-                    className="text-[15px] font-semibold px-1.5 py-0.5"
+                    className="text-[10px] font-semibold px-1.5 py-0.5"
                     style={{
                       background:   "rgba(255,255,255,0.08)",
                       color:        "rgba(255,255,255,0.55)",
@@ -225,7 +198,7 @@ export default function GameCard({
                 ))
               ) : (
                 <span
-                  className="text-[15px] font-semibold px-1.5 py-0.5"
+                  className="text-[10px] font-semibold px-1.5 py-0.5"
                   style={{
                     background:   "rgba(255,255,255,0.06)",
                     color:        "rgba(255,255,255,0.3)",
@@ -237,17 +210,17 @@ export default function GameCard({
               )}
             </div>
 
-            {/* Price — 14px. Free=blue, paid=green, Unknown=gray */}
+            {/* Price — Free=blue, paid=green, Unknown=dim */}
             {priceDisplay && (
               <span
-                className="text-[15px] font-bold flex-shrink-0"
+                className="font-bold flex-shrink-0"
                 style={{
                   color: priceDisplay === "Free"
                     ? "#48BCF9"
                     : priceDisplay === "Unknown"
                     ? "rgba(255,255,255,0.3)"
                     : "#5BDE8A",
-                  fontSize: priceDisplay === "Unknown" ? 13 : 15,
+                  fontSize: priceDisplay === "Unknown" ? 10 : 13,
                 }}
               >
                 {priceDisplay}

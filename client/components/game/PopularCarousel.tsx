@@ -6,7 +6,6 @@ import {
   useTransform,
   useMotionTemplate,
   useReducedMotion,
-  cubicBezier,
 } from "framer-motion"
 import { useRef, useLayoutEffect, useState, useEffect, useCallback } from "react"
 import { useRouter } from "next/navigation"
@@ -14,12 +13,6 @@ import { ChevronRight, ChevronLeft } from "lucide-react"
 import type { Game } from "@/types/game"
 import { RankBadge, StarButton, formatPrice } from "./GameCard"
 import { SectionHeading } from "@/components/ui/SectionHeading"
-
-// ─── Easing (same as the original ScrollTiltedGrid) ──────────────────────────
-
-const easeIntoFocus  = cubicBezier(0.22, 1, 0.36, 1)
-const easeOutOfFocus = cubicBezier(0, 0, 0.58, 1)
-const focusEase      = [easeIntoFocus, easeOutOfFocus] as const
 
 // ─── Layout constants ─────────────────────────────────────────────────────────
 
@@ -64,28 +57,28 @@ function PopularTile({
   const centeredAt = index * (cardWidth + GAP)
 
   // Normalised: 0 = centred, −1 = one card to the right, +1 = one card to the left
-  const progress = useTransform(scrollX, (v) => (v - centeredAt) / (cardWidth + GAP))
+  const progress = useTransform(scrollX, (v: number) => (v - centeredAt) / (cardWidth + GAP))
 
   // ── Transforms — adapted from ScrollTiltedGrid to horizontal axis ───────────
   // Values are intentionally moderate so side cards remain clearly visible.
 
   // Brightness: side cards clearly dimmed, centre is full
-  const bright   = useTransform(progress, [-1, 0, 1], [0.38, 1, 0.38], { ease: focusEase })
+  const bright   = useTransform(progress, [-1, 0, 1], [0.38, 1, 0.38])
 
   // Blur: noticeable on sides, none at centre
-  const blur     = useTransform(progress, [-1, 0, 1], [4, 0, 4], { ease: focusEase })
+  const blur     = useTransform(progress, [-1, 0, 1], [4, 0, 4])
 
   // rotateY — the main tilt; 18° is visible but keeps side cards readable
-  const rotateY  = useTransform(progress, [-1, 0, 1], [-18, 0, 18], { ease: focusEase })
+  const rotateY  = useTransform(progress, [-1, 0, 1], [-18, 0, 18])
 
   // translateZ — shallow depth pop so centre lifts slightly forward
-  const tz       = useTransform(progress, [-1, 0, 1], [-50, 0, -50], { ease: focusEase })
+  const tz       = useTransform(progress, [-1, 0, 1], [-50, 0, -50])
 
   // Scale — side cards shrink slightly, further cards shrink more
-  const scale    = useTransform(progress, [-1, 0, 1], [0.88, 1, 0.88], { ease: focusEase })
+  const scale    = useTransform(progress, [-1, 0, 1], [0.88, 1, 0.88])
 
   // Slight z-rotation lean (same as original `rot`)
-  const rot      = useTransform(progress, [-1, 0, 1], [3, 0, -3], { ease: focusEase })
+  const rot      = useTransform(progress, [-1, 0, 1], [3, 0, -3])
 
   const filter   = useMotionTemplate`brightness(${bright}) blur(${blur}px)`
 
@@ -119,24 +112,23 @@ function PopularTile({
   // ── Full animated tile ────────────────────────────────────────────────────
   // The outer div owns: width, flex-shrink, snap — no transforms, no overflow clip.
   // The inner motion.div owns: all 3-D + filter transforms + overflow clip.
-  // perspective is set ON the motion.div so Framer Motion injects it correctly
-  // into the transform chain: perspective(1200px) rotateY(...) translateZ(...).
+  // perspective is set on the wrapper div so the transform chain sees it.
+  // (Framer Motion v12 excludes `perspective` from MotionCSS style type.)
   return (
-    <div style={{ width: cardWidth, flexShrink: 0, scrollSnapAlign: "center" }}>
+    <div style={{ width: cardWidth, flexShrink: 0, scrollSnapAlign: "center", perspective: 1200 }}>
       <motion.div
         className="relative cursor-pointer group/tile overflow-hidden"
         style={{
           width:        "100%",
           height:       CARD_HEIGHT,
           borderRadius: 14,
-          perspective:  1200,   // Framer Motion adds this to the transform chain
           rotateY,
           z:            tz,
           rotate:       rot,
           scale,
           filter,
           willChange:   "transform, filter",
-        }}
+        } as any}
         onClick={() => router.push(`/game/${game.id}`)}
       >
         {/* Rank badge */}
@@ -154,7 +146,7 @@ function PopularTile({
             className="absolute inset-0 w-full h-full object-cover"
           />
         ) : (
-          <div className="absolute inset-0" style={{ background: "linear-gradient(135deg,#1c2a3a,#2a1c3a)" }} />
+          <div className="absolute inset-0" style={{ background: "linear-gradient(135deg,#1c2533,#22182e)" }} />
         )}
 
         {/* Gradient overlay */}
@@ -276,7 +268,7 @@ export default function PopularCarousel({
 
   // Keep currentIndex in sync with native scroll (e.g. touch swipe)
   useEffect(() => {
-    return scrollX.on("change", (v) => {
+    return scrollX.on("change", (v: number) => {
       const idx = Math.round(v / (cardWidth + GAP))
       setCurrentIndex(Math.max(0, Math.min(idx, games.length - 1)))
     })

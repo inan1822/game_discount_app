@@ -15,6 +15,9 @@ import {
     getHiddenGemsService,
     getDealOfDayService,
     getByGenreService,
+    batchGetPricesService,
+    getGameGiveawaysService,
+    getGameEventsService,
 } from "./games.service.js"
 
 const getString = (val: unknown): string => {
@@ -24,8 +27,9 @@ const getString = (val: unknown): string => {
 
 export const searchGames = async (req: Request, res: Response): Promise<void> => {
     try {
-        const q    = getString(req.query.q)
-        const page = Number(req.query.page) || 1
+        const q       = getString(req.query.q)
+        const pageRaw = Number(req.query.page)
+        const page    = Number.isInteger(pageRaw) && pageRaw >= 1 ? pageRaw : 1
         const results = await searchGamesService(q, page)
         res.status(200).json({ status: "200", message: "OK", data: results })
     } catch (error) {
@@ -47,7 +51,8 @@ export const getGameById = async (req: Request, res: Response): Promise<void> =>
 /** Popular — biggest communities (most added to user libraries) */
 export const getPopularGames = async (req: Request, res: Response): Promise<void> => {
     try {
-        const page  = Number(req.query.page) || 1
+        const pageRaw = Number(req.query.page)
+        const page    = Number.isInteger(pageRaw) && pageRaw >= 1 ? pageRaw : 1
         const games = await getPopularGamesService(page)
         res.status(200).json({ status: "200", message: "OK", data: games })
     } catch (error) {
@@ -59,7 +64,8 @@ export const getPopularGames = async (req: Request, res: Response): Promise<void
 /** New — released in the last 12 months */
 export const getNewGames = async (req: Request, res: Response): Promise<void> => {
     try {
-        const page  = Number(req.query.page) || 1
+        const pageRaw = Number(req.query.page)
+        const page    = Number.isInteger(pageRaw) && pageRaw >= 1 ? pageRaw : 1
         const games = await getNewGamesService(page)
         res.status(200).json({ status: "200", message: "OK", data: games })
     } catch (error) {
@@ -71,7 +77,8 @@ export const getNewGames = async (req: Request, res: Response): Promise<void> =>
 /** Trended — released in last 3 years, sorted by community traction */
 export const getTrendedGames = async (req: Request, res: Response): Promise<void> => {
     try {
-        const page  = Number(req.query.page) || 1
+        const pageRaw = Number(req.query.page)
+        const page    = Number.isInteger(pageRaw) && pageRaw >= 1 ? pageRaw : 1
         const games = await getTrendedGamesService(page)
         res.status(200).json({ status: "200", message: "OK", data: games })
     } catch (error) {
@@ -96,15 +103,19 @@ export const getForYou = async (req: Request, res: Response): Promise<void> => {
     }
 }
 
-/** Deals — all store deals for a game (proxy to CheapShark, avoids browser CORS) */
+/** Deals — all store deals for a game.
+ *  Primary:  ITAD via ?steamAppId=105600 (exact match, no fuzzy needed)
+ *  Fallback: CheapShark title search with exact → prefix → acronym → Fuse.js
+ */
 export const getGameDeals = async (req: Request, res: Response): Promise<void> => {
     try {
-        const title = getString(req.query.title)
+        const title      = getString(req.query.title)
+        const steamAppId = getString(req.query.steamAppId) || undefined
         if (!title) {
             res.status(400).json({ status: "400", message: "title is required", data: null })
             return
         }
-        const deals = await getGameDealsService(title)
+        const deals = await getGameDealsService(title, steamAppId)
         res.status(200).json({ status: "200", message: "OK", data: deals })
     } catch (error) {
         const { status, message } = getErrorInfo(error)
@@ -164,8 +175,9 @@ export const getDealOfDay = async (_req: Request, res: Response): Promise<void> 
 /** By Genre */
 export const getByGenre = async (req: Request, res: Response): Promise<void> => {
     try {
-        const genre = getString(req.query.genre)
-        const page  = Number(req.query.page) || 1
+        const genre   = getString(req.query.genre)
+        const pageRaw = Number(req.query.page)
+        const page    = Number.isInteger(pageRaw) && pageRaw >= 1 ? pageRaw : 1
         if (!genre) {
             res.status(400).json({ status: "400", message: "genre is required", data: null })
             return
@@ -178,10 +190,72 @@ export const getByGenre = async (req: Request, res: Response): Promise<void> => 
     }
 }
 
+/**
+ * POST /api/v1/games/batch-prices
+ * Body: { titles: string[] }  — max 20 titles per request
+ * Returns: { [title]: price | null }
+ * Requires: Bearer token (prevents abuse of the CheapShark proxy)
+ */
+export const batchPrices = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const { titles } = req.body as { titles?: unknown }
+        if (!Array.isArray(titles) || titles.length === 0) {
+            res.status(400).json({ status: "400", message: "titles must be a non-empty array", data: null })
+            return
+        }
+        if (titles.length > 20) {
+            res.status(400).json({ status: "400", message: "Maximum 20 titles per request", data: null })
+            return
+        }
+        if (!titles.every(t => typeof t === "string")) {
+            res.status(400).json({ status: "400", message: "All titles must be strings", data: null })
+            return
+        }
+        const prices = await batchGetPricesService(titles as string[])
+        res.status(200).json({ status: "200", message: "OK", data: prices })
+    } catch (error) {
+        const { status, message } = getErrorInfo(error)
+        res.status(status).json({ status: String(status), message, data: null })
+    }
+}
+
+/** Steam game events / news feed — requires steamAppId query param */
+export const getGameEvents = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const steamAppId = getString(req.query.steamAppId)
+        if (!steamAppId) {
+            res.status(400).json({ status: "400", message: "steamAppId is required", data: null })
+            return
+        }
+        const events = await getGameEventsService(steamAppId)
+        res.status(200).json({ status: "200", message: "OK", data: events })
+    } catch (error) {
+        const { status, message } = getErrorInfo(error)
+        res.status(status).json({ status: String(status), message, data: null })
+    }
+}
+
+/** Giveaways — GamerPower free game giveaways matching the given title */
+export const getGameGiveaways = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const title = getString(req.query.title)
+        if (!title) {
+            res.status(400).json({ status: "400", message: "title is required", data: null })
+            return
+        }
+        const giveaways = await getGameGiveawaysService(title)
+        res.status(200).json({ status: "200", message: "OK", data: giveaways })
+    } catch (error) {
+        const { status, message } = getErrorInfo(error)
+        res.status(status).json({ status: String(status), message, data: null })
+    }
+}
+
 // ─── Legacy handlers (kept for backward compat) ───────────────────────────────
 
 export const getTrendingGames = async (_req: Request, res: Response): Promise<void> => {
     try {
+        console.warn("[API] Deprecated endpoint /trending called — use /popular instead")
         const games = await getTrendingGamesService()
         res.status(200).json({ status: "200", message: "OK", data: games })
     } catch (error) {
@@ -192,8 +266,10 @@ export const getTrendingGames = async (_req: Request, res: Response): Promise<vo
 
 export const getGamesByGenre = async (req: Request, res: Response): Promise<void> => {
     try {
-        const genre = getString(req.query.genre)
-        const page  = Number(req.query.page) || 1
+        console.warn("[API] Deprecated endpoint /genre called — use /by-genre instead")
+        const genre   = getString(req.query.genre)
+        const pageRaw = Number(req.query.page)
+        const page    = Number.isInteger(pageRaw) && pageRaw >= 1 ? pageRaw : 1
         const games = await getGamesByGenreService(genre, page)
         res.status(200).json({ status: "200", message: "OK", data: games })
     } catch (error) {

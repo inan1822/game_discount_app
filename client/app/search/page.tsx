@@ -2,17 +2,29 @@
 
 import { useState, useEffect, useRef } from "react"
 import { Search, X } from "lucide-react"
+import Fuse from "fuse.js"
 import { searchGames } from "@/lib/api/games"
 import GameCard from "@/components/game/GameCard"
 import BottomNav from "@/components/layout/BottomNav"
 import type { Game } from "@/types/game"
 
+// Fuse.js options for re-ranking RAWG results by title relevance.
+// RAWG returns results ranked by its own relevance model — Fuse re-sorts
+// so the closest title match always floats to the top.
+const FUSE_OPTS: Fuse.IFuseOptions<Game> = {
+  keys:             [{ name: "name", weight: 1 }],
+  threshold:        0.45,    // 0 = exact match only, 1 = match anything
+  includeScore:     true,
+  minMatchCharLength: 2,
+  ignoreLocation:   true,    // don't penalise matches far from start of string
+}
+
 export default function SearchPage() {
-  const [query, setQuery] = useState("")
+  const [query,   setQuery]   = useState("")
   const [results, setResults] = useState<Game[]>([])
   const [loading, setLoading] = useState(false)
   const [searched, setSearched] = useState(false)
-  const inputRef = useRef<HTMLInputElement>(null)
+  const inputRef   = useRef<HTMLInputElement>(null)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
@@ -36,10 +48,33 @@ export default function SearchPage() {
     setLoading(true)
     try {
       const data = await searchGames(q)
+
+      // Re-rank: use Fuse.js to float the best title match to the top.
+      // RAWG's search is good but sometimes buries the exact match.
+      // Only re-rank when Fuse finds confident matches (score < 0.3).
+      if (data.length > 1) {
+        const fuse   = new Fuse(data, FUSE_OPTS)
+        const ranked = fuse.search(q)
+        if (ranked.length > 0 && (ranked[0].score ?? 1) < 0.3) {
+          // Fuse found high-confidence matches — use Fuse order for those,
+          // then append anything Fuse didn't rank (score too low / unmatched).
+          const rankedIds = new Set(ranked.map(r => r.item.id))
+          const reordered = [
+            ...ranked.map(r => r.item),
+            ...data.filter(g => !rankedIds.has(g.id)),
+          ]
+          setResults(reordered)
+          setSearched(true)
+          return
+        }
+      }
+
+      // Fall back to RAWG's native ordering when Fuse isn't confident
       setResults(data)
       setSearched(true)
     } catch {
       setResults([])
+      setSearched(true)
     } finally {
       setLoading(false)
     }

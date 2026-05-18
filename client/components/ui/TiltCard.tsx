@@ -12,6 +12,7 @@ export interface TiltCardProps {
   className?: string
   style?: React.CSSProperties
   children?: React.ReactNode
+  onClick?: React.MouseEventHandler<HTMLDivElement>
 }
 
 export function TiltCard({
@@ -23,6 +24,7 @@ export function TiltCard({
   className,
   style,
   children,
+  onClick,
 }: TiltCardProps) {
   const cardRef = useRef<HTMLDivElement>(null)
   const [transform, setTransform] = useState(
@@ -60,6 +62,7 @@ export function TiltCard({
   return (
     <div
       ref={cardRef}
+      onClick={onClick}
       onPointerEnter={() => setIsHovered(true)}
       onPointerMove={handlePointerMove}
       onPointerLeave={handlePointerLeave}

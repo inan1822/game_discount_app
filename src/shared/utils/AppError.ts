@@ -9,7 +9,7 @@ export class AppError extends Error {
 
 export function getErrorInfo(error: unknown): { status: number; message: string } {
     if (error instanceof Error) {
-        const status = (error as any).status ?? 500
+        const status = (error instanceof AppError) ? error.status : ((error as unknown as Record<string, unknown>).status as number | undefined) ?? 500
         return { status, message: error.message || "Internal server error" }
     }
     return { status: 500, message: "Internal server error" }

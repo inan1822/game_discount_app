@@ -1,17 +1,17 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useRef, useCallback } from "react"
 import { useParams, useRouter } from "next/navigation"
 import { motion, AnimatePresence } from "framer-motion"
 import {
   ArrowLeft, Heart, Home, BellRing, Search as SearchIcon,
-  Users, User, LogIn, ExternalLink, Clock, Tag,
+  Users, User, LogIn, ExternalLink, Tag, Zap, Calendar,
 } from "lucide-react"
-import { getGameById, getGameDeals } from "@/lib/api/games"
+import { getGameById, getGameDeals, getGameGiveaways, getGameEvents } from "@/lib/api/games"
 import { addToWishlist, removeFromWishlist, getWishlist } from "@/lib/api/wishlist"
 import { useAuth } from "@/context/AuthContext"
 import { BackgroundGradientAnimation } from "@/components/ui/BackgroundGradientAnimation"
-import type { Game, PriceResult } from "@/types/game"
+import type { Game, PriceResult, GiveawayItem, GameEvent } from "@/types/game"
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -63,7 +63,8 @@ function NavGlowItem({
       animate={{ opacity: 1, x: 0 }}
       transition={{ delay, duration: 0.35 }}
       onMouseMove={e => {
-        const r = ref.current!.getBoundingClientRect()
+        const r = ref.current?.getBoundingClientRect()
+        if (!r) return
         setPos({ x: e.clientX - r.left, y: e.clientY - r.top })
       }}
       onMouseEnter={() => setHovered(true)}
@@ -182,43 +183,40 @@ function Sidebar({ activeNav, onNav, isLoggedIn, onLogout }: {
 function shortPlatform(platform: string): string {
   const p = platform.toLowerCase()
   if (p.includes("playstation") || p.includes("ps5") || p.includes("ps4") || p.includes("ps3")) return "PlayStation"
-  if (p.includes("xbox"))       return "Xbox"
-  if (p.includes("nintendo") || p.includes("switch")) return "Nintendo Switch"
-  if (p.includes("pc") || p.includes("windows"))      return "PC"
-  if (p.includes("linux"))  return "Linux"
-  if (p.includes("mac"))    return "macOS"
-  if (p.includes("ios") || p.includes("iphone"))      return "iOS"
+  if (p.includes("xbox"))                                    return "Xbox"
+  if (p.includes("nintendo") || p.includes("switch"))       return "Nintendo Switch"
+  if (p.includes("pc") || p.includes("windows"))            return "PC"
+  if (p.includes("linux"))   return "Linux"
+  if (p.includes("mac"))     return "macOS"
+  if (p.includes("ios") || p.includes("iphone"))            return "iOS"
   if (p.includes("android")) return "Android"
   return platform
 }
 
-/** How many days until the deal "expires" — we use 30d as placeholder since CheapShark has no end date */
-function daysLeft(savings: number): number {
-  // Map savings % to a plausible days-remaining window (pure visual)
-  return Math.max(1, Math.round(30 - savings * 0.2))
+/** Relative time label — "2 hours ago", "3 days ago", etc. */
+function relativeTime(unixSeconds: number): string {
+  const diff = Date.now() / 1000 - unixSeconds
+  if (diff < 3600)   return `${Math.max(1, Math.round(diff / 60))}m ago`
+  if (diff < 86400)  return `${Math.round(diff / 3600)}h ago`
+  if (diff < 604800) return `${Math.round(diff / 86400)}d ago`
+  const d = new Date(unixSeconds * 1000)
+  return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
 }
 
-/** Format date range for an event card — e.g. "May 1 – Jun 1" */
-function eventDateRange(savings: number): string {
-  const now   = new Date()
-  const start = new Date(now); start.setDate(start.getDate() - Math.round(savings * 0.1))
-  const end   = new Date(now); end.setDate(end.getDate() + daysLeft(savings))
-  const fmt = (d: Date) => d.toLocaleDateString("en-US", { month: "short", day: "numeric" })
-  return `${fmt(start)} – ${fmt(end)}`
-}
+// ─── SteamEventCard ───────────────────────────────────────────────────────────
 
-// ─── EventCard (active deal) ──────────────────────────────────────────────────
+function SteamEventCard({ event }: { event: GameEvent }) {
+  const isUpdate = event.feedLabel.toLowerCase().includes("update") ||
+                   event.feedLabel.toLowerCase().includes("patch")
 
-function EventCard({ deal, game }: { deal: PriceResult; game: Game }) {
-  const days = daysLeft(deal.savings)
   return (
     <motion.a
-      href={deal.dealLink}
+      href={event.url}
       target="_blank"
       rel="noopener noreferrer"
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0  }}
-      whileHover={{ y: -2, transition: { duration: 0.18 } }}
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      whileHover={{ y: -2, transition: { duration: 0.16 } }}
       className="block rounded-[16px] overflow-hidden relative group"
       style={{
         background:           "rgba(28,30,42,0.80)",
@@ -227,108 +225,136 @@ function EventCard({ deal, game }: { deal: PriceResult; game: Game }) {
         WebkitBackdropFilter: "blur(8px)",
       }}
     >
-      {/* Top cover strip */}
-      <div className="relative h-28 overflow-hidden">
-        {game.cover ? (
-          <img
-            src={game.cover}
-            alt={game.name}
-            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-          />
-        ) : (
-          <div style={{ background: "linear-gradient(135deg,#1c2a3a,#2a1c3a)", height: "100%" }} />
-        )}
-        <div className="absolute inset-0" style={{ background: "linear-gradient(to top, rgba(28,30,42,0.95) 0%, transparent 60%)" }} />
-
-        {/* Days left badge */}
-        <div
-          className="absolute top-3 right-3 flex items-center gap-1.5 px-2.5 py-1 rounded-full text-white text-[11px] font-bold"
-          style={{ background: "rgba(174,59,214,0.85)", backdropFilter: "blur(4px)" }}
+      {/* Feed-type badge */}
+      <div className="px-4 pt-3 pb-2 flex items-center justify-between">
+        <span
+          className="text-[9px] font-bold tracking-widest px-2 py-0.5 rounded-full"
+          style={{
+            background: isUpdate
+              ? "rgba(72,188,249,0.12)"
+              : "rgba(174,59,214,0.12)",
+            color: isUpdate ? "#48BCF9" : "#CF6EF5",
+          }}
         >
-          <Clock size={10} />
-          {days}d left
-        </div>
-
-        {/* Store icon */}
-        {deal.storeIcon && (
-          <img src={deal.storeIcon} alt={deal.storeName} className="absolute bottom-3 left-3 w-6 h-6 object-contain" />
-        )}
+          {event.feedLabel.toUpperCase()}
+        </span>
+        <span className="text-[10px] flex items-center gap-1" style={{ color: "rgba(255,255,255,0.3)" }}>
+          <Calendar size={9} />
+          {relativeTime(event.date)}
+        </span>
       </div>
 
-      {/* Body */}
-      <div className="px-4 py-3">
-        <p className="text-[9px] font-bold tracking-widest mb-1" style={{ color: "rgba(255,255,255,0.3)" }}>
-          {eventDateRange(deal.savings).toUpperCase()}
+      {/* Title */}
+      <div className="px-4 pb-2">
+        <p className="text-white font-semibold text-[13px] leading-snug line-clamp-2 group-hover:text-[#CF6EF5] transition-colors">
+          {event.title}
         </p>
-        <p className="text-white font-semibold text-sm leading-tight truncate">{game.name} — {deal.storeName}</p>
-        <p className="text-[11px] mt-0.5 truncate" style={{ color: "rgba(255,255,255,0.4)" }}>
-          {Math.round(deal.savings)}% off · Sale ends soon
-        </p>
+      </div>
 
-        <div className="flex items-center justify-between mt-3">
-          <div className="flex items-center gap-2">
-            {parseFloat(deal.normalPrice) > parseFloat(deal.salePrice) && (
-              <span className="text-[#9fa0a1] text-xs line-through">${deal.normalPrice}</span>
-            )}
-            <span className="text-white font-bold text-sm">
-              {parseFloat(deal.salePrice) === 0 ? "FREE" : `$${deal.salePrice}`}
-            </span>
-          </div>
-          <span
-            className="text-[11px] font-bold px-2 py-0.5 rounded-full"
-            style={{ background: "rgba(91,222,138,0.15)", color: "#5BDE8A" }}
-          >
-            -{Math.round(deal.savings)}%
-          </span>
+      {/* Summary excerpt */}
+      {event.summary && (
+        <div className="px-4 pb-3">
+          <p className="text-[11px] leading-relaxed line-clamp-3" style={{ color: "rgba(255,255,255,0.38)" }}>
+            {event.summary}
+          </p>
         </div>
+      )}
+
+      {/* Footer */}
+      <div
+        className="px-4 py-2.5 flex items-center justify-between"
+        style={{ borderTop: "1px solid rgba(255,255,255,0.05)" }}
+      >
+        <span className="text-[10px]" style={{ color: "rgba(255,255,255,0.3)" }}>
+          {event.author || "Steam"}
+        </span>
+        <span className="text-[10px] flex items-center gap-1" style={{ color: "rgba(174,59,214,0.7)" }}>
+          Read more <ExternalLink size={9} />
+        </span>
       </div>
     </motion.a>
   )
 }
 
-// ─── MissedCard (expired deal) ────────────────────────────────────────────────
+// ─── GiveawayRow ─────────────────────────────────────────────────────────────
 
-function MissedCard({ deal, game }: { deal: PriceResult; game: Game }) {
+function GiveawayRow({ giveaway }: { giveaway: GiveawayItem }) {
+  const hasWorth  = giveaway.worth && giveaway.worth !== "$0.00"
+  const hasExpiry = giveaway.endDate && giveaway.endDate !== "N/A"
+
   return (
-    <div
-      className="flex items-center gap-3 rounded-[14px] px-4 py-3"
+    <motion.a
+      href={giveaway.claimUrl}
+      target="_blank"
+      rel="noopener noreferrer"
+      initial={{ opacity: 0, x: 8 }}
+      animate={{ opacity: 1, x: 0 }}
+      whileHover={{ x: 2, transition: { duration: 0.15 } }}
+      className="flex items-center justify-between rounded-[14px] px-4 py-3 group"
       style={{
-        background:           "rgba(28,30,42,0.60)",
-        border:               "1px solid rgba(255,255,255,0.04)",
-        backdropFilter:       "blur(6px)",
-        WebkitBackdropFilter: "blur(6px)",
+        background:           "rgba(28,42,35,0.75)",
+        border:               "1px solid rgba(91,222,138,0.18)",
+        backdropFilter:       "blur(8px)",
+        WebkitBackdropFilter: "blur(8px)",
       }}
     >
-      {/* Cover thumb */}
-      <div className="relative flex-shrink-0 w-12 h-12 rounded-lg overflow-hidden">
-        {game.cover ? (
-          <img src={game.cover} alt={game.name} className="w-full h-full object-cover opacity-50 grayscale" />
-        ) : (
-          <div className="w-full h-12 bg-[#2a2d32]" />
-        )}
-        {deal.storeIcon && (
-          <img src={deal.storeIcon} alt={deal.storeName} className="absolute bottom-0.5 right-0.5 w-4 h-4 object-contain" />
-        )}
+      <div className="flex items-center gap-3 min-w-0">
+        {/* Gift icon bubble */}
+        <div
+          className="flex items-center justify-center flex-shrink-0 text-base"
+          style={{
+            width: 36, height: 36, borderRadius: 10,
+            background: "rgba(91,222,138,0.12)",
+            border:     "1px solid rgba(91,222,138,0.2)",
+          }}
+        >
+          🎁
+        </div>
+
+        <div className="min-w-0">
+          <p className="text-white text-[12px] font-semibold truncate leading-tight">
+            {giveaway.title}
+          </p>
+          <p className="text-[10px] truncate mt-0.5" style={{ color: "rgba(255,255,255,0.35)" }}>
+            {giveaway.platforms}
+            {hasExpiry && (
+              <span className="ml-1.5" style={{ color: "rgba(255,200,80,0.75)" }}>
+                · Ends {new Date(giveaway.endDate).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+              </span>
+            )}
+          </p>
+        </div>
       </div>
 
-      <div className="flex-1 min-w-0">
-        <p className="text-white text-[12px] font-semibold truncate">{deal.storeName}</p>
-        <p className="text-[10px] truncate" style={{ color: "rgba(255,255,255,0.35)" }}>was ${deal.normalPrice}</p>
+      <div className="flex items-center gap-2 flex-shrink-0 ml-2">
+        {hasWorth && (
+          <span className="text-[10px] line-through" style={{ color: "rgba(255,255,255,0.3)" }}>
+            {giveaway.worth}
+          </span>
+        )}
+        <span
+          className="text-[11px] font-bold px-2 py-0.5 rounded-full"
+          style={{ background: "rgba(91,222,138,0.18)", color: "#5BDE8A" }}
+        >
+          FREE
+        </span>
+        <ExternalLink size={11} className="text-[#5BDE8A] opacity-60 group-hover:opacity-100 transition-opacity" />
       </div>
-
-      <span
-        className="text-[10px] font-bold px-2 py-0.5 rounded-full flex-shrink-0"
-        style={{ background: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.3)" }}
-      >
-        Expired
-      </span>
-    </div>
+    </motion.a>
   )
 }
 
 // ─── DiscountRow ──────────────────────────────────────────────────────────────
+// Each row = one store. href goes directly to that store's page for this game.
+// For ITAD deals: direct store URL (e.g. store.steampowered.com/app/105600/).
+// For Steam fallback: direct store.steampowered.com/app/{id}/ link.
+// For CheapShark (non-Steam only): cheapshark.com/redirect?dealID=xxx.
 
-function DiscountRow({ deal }: { deal: PriceResult }) {
+function DiscountRow({ deal, isCheapest }: { deal: PriceResult; isCheapest: boolean }) {
+  const isFree    = parseFloat(deal.salePrice) === 0
+  const hasSaving = deal.savings > 0
+  const hasNormal = parseFloat(deal.normalPrice) > parseFloat(deal.salePrice)
+
   return (
     <motion.a
       href={deal.dealLink}
@@ -337,26 +363,52 @@ function DiscountRow({ deal }: { deal: PriceResult }) {
       initial={{ opacity: 0, x: 8 }}
       animate={{ opacity: 1, x: 0 }}
       whileHover={{ x: 2, transition: { duration: 0.15 } }}
-      className="flex items-center justify-between rounded-[14px] px-4 py-3 group"
+      className="flex items-center gap-3 rounded-[14px] px-4 py-3 group"
       style={{
-        background:           "rgba(28,30,42,0.70)",
-        border:               "1px solid rgba(255,255,255,0.05)",
+        background:           isCheapest
+          ? "rgba(100,117,209,0.10)"
+          : "rgba(28,30,42,0.70)",
+        border:               isCheapest
+          ? "1px solid rgba(100,117,209,0.28)"
+          : "1px solid rgba(255,255,255,0.05)",
         backdropFilter:       "blur(8px)",
         WebkitBackdropFilter: "blur(8px)",
-        transition:           "border-color 0.2s",
       }}
     >
-      <div className="flex items-center gap-3">
-        {deal.storeIcon ? (
-          <img src={deal.storeIcon} alt={deal.storeName} className="w-6 h-6 object-contain" />
-        ) : (
-          <div className="w-6 h-6 rounded bg-[#2a2d32]" />
+      {/* Store icon */}
+      {deal.storeIcon ? (
+        <img
+          src={deal.storeIcon}
+          alt={deal.storeName}
+          className="w-7 h-7 object-contain flex-shrink-0 rounded"
+        />
+      ) : (
+        <div className="w-7 h-7 rounded bg-[#2a2d32] flex-shrink-0" />
+      )}
+
+      {/* Store name + "Best Deal" badge */}
+      <div className="flex flex-col min-w-0 flex-1">
+        <div className="flex items-center gap-2">
+          <span className="text-white text-sm font-semibold truncate">{deal.storeName}</span>
+          {isCheapest && (
+            <span
+              className="text-[9px] font-bold px-1.5 py-0.5 rounded-full flex-shrink-0"
+              style={{ background: "rgba(100,117,209,0.25)", color: "#8899E8" }}
+            >
+              BEST DEAL
+            </span>
+          )}
+        </div>
+        {hasNormal && (
+          <span className="text-[10px]" style={{ color: "rgba(255,255,255,0.3)" }}>
+            Regular: ${deal.normalPrice}
+          </span>
         )}
-        <span className="text-white text-sm font-semibold">{deal.storeName}</span>
       </div>
 
-      <div className="flex items-center gap-2.5">
-        {deal.savings > 0 && (
+      {/* Price + savings + link arrow */}
+      <div className="flex items-center gap-2 flex-shrink-0 ml-auto">
+        {hasSaving && (
           <span
             className="text-[10px] font-bold px-1.5 py-0.5 rounded-full"
             style={{ background: "rgba(91,222,138,0.15)", color: "#5BDE8A" }}
@@ -364,13 +416,14 @@ function DiscountRow({ deal }: { deal: PriceResult }) {
             -{Math.round(deal.savings)}%
           </span>
         )}
-        {parseFloat(deal.normalPrice) > parseFloat(deal.salePrice) && (
-          <span className="text-[#9fa0a1] text-xs line-through">${deal.normalPrice}</span>
-        )}
-        <span className="text-white font-bold text-sm">
-          {parseFloat(deal.salePrice) === 0 ? "FREE" : `$${deal.salePrice}`}
+        <span className="text-white font-bold text-sm min-w-[48px] text-right">
+          {isFree ? "FREE" : `$${deal.salePrice}`}
         </span>
-        <ExternalLink size={12} className="text-[#9fa0a1] group-hover:text-[#AE3BD6] transition-colors" />
+        <ExternalLink
+          size={13}
+          className="transition-colors"
+          style={{ color: isCheapest ? "#8899E8" : "rgba(255,255,255,0.3)" }}
+        />
       </div>
     </motion.a>
   )
@@ -379,42 +432,66 @@ function DiscountRow({ deal }: { deal: PriceResult }) {
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function GameDetailPage() {
-  const { id }             = useParams<{ id: string }>()
-  const router             = useRouter()
-  const { user, logout }   = useAuth()
-  const isLoggedIn         = !!user
+  const { id }           = useParams<{ id: string }>()
+  const router           = useRouter()
+  const { user, logout } = useAuth()
+  const isLoggedIn       = !!user
 
-  const [game,         setGame]         = useState<Game | null>(null)
-  const [deals,        setDeals]        = useState<PriceResult[]>([])
-  const [loadingGame,  setLoadingGame]  = useState(true)
-  const [loadingDeals, setLoadingDeals] = useState(true)
-  const [tab,          setTab]          = useState<"Events" | "Discounts">("Events")
-  const [inWishlist,   setInWishlist]   = useState(false)
-  const [wishlistBusy, setWishlistBusy] = useState(false)
+  const [game,          setGame]          = useState<Game | null>(null)
+  const [deals,         setDeals]         = useState<PriceResult[]>([])
+  const [giveaways,     setGiveaways]     = useState<GiveawayItem[]>([])
+  const [events,        setEvents]        = useState<GameEvent[]>([])
+  const [loadingGame,   setLoadingGame]   = useState(true)
+  const [loadingDeals,  setLoadingDeals]  = useState(true)
+  const [loadingEvents, setLoadingEvents] = useState(true)
+  const [tab,           setTab]           = useState<"Events" | "Discounts">("Events")
+  const [inWishlist,    setInWishlist]    = useState(false)
+  const [wishlistBusy,  setWishlistBusy]  = useState(false)
 
-  // Load game + deals
+  // Stable router reference for useEffect deps
+  const routerPush = useCallback((path: string) => router.push(path), [router])
+
+  // Load game, then deals + giveaways + events in parallel
   useEffect(() => {
     if (!id) return
     setLoadingGame(true)
+    setLoadingDeals(true)
+    setLoadingEvents(true)
+
     getGameById(id)
       .then(g => {
         setGame(g)
-        setLoadingDeals(true)
-        getGameDeals(g.name)
-          .then(setDeals)
-          .catch(() => setDeals([]))
-          .finally(() => setLoadingDeals(false))
-      })
-      .catch(() => router.push("/"))
-      .finally(() => setLoadingGame(false))
-  }, [id])
 
-  // Load wishlist to check if this game is saved
+        // Deals + giveaways in parallel (both use game title / steamAppId)
+        Promise.all([
+          getGameDeals(g.name, g.steamAppId).catch(() => []),
+          getGameGiveaways(g.name).catch(() => []),
+        ]).then(([d, gv]) => {
+          setDeals(d as PriceResult[])
+          setGiveaways(gv as GiveawayItem[])
+        }).finally(() => setLoadingDeals(false))
+
+        // Events — only possible when we have a Steam AppID
+        if (g.steamAppId) {
+          getGameEvents(g.steamAppId)
+            .catch(() => [])
+            .then(ev => setEvents(ev as GameEvent[]))
+            .finally(() => setLoadingEvents(false))
+        } else {
+          setEvents([])
+          setLoadingEvents(false)
+        }
+      })
+      .catch(() => routerPush("/"))
+      .finally(() => setLoadingGame(false))
+  }, [id, routerPush])
+
+  // Check whether this game is already in the user's wishlist
   useEffect(() => {
     if (!isLoggedIn || !id) return
     getWishlist()
-      .then(list => setInWishlist(list.some((w: { gameId: string }) => w.gameId === id)))
-      .catch(() => {})
+      .then((list: { gameId: string }[]) => setInWishlist(list.some(w => w.gameId === id)))
+      .catch(() => console.warn("[Wishlist] Failed to load wishlist"))
   }, [isLoggedIn, id])
 
   const handleToggleWishlist = async () => {
@@ -429,8 +506,11 @@ export default function GameDetailPage() {
         await addToWishlist({ gameId: String(game.id), gameName: game.name, gameCover: game.cover, gameSlug: game.slug })
         setInWishlist(true)
       }
-    } catch { /* silent */ }
-    finally { setWishlistBusy(false) }
+    } catch (err) {
+      console.warn("[Wishlist] Toggle failed:", err)
+    } finally {
+      setWishlistBusy(false)
+    }
   }
 
   const handleNav = (label: string, href: string) => {
@@ -438,14 +518,15 @@ export default function GameDetailPage() {
     router.push(href)
   }
 
-  // Split deals: active (savings > 0) vs already missed (savings = 0 or at normal price)
-  const activeDeals = deals.filter(d => d.savings > 2)
-  const missedDeals = deals.filter(d => d.savings <= 2)
-  // Cheapest deal link
-  const cheapestDeal = deals.length > 0 ? deals.reduce((a, b) => parseFloat(a.salePrice) <= parseFloat(b.salePrice) ? a : b) : null
+  // Cheapest deal for the "Buy" button and cover external link
+  const cheapestDeal = deals.length > 0
+    ? deals.reduce((a, b) => parseFloat(a.salePrice) <= parseFloat(b.salePrice) ? a : b)
+    : null
+
+  // No content to show in discounts tab
+  const discountsEmpty = !loadingDeals && deals.length === 0 && giveaways.length === 0
 
   if (loadingGame) return <PageSkeleton />
-
   if (!game) return null
 
   return (
@@ -477,7 +558,7 @@ export default function GameDetailPage() {
             className="flex flex-col flex-shrink-0 overflow-y-auto"
             style={{ width: 460, scrollbarWidth: "none" }}
           >
-            {/* Back button — above the cover */}
+            {/* Back button */}
             <motion.button
               onClick={() => router.back()}
               whileHover={{ x: -3 }} whileTap={{ scale: 0.95 }}
@@ -499,31 +580,28 @@ export default function GameDetailPage() {
               <span>Back</span>
             </motion.button>
 
-            {/* Cover card — full panel width */}
+            {/* Cover card */}
             <div className="relative rounded-[10px] overflow-hidden mb-4 flex-shrink-0" style={{ height: 280 }}>
               {game.cover ? (
                 <img src={game.cover} alt={game.name} className="w-full h-full object-cover" />
               ) : (
                 <div className="w-full h-full" style={{ background: "linear-gradient(135deg,#1c2a3a,#2a1c3a)" }} />
               )}
-              {/* Gradient overlay for bottom info */}
               <div
                 className="absolute inset-0"
                 style={{ background: "linear-gradient(to top, rgba(18,19,26,0.92) 0%, rgba(18,19,26,0.3) 50%, transparent 100%)" }}
               />
 
-              {/* Top-right buttons: external link + favorite */}
+              {/* Top-right: external link + favorite */}
               <div className="absolute top-3 right-3 flex gap-2">
                 {cheapestDeal && (
                   <a
                     href={cheapestDeal.dealLink}
                     target="_blank"
                     rel="noopener noreferrer"
+                    aria-label={`Best price on ${cheapestDeal.storeName}`}
                     className="flex items-center justify-center"
-                    style={{
-                      width: 36, height: 36, borderRadius: "50%",
-                      background: "rgba(0,0,0,0.5)",
-                    }}
+                    style={{ width: 36, height: 36, borderRadius: "50%", background: "rgba(0,0,0,0.5)" }}
                   >
                     <ExternalLink size={14} className="text-[#B3BADE]" />
                   </a>
@@ -531,6 +609,7 @@ export default function GameDetailPage() {
                 <motion.button
                   onClick={handleToggleWishlist}
                   whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}
+                  aria-label={inWishlist ? "Remove from wishlist" : "Add to wishlist"}
                   className="flex items-center justify-center"
                   style={{
                     width: 36, height: 36, borderRadius: "50%",
@@ -546,7 +625,7 @@ export default function GameDetailPage() {
                 </motion.button>
               </div>
 
-              {/* Bottom: title + rating + metacritic + year */}
+              {/* Bottom: title + badges */}
               <div className="absolute bottom-0 left-0 right-0 px-4 pb-4">
                 <h1 className="text-white font-bold text-xl leading-tight mb-1">{game.name}</h1>
                 <div className="flex items-center gap-3 flex-wrap">
@@ -565,18 +644,14 @@ export default function GameDetailPage() {
               </div>
             </div>
 
-            {/* Platform pills — dark style matching Figma #2A2D32 */}
+            {/* Platform pills */}
             {game.platforms.length > 0 && (
               <div className="flex flex-wrap gap-2 mb-4">
                 {[...new Set(game.platforms.map(shortPlatform))].slice(0, 5).map(p => (
                   <span
                     key={p}
                     className="text-[11px] font-semibold px-3 py-1.5"
-                    style={{
-                      background:   "#2A2D32",
-                      color:        "#B3BADE",
-                      borderRadius: 6,
-                    }}
+                    style={{ background: "#2A2D32", color: "#B3BADE", borderRadius: 6 }}
                   >
                     {p}
                   </span>
@@ -591,7 +666,7 @@ export default function GameDetailPage() {
               </p>
             )}
 
-            {/* Friend circles — 5 colorful circles */}
+            {/* Friend circles — placeholder */}
             <div className="flex items-center gap-3 mb-4">
               <div className="flex -space-x-2">
                 {[
@@ -613,13 +688,13 @@ export default function GameDetailPage() {
               <span className="text-[12px]" style={{ color: "#9FA0A1" }}>5 friends playing</span>
             </div>
 
-            {/* Visit Store button — solid #6475D1 */}
+            {/* Buy button — links to the cheapest store page for THIS game */}
             {cheapestDeal && (
               <motion.a
                 href={cheapestDeal.dealLink}
                 target="_blank"
                 rel="noopener noreferrer"
-                whileHover={{ brightness: 1.1, scale: 1.01 } as never}
+                whileHover={{ scale: 1.01 }}
                 whileTap={{ scale: 0.98 }}
                 className="flex items-center justify-center gap-2 rounded-[12px] py-3 mb-5 text-white font-semibold text-sm"
                 style={{
@@ -635,9 +710,9 @@ export default function GameDetailPage() {
             {/* Genre pills */}
             {game.genres.length > 0 && (
               <div className="flex flex-wrap gap-1.5 mb-4">
-                {game.genres.map(g => (
+                {game.genres.map(genre => (
                   <span
-                    key={g}
+                    key={genre}
                     className="text-[11px] px-2.5 py-1 rounded-full font-medium"
                     style={{
                       background: "rgba(100,117,209,0.15)",
@@ -645,7 +720,7 @@ export default function GameDetailPage() {
                       border:     "1px solid rgba(100,117,209,0.25)",
                     }}
                   >
-                    {g}
+                    {genre}
                   </span>
                 ))}
               </div>
@@ -699,6 +774,8 @@ export default function GameDetailPage() {
             {/* Tab content */}
             <div className="flex-1 overflow-y-auto pr-1" style={{ scrollbarWidth: "none" }}>
               <AnimatePresence mode="wait">
+
+                {/* ── EVENTS TAB ── Steam news / in-game events */}
                 {tab === "Events" ? (
                   <motion.div
                     key="events"
@@ -707,43 +784,27 @@ export default function GameDetailPage() {
                     exit={{ opacity: 0, x: 10 }}
                     transition={{ duration: 0.2 }}
                   >
-                    {loadingDeals ? (
+                    {loadingEvents ? (
                       <EventsSkeleton />
-                    ) : activeDeals.length === 0 && missedDeals.length === 0 ? (
-                      <EmptyDeals />
+                    ) : events.length === 0 ? (
+                      <EmptyEvents hasSteam={!!game.steamAppId} />
                     ) : (
                       <>
-                        {/* Active events */}
-                        {activeDeals.length > 0 && (
-                          <>
-                            <p className="text-[9px] font-bold tracking-widest mb-3" style={{ color: "rgba(255,255,255,0.25)" }}>
-                              ACTIVE EVENTS
-                            </p>
-                            <div className="grid grid-cols-2 gap-3 mb-6">
-                              {activeDeals.slice(0, 6).map(deal => (
-                                <EventCard key={deal.dealID} deal={deal} game={game} />
-                              ))}
-                            </div>
-                          </>
-                        )}
-
-                        {/* Already missed */}
-                        {missedDeals.length > 0 && (
-                          <>
-                            <p className="text-[9px] font-bold tracking-widest mb-3" style={{ color: "rgba(255,255,255,0.25)" }}>
-                              ALREADY MISSED
-                            </p>
-                            <div className="flex flex-col gap-2">
-                              {missedDeals.slice(0, 4).map(deal => (
-                                <MissedCard key={deal.dealID} deal={deal} game={game} />
-                              ))}
-                            </div>
-                          </>
-                        )}
+                        <p className="text-[9px] font-bold tracking-widest mb-3" style={{ color: "rgba(255,255,255,0.25)" }}>
+                          LATEST FROM STEAM
+                        </p>
+                        <div className="flex flex-col gap-3">
+                          {events.map(ev => (
+                            <SteamEventCard key={ev.id} event={ev} />
+                          ))}
+                        </div>
                       </>
                     )}
                   </motion.div>
+
                 ) : (
+
+                  /* ── DISCOUNTS TAB ── Store prices + free giveaways */
                   <motion.div
                     key="discounts"
                     initial={{ opacity: 0, x: 10 }}
@@ -753,18 +814,47 @@ export default function GameDetailPage() {
                   >
                     {loadingDeals ? (
                       <DiscountsSkeleton />
-                    ) : deals.length === 0 ? (
-                      <EmptyDeals />
+                    ) : discountsEmpty ? (
+                      <EmptyDiscounts />
                     ) : (
                       <>
-                        <p className="text-[9px] font-bold tracking-widest mb-3" style={{ color: "rgba(255,255,255,0.25)" }}>
-                          BEST PRICES RIGHT NOW
-                        </p>
-                        <div className="flex flex-col gap-2">
-                          {deals.map(deal => (
-                            <DiscountRow key={deal.dealID} deal={deal} />
-                          ))}
-                        </div>
+                        {/* Store deals — sorted cheapest first, best deal highlighted */}
+                        {deals.length > 0 && (
+                          <>
+                            <p
+                              className="text-[9px] font-bold tracking-widest mb-3"
+                              style={{ color: "rgba(255,255,255,0.25)" }}
+                            >
+                              WHERE TO BUY · {deals.length} STORE{deals.length > 1 ? "S" : ""}
+                            </p>
+                            <div className="flex flex-col gap-2 mb-5">
+                              {deals.map((deal, i) => (
+                                <DiscountRow
+                                  key={`${deal.storeID}-${deal.dealID}`}
+                                  deal={deal}
+                                  isCheapest={i === 0}
+                                />
+                              ))}
+                            </div>
+                          </>
+                        )}
+
+                        {/* 🎁 Giveaways — shown below store deals */}
+                        {giveaways.length > 0 && (
+                          <>
+                            <p
+                              className="text-[9px] font-bold tracking-widest mb-3"
+                              style={{ color: "#5BDE8A" }}
+                            >
+                              🎁 FREE GIVEAWAYS
+                            </p>
+                            <div className="flex flex-col gap-2">
+                              {giveaways.map(gv => (
+                                <GiveawayRow key={gv.id} giveaway={gv} />
+                              ))}
+                            </div>
+                          </>
+                        )}
                       </>
                     )}
                   </motion.div>
@@ -779,13 +869,13 @@ export default function GameDetailPage() {
   )
 }
 
-// ─── Skeletons ────────────────────────────────────────────────────────────────
+// ─── Skeletons & Empty States ─────────────────────────────────────────────────
 
 function EventsSkeleton() {
   return (
-    <div className="grid grid-cols-2 gap-3">
+    <div className="flex flex-col gap-3">
       {[...Array(4)].map((_, i) => (
-        <div key={i} className="h-52 rounded-[16px] bg-[#1c1e2a] animate-pulse" />
+        <div key={i} className="h-36 rounded-[16px] bg-[#1c1e2a] animate-pulse" />
       ))}
     </div>
   )
@@ -801,16 +891,33 @@ function DiscountsSkeleton() {
   )
 }
 
-function EmptyDeals() {
+function EmptyEvents({ hasSteam }: { hasSteam: boolean }) {
+  return (
+    <div
+      className="rounded-[16px] p-8 text-center"
+      style={{ background: "rgba(28,30,42,0.60)", border: "1px solid rgba(255,255,255,0.05)" }}
+    >
+      <Zap size={28} className="mx-auto mb-3 opacity-30 text-white" />
+      <p className="text-white font-semibold text-sm mb-1">No events right now</p>
+      <p className="text-[12px]" style={{ color: "rgba(255,255,255,0.35)" }}>
+        {hasSteam
+          ? "This game has no recent news or events on Steam."
+          : "In-game events are only available for Steam titles."}
+      </p>
+    </div>
+  )
+}
+
+function EmptyDiscounts() {
   return (
     <div
       className="rounded-[16px] p-8 text-center"
       style={{ background: "rgba(28,30,42,0.60)", border: "1px solid rgba(255,255,255,0.05)" }}
     >
       <Tag size={28} className="mx-auto mb-3 opacity-30 text-white" />
-      <p className="text-white font-semibold text-sm mb-1">No deals found</p>
+      <p className="text-white font-semibold text-sm mb-1">No discounts found</p>
       <p className="text-[12px]" style={{ color: "rgba(255,255,255,0.35)" }}>
-        This game may be console-exclusive or not tracked by CheapShark yet.
+        This game may be console-exclusive or not currently on sale.
       </p>
     </div>
   )
@@ -828,8 +935,8 @@ function PageSkeleton() {
         </div>
         <div className="flex-1 flex flex-col gap-3">
           <div className="h-10 w-48 rounded-[12px] bg-[#1c1e2a] animate-pulse" />
-          <div className="grid grid-cols-2 gap-3">
-            {[...Array(4)].map((_, i) => <div key={i} className="h-52 rounded-[16px] bg-[#1c1e2a] animate-pulse" />)}
+          <div className="flex flex-col gap-3">
+            {[...Array(4)].map((_, i) => <div key={i} className="h-36 rounded-[16px] bg-[#1c1e2a] animate-pulse" />)}
           </div>
         </div>
       </div>
