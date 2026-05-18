@@ -23,8 +23,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body className={`${nunito.variable} font-sans antialiased bg-[#12131a] text-white`}>
         <AuthProvider>
           <WishlistProvider>
-            {/* Mobile-first: max 390px centered — matches Figma design */}
-            <div className="min-h-screen max-w-[390px] mx-auto relative overflow-x-hidden">
+            <div className="min-h-screen">
               {children}
             </div>
             <ToastContainer

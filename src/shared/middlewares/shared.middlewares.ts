@@ -2,8 +2,6 @@ import jwt from "jsonwebtoken"
 import dotenv from "dotenv"
 import userModel from "../../featchers/users/User.model.js"
 import { NextFunction, Request, Response } from "express"
-import { string } from "joi"
-
 
 dotenv.config()
 
@@ -28,13 +26,11 @@ export const authMiddleware = async (req: Request, res: Response, next: NextFunc
         next();
 
     } catch (error) {
-        // אם הטוקן לא תקין או פג תוקף
-        res.status(403).json({
+        res.status(401).json({
             status: "401",
             message: "Invalid or Expired Token",
-            data: (error as Error).message
+            data: null
         })
-
     }
 }
 

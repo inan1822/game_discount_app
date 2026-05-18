@@ -49,6 +49,10 @@ export const verifyEmailService = async ({ email, code }: { email: string, code:
         throw new AppError("User not found", 404)
     }
 
+    if (user.sendVerificationCodeExpiry && user.sendVerificationCodeExpiry < new Date()) {
+        throw new AppError("Verification code has expired", 400)
+    }
+
     if (user.sendVerificationCode !== code) {
         throw new AppError("Invalid code", 400)
     }
@@ -145,6 +149,20 @@ export const getMeService = async (userId: string) => {
     return user
 }
 
+
+export const resendVerificationService = async (email: string) => {
+    const user = await userModel.findOne({ email })
+    if (!user) throw new AppError("User not found", 404)
+    if (user.isVerified) throw new AppError("Email already verified", 400)
+
+    const code = generateCode()
+    user.sendVerificationCode = code
+    user.sendVerificationCodeExpiry = new Date(Date.now() + 24 * 60 * 60 * 1000)
+    await user.save()
+
+    await sendVerificationEmail(email, code)
+    return { message: "Verification email resent" }
+}
 
 export const requestPasswordResetService = async (email: string) => {
     const user = await userModel.findOne({ email })

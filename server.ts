@@ -1,18 +1,16 @@
+import "dotenv/config"
 import express from "express"
 import authRouter from "./src/featchers/auth/auth.routes.js"
 import userRouter from "./src/featchers/users/users.routes.js"
 import gamesRouter from "./src/featchers/games/games.routes.js"
 import wishlistRouter from "./src/featchers/wishlist/wishlist.routes.js"
 import mongoConnect from "./src/config/db.js"
-import dotenv from "dotenv"
 import rateLimit from "express-rate-limit"
 import cors from "cors"
 import helmet from "helmet"
 import hpp from "hpp"
 import errorHandler from "./src/shared/middlewares/errorHandler.js"
 import morgan from "morgan"
-
-dotenv.config()
 
 const app = express()
 
@@ -38,7 +36,7 @@ app.use(cors({
     credentials: true
 }))
 
-app.use(express.json())
+app.use(express.json({ limit: "10kb" }))
 
 app.use(hpp({
     checkQuery: true,
@@ -78,6 +76,10 @@ app.use("/api/v1/wishlist", globalLimiter, wishlistRouter)
 
 app.get("/", (_req, res) => {
     res.status(200).json({ status: "ok", message: "DisLow API is running" })
+})
+
+app.use((_req, res) => {
+    res.status(404).json({ status: "404", message: "Route not found", data: null })
 })
 
 app.use(errorHandler)

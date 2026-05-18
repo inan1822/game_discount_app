@@ -3,8 +3,7 @@ import joi from "joi"
 export const registerSchema = joi.object({
     name: joi.string().min(2).max(40).required(),
     email: joi.string().email().required(),
-    password: joi.string().min(8).required(),
-    role: joi.string().valid("customer", "admin").default("customer")
+    password: joi.string().min(8).required()
 }).options({ stripUnknown: true })
 
 export const loginSchema = joi.object({

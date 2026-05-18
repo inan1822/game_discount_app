@@ -1,6 +1,5 @@
 import mongoose from "mongoose"
 import dotenv from "dotenv"
-import { promises } from "nodemailer/lib/xoauth2/index.js"
 
 dotenv.config()
 

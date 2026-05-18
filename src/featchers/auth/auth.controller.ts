@@ -1,6 +1,7 @@
 import {
     registerService,
     verifyEmailService,
+    resendVerificationService,
     loginService,
     verifyTwoFactorService,
     logoutService,
@@ -43,6 +44,16 @@ export const verifyEmail = async (req: Request, res: Response): Promise<void> =>
             message,
             data: null
         })
+    }
+}
+
+export const resendVerification = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const result = await resendVerificationService(req.body.email)
+        res.status(200).json({ status: "200", message: result.message, data: null })
+    } catch (error) {
+        const { status, message } = getErrorInfo(error)
+        res.status(status).json({ status: String(status), message, data: null })
     }
 }
 
@@ -129,7 +140,7 @@ export const getMe = async (req: Request, res: Response) => {
 
 export const requestPasswordReset = async (req: Request, res: Response) => {
     try {
-        const result = await requestPasswordResetService(req.body)
+        const result = await requestPasswordResetService(req.body.email)
         res.status(200).json(result)
     } catch (error) {
         const { status, message } = getErrorInfo(error)

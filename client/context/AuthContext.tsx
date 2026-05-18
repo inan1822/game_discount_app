@@ -8,8 +8,10 @@ interface AuthContextType {
   user: User | null
   token: string | null
   isLoading: boolean
+  isGuest: boolean
   login: (email: string, password: string) => Promise<void>
   register: (name: string, email: string, password: string) => Promise<void>
+  loginAsGuest: () => void
   logout: () => void
   isAuthenticated: boolean
 }
@@ -20,6 +22,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null)
   const [token, setToken] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const [isGuest, setIsGuest] = useState(false)
 
   // Restore session on mount
   useEffect(() => {
@@ -28,6 +31,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setToken(savedToken)
       fetchMe()
     } else {
+      const guest = localStorage.getItem("dislow_guest") === "true"
+      setIsGuest(guest)
       setIsLoading(false)
     }
   }, [])
@@ -56,11 +61,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     // After register, user needs to verify email before logging in
   }
 
+  const loginAsGuest = () => {
+    localStorage.setItem("dislow_guest", "true")
+    setIsGuest(true)
+  }
+
   const logout = () => {
     localStorage.removeItem("dislow_token")
     localStorage.removeItem("dislow_user")
+    localStorage.removeItem("dislow_guest")
     setUser(null)
     setToken(null)
+    setIsGuest(false)
   }
 
   return (
@@ -68,8 +80,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       user,
       token,
       isLoading,
+      isGuest,
       login,
       register,
+      loginAsGuest,
       logout,
       isAuthenticated: !!user
     }}>

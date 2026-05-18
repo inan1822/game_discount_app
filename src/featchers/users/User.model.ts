@@ -9,6 +9,10 @@ export interface IUser extends mongoose.Document {
     password: string
     token: string | null
     isVerified: boolean
+    avatar?: string
+    discordId?: string
+    steamId?: string
+    googleId?: string
     sendVerificationCode?: string
     sendVerificationCodeExpiry?: Date
     twoFactorCode?: string
@@ -53,6 +57,10 @@ const userSchema = new mongoose.Schema<IUser>({
     twoFactorExpiry: Date,
     resetPasswordToken: String,
     resetPasswordExpiry: Date,
+    avatar: { type: String },
+    discordId: { type: String, sparse: true, index: true },
+    steamId:   { type: String, sparse: true, index: true },
+    googleId:  { type: String, sparse: true, index: true },
     role: {
         type: String,
         enum: ["user", "admin"],

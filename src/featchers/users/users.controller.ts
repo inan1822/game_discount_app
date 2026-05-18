@@ -48,14 +48,14 @@ export const deleteUser = async (req: Request, res: Response) => {
 
 export const deleteMyUser = async (req: Request, res: Response) => {
     try {
-        const user = await userModel.findById(req.params.id).select("+password")
+        const user = await userModel.findById(req.user!.id).select("+password")
         if (!user) return res.status(404).json({ status: "404", message: "User not found", data: null })
 
         const isPasswordCorrect = await bcrypt.compare(req.body.password, user.password)
         if (!isPasswordCorrect) return res.status(401).json({ status: "401", message: "Incorrect password", data: null })
 
-        await WishlistModel.deleteMany({ userId: req.params.id })
-        await userModel.findByIdAndDelete(req.params.id)
+        await WishlistModel.deleteMany({ userId: req.user!.id })
+        await userModel.findByIdAndDelete(req.user!.id)
 
         res.status(200).json({ status: "200", message: "Account deleted", data: null })
     } catch (error) {
@@ -67,7 +67,7 @@ export const deleteMyUser = async (req: Request, res: Response) => {
 export const updateUser = async (req: Request, res: Response) => {
     try {
         const { name, email, currentPassword, newPassword } = req.body
-        const user = await userModel.findById(req.params.id).select("+password")
+        const user = await userModel.findById(req.user!.id).select("+password")
         if (!user) return res.status(404).json({ status: "404", message: "User not found", data: null })
 
         if (email || newPassword) {
