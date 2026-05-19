@@ -11,8 +11,7 @@ declare global {
             api_key: string
             api_secret: string
             RAWG_API: string
-            ITAD_CLIENT_ID: string
-            ITAD_CLIENT_SECRET: string
+            ITAD_API_KEY: string
         }
     }
 }

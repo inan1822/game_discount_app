@@ -1,9 +1,19 @@
 import { register, login, verifyEmail, resendVerification, verifyTwoFactor, requestPasswordReset, resetPassword, getMe, logout } from "./auth.controller.js"
 import { discordRedirect, discordCallbackHandler, googleRedirect, googleCallbackHandler, steamRedirect, steamCallbackHandler } from "./oauth.controller.js"
 import { Router } from "express"
+import rateLimit from "express-rate-limit"
 import { authMiddleware } from "../../shared/middlewares/shared.middlewares.js"
 import { validateRequest } from "../../shared/middlewares/validateRequst.js"
 import { registerSchema, loginSchema, verifyEmailSchema, verifyTwoFactorSchema, requestPasswordResetSchema, resetPasswordSchema } from "../../shared/validators/auth.schemas.js"
+
+// Strict limiter applied only to credential/token endpoints (login, 2FA, password reset)
+const strictAuthLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,  // 15-minute window
+    limit: 5,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { status: "429", message: "Too many attempts, please try again later", data: null }
+})
 
 const authRouter: Router = Router()
 
@@ -11,10 +21,10 @@ const authRouter: Router = Router()
 authRouter.post("/register", validateRequest(registerSchema, "body"), register)
 authRouter.post("/verify", validateRequest(verifyEmailSchema, "body"), verifyEmail)
 authRouter.post("/resend-verify", validateRequest(requestPasswordResetSchema, "body"), resendVerification)
-authRouter.post("/login", validateRequest(loginSchema, "body"), login)
-authRouter.post("/admin", validateRequest(verifyTwoFactorSchema, "body"), verifyTwoFactor)
-authRouter.post("/request-password-reset", validateRequest(requestPasswordResetSchema, "body"), requestPasswordReset)
-authRouter.post("/reset-password", validateRequest(resetPasswordSchema, "body"), resetPassword)
+authRouter.post("/login", strictAuthLimiter, validateRequest(loginSchema, "body"), login)
+authRouter.post("/admin", strictAuthLimiter, validateRequest(verifyTwoFactorSchema, "body"), verifyTwoFactor)
+authRouter.post("/request-password-reset", strictAuthLimiter, validateRequest(requestPasswordResetSchema, "body"), requestPasswordReset)
+authRouter.post("/reset-password", strictAuthLimiter, validateRequest(resetPasswordSchema, "body"), resetPassword)
 authRouter.post("/logout", authMiddleware, logout)
 authRouter.get("/me", authMiddleware, getMe)
 

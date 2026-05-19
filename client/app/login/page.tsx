@@ -81,6 +81,12 @@ export default function LoginPage() {
   const router = useRouter()
   const { login, loginAsGuest } = useAuth()
 
+  // If middleware redirected here from a protected page, go back there after login
+  const searchParams = typeof window !== "undefined"
+    ? new URLSearchParams(window.location.search)
+    : null
+  const returnTo = searchParams?.get("from") ?? "/"
+
   // SSR gets the fixed order; after hydration we shuffle (avoids mismatch)
   const [galleryItems, setGalleryItems] = useState<GalleryItem[]>(
     COVERS.map(url => ({ common: "", binomial: "", photo: { url, text: "", by: "", pos: "center" } }))
@@ -102,7 +108,7 @@ export default function LoginPage() {
     try {
       await login(form.email, form.password)
       toast.success("Welcome back! 🎮")
-      router.push("/")
+      router.push(returnTo)
     } catch (err: any) {
       toast.error(err?.response?.data?.message ?? "Login failed")
     } finally {
@@ -272,7 +278,7 @@ export default function LoginPage() {
             <motion.div className="text-center mt-3" {...fadeUp(0.97)}>
               <button
                 type="button"
-                onClick={() => { loginAsGuest(); router.push("/") }}
+                onClick={() => { loginAsGuest(); router.push("/") /* guests go home, not protected pages */ }}
                 className="text-xs transition-colors hover:text-white"
                 style={{ color: "rgba(255,255,255,0.35)" }}
               >

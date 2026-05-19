@@ -7,8 +7,6 @@ import {
     getNewGamesService,
     getTrendedGamesService,
     getForYouService,
-    getTrendingGamesService,
-    getGamesByGenreService,
     getGamePriceService,
     getGameDealsService,
     getFreeToPlayService,
@@ -251,12 +249,14 @@ export const getGameGiveaways = async (req: Request, res: Response): Promise<voi
     }
 }
 
-// ─── Legacy handlers (kept for backward compat) ───────────────────────────────
+// ─── Legacy handlers — delegate to the current services ──────────────────────
 
-export const getTrendingGames = async (_req: Request, res: Response): Promise<void> => {
+export const getTrendingGames = async (req: Request, res: Response): Promise<void> => {
+    console.warn("[API] Deprecated endpoint /trending — use /popular instead")
+    const pageRaw = Number(req.query.page)
+    const page    = Number.isInteger(pageRaw) && pageRaw >= 1 ? pageRaw : 1
     try {
-        console.warn("[API] Deprecated endpoint /trending called — use /popular instead")
-        const games = await getTrendingGamesService()
+        const games = await getPopularGamesService(page)
         res.status(200).json({ status: "200", message: "OK", data: games })
     } catch (error) {
         const { status, message } = getErrorInfo(error)
@@ -265,12 +265,12 @@ export const getTrendingGames = async (_req: Request, res: Response): Promise<vo
 }
 
 export const getGamesByGenre = async (req: Request, res: Response): Promise<void> => {
+    console.warn("[API] Deprecated endpoint /genre — use /by-genre instead")
+    const genre   = getString(req.query.genre)
+    const pageRaw = Number(req.query.page)
+    const page    = Number.isInteger(pageRaw) && pageRaw >= 1 ? pageRaw : 1
     try {
-        console.warn("[API] Deprecated endpoint /genre called — use /by-genre instead")
-        const genre   = getString(req.query.genre)
-        const pageRaw = Number(req.query.page)
-        const page    = Number.isInteger(pageRaw) && pageRaw >= 1 ? pageRaw : 1
-        const games = await getGamesByGenreService(genre, page)
+        const games = await getByGenreService(genre, page)
         res.status(200).json({ status: "200", message: "OK", data: games })
     } catch (error) {
         const { status, message } = getErrorInfo(error)

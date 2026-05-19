@@ -5,15 +5,24 @@ import { NextFunction, Request, Response } from "express"
 
 dotenv.config()
 
+/** Read the JWT from the httpOnly cookie, with a fallback to Bearer header. */
+function extractToken(req: Request): string | undefined {
+    const cookieHeader = req.headers.cookie
+    if (cookieHeader) {
+        const pair = cookieHeader.split(";").map(c => c.trim()).find(c => c.startsWith("dislow_token="))
+        if (pair) return decodeURIComponent(pair.split("=").slice(1).join("="))
+    }
+    return req.headers.authorization?.split(" ")[1]
+}
+
 export const authMiddleware = async (req: Request, res: Response, next: NextFunction): Promise<void | Response | NextFunction | Request> => {
     try {
-        const authHeader = req.headers.authorization
-        const inputToken = authHeader?.split(" ")[1]
+        const inputToken = extractToken(req)
         if (!inputToken) {
             return res.status(401).json({
                 status: "401",
                 message: "Access Denied: No Token Provided"
-            });
+            })
         }
 
         const decoded = jwt.verify(inputToken, process.env.JWT_SECRET!) as { id: string, role: string }

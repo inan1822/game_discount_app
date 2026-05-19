@@ -1,17 +1,22 @@
 import bcrypt from "bcrypt"
+import crypto from "crypto"
 import jwt from "jsonwebtoken"
 import userModel from "../users/User.model.js"
 import {
     sendVerificationEmail,
     sendResetPasswordEmail
 } from "../../shared/utils/mailer.js"
-
-
 import { AppError } from "../../shared/utils/AppError.js"
+import mongoose from "mongoose"
 
-const generateCode = () => {
-    return Math.floor(100000 + Math.random() * 900000).toString()
+const generateCode = () => crypto.randomInt(100000, 1000000).toString()
+
+// SHA-256 one-way hash for OTP/reset codes stored in DB.
+// We email the plain code, store only the hash — breach-safe.
+function hashCode(code: string): string {
+    return crypto.createHash("sha256").update(code).digest("hex")
 }
+
 interface TwoFactorResponse {
     requiresTwoFactor: true
 }
@@ -19,8 +24,12 @@ interface TwoFactorResponse {
 interface LoginResponse {
     requiresTwoFactor: false
     token: string
-    userID: any
+    userID: mongoose.Types.ObjectId
 }
+
+// Properly-formed bcrypt hash (correct length) used as a timing-attack dummy
+// when a login email is not found — keeps response time constant.
+const DUMMY_HASH = "$2b$12$aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 export const registerService = async ({ name, email, password }: { name: string, email: string, password: string }) => {
     const existingUser = await userModel.findOne({ email })
     if (existingUser) {
@@ -33,7 +42,7 @@ export const registerService = async ({ name, email, password }: { name: string,
         name,
         email,
         password,
-        sendVerificationCode: code,
+        sendVerificationCode: hashCode(code),       // store hash, email plain code
         sendVerificationCodeExpiry: Date.now() + 24 * 60 * 60 * 1000
     })
 
@@ -44,7 +53,9 @@ export const registerService = async ({ name, email, password }: { name: string,
 
 
 export const verifyEmailService = async ({ email, code }: { email: string, code: string }): Promise<string> => {
-    const user = await userModel.findOne({ email })
+    const user = await userModel
+        .findOne({ email })
+        .select("+sendVerificationCode +sendVerificationCodeExpiry")
     if (!user) {
         throw new AppError("User not found", 404)
     }
@@ -53,7 +64,7 @@ export const verifyEmailService = async ({ email, code }: { email: string, code:
         throw new AppError("Verification code has expired", 400)
     }
 
-    if (user.sendVerificationCode !== code) {
+    if (user.sendVerificationCode !== hashCode(code)) {
         throw new AppError("Invalid code", 400)
     }
 
@@ -63,10 +74,6 @@ export const verifyEmailService = async ({ email, code }: { email: string, code:
 
     return "Email verified successfully"
 }
-
-// Pre-computed dummy hash — used to keep response time constant when user is not found.
-// Prevents timing attacks that reveal whether an email exists in the DB.
-const DUMMY_HASH = "$2b$12$invalidhashpadding00000000000000000000000000000000000000"
 
 export const loginService = async ({ email, password }: { email: string, password: string }): Promise<TwoFactorResponse | LoginResponse> => {
     const user = await userModel.findOne({ email }).select("+password")
@@ -87,7 +94,7 @@ export const loginService = async ({ email, password }: { email: string, passwor
     // admin needs 2FA
     if (user.role === "admin") {
         const code = generateCode()
-        user.twoFactorCode = code
+        user.twoFactorCode = hashCode(code)         // store hash, email plain code
         user.twoFactorExpiry = new Date(Date.now() + 10 * 60 * 1000)
         await user.save()
         await sendVerificationEmail(email, code)
@@ -114,11 +121,13 @@ export const loginService = async ({ email, password }: { email: string, passwor
 
 
 export const verifyTwoFactorService = async ({ email, code }: { email: string, code: string }) => {
-    const user = await userModel.findOne({
-        email,
-        twoFactorCode: code,
-        twoFactorExpiry: { $gt: Date.now() }
-    })
+    const user = await userModel
+        .findOne({
+            email,
+            twoFactorCode: hashCode(code),          // compare against stored hash
+            twoFactorExpiry: { $gt: Date.now() }
+        })
+        .select("+twoFactorCode +twoFactorExpiry")
 
     if (!user) {
         throw new AppError("Invalid or expired code", 400)
@@ -157,11 +166,12 @@ export const getMeService = async (userId: string) => {
 
 export const resendVerificationService = async (email: string) => {
     const user = await userModel.findOne({ email })
-    if (!user) throw new AppError("User not found", 404)
+    // Anti-enumeration: always return success whether the email exists or not
+    if (!user) return { message: "Verification email resent" }
     if (user.isVerified) throw new AppError("Email already verified", 400)
 
     const code = generateCode()
-    user.sendVerificationCode = code
+    user.sendVerificationCode = hashCode(code)      // store hash, email plain code
     user.sendVerificationCodeExpiry = new Date(Date.now() + 24 * 60 * 60 * 1000)
     await user.save()
 
@@ -171,26 +181,27 @@ export const resendVerificationService = async (email: string) => {
 
 export const requestPasswordResetService = async (email: string) => {
     const user = await userModel.findOne({ email })
-    if (!user) {
-        throw new AppError("User not found", 404)
-    }
+    // Anti-enumeration: always return the same vague response
+    if (!user) return { message: "If that email is registered, a reset link was sent" }
 
     const resetToken = generateCode()
-    user.resetPasswordToken = resetToken
+    user.resetPasswordToken = hashCode(resetToken)  // store hash, email plain token
     user.resetPasswordExpiry = new Date(Date.now() + 60 * 60 * 1000)
     await user.save()
 
     await sendResetPasswordEmail(email, resetToken)
 
-    return { message: "Password reset email sent" }
+    return { message: "If that email is registered, a reset link was sent" }
 }
 
 
 export const resetPasswordService = async ({ token, newPassword }: { token: string, newPassword: string }) => {
-    const user = await userModel.findOne({
-        resetPasswordToken: token,
-        resetPasswordExpiry: { $gt: Date.now() }
-    })
+    const user = await userModel
+        .findOne({
+            resetPasswordToken: hashCode(token),    // compare against stored hash
+            resetPasswordExpiry: { $gt: Date.now() }
+        })
+        .select("+resetPasswordToken +resetPasswordExpiry")
 
     if (!user) {
         throw new AppError("Invalid or expired token", 400)

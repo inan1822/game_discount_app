@@ -1,18 +1,17 @@
 "use client"
 
-import { createContext, useContext, useState, useEffect, ReactNode } from "react"
+import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from "react"
 import api from "@/lib/api/axios"
 import type { User } from "@/types/user"
 
 interface AuthContextType {
   user: User | null
-  token: string | null
   isLoading: boolean
   isGuest: boolean
   login: (email: string, password: string) => Promise<void>
   register: (name: string, email: string, password: string) => Promise<void>
   loginAsGuest: () => void
-  logout: () => void
+  logout: () => Promise<void>
   isAuthenticated: boolean
 }
 
@@ -20,65 +19,59 @@ const AuthContext = createContext<AuthContextType | null>(null)
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null)
-  const [token, setToken] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [isGuest, setIsGuest] = useState(false)
 
-  // Restore session on mount
-  useEffect(() => {
-    const savedToken = localStorage.getItem("dislow_token")
-    if (savedToken) {
-      setToken(savedToken)
-      fetchMe()
-    } else {
-      const guest = localStorage.getItem("dislow_guest") === "true"
-      setIsGuest(guest)
-      setIsLoading(false)
-    }
-  }, [])
-
-  const fetchMe = async () => {
+  // fetchMe wrapped in useCallback so it's stable across renders
+  const fetchMe = useCallback(async () => {
     try {
       const { data } = await api.get("/auth/me")
       setUser(data.data)
     } catch {
-      logout()
+      setUser(null)
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [])
 
-  const login = async (email: string, password: string) => {
-    const { data } = await api.post("/auth/login", { email, password })
-    const { token: newToken } = data.data
-    localStorage.setItem("dislow_token", newToken)
-    setToken(newToken)
+  // Restore session on mount — the httpOnly cookie is sent automatically
+  useEffect(() => {
+    const guest = localStorage.getItem("dislow_guest") === "true"
+    setIsGuest(guest)
+    fetchMe()
+  }, [fetchMe])
+
+  const login = useCallback(async (email: string, password: string) => {
+    await api.post("/auth/login", { email, password })
+    // Server sets the httpOnly cookie; just fetch the user profile
     await fetchMe()
-  }
+  }, [fetchMe])
 
-  const register = async (name: string, email: string, password: string) => {
+  const register = useCallback(async (name: string, email: string, password: string) => {
     await api.post("/auth/register", { name, email, password })
-    // After register, user needs to verify email before logging in
-  }
+    // After register the user must verify email before logging in
+  }, [])
 
-  const loginAsGuest = () => {
+  const loginAsGuest = useCallback(() => {
     localStorage.setItem("dislow_guest", "true")
     setIsGuest(true)
-  }
+  }, [])
 
-  const logout = () => {
-    localStorage.removeItem("dislow_token")
-    localStorage.removeItem("dislow_user")
+  const logout = useCallback(async () => {
+    try {
+      // Ask the server to clear the DB token and the httpOnly cookie
+      await api.post("/auth/logout")
+    } catch {
+      // Ignore — proceed with local cleanup regardless
+    }
     localStorage.removeItem("dislow_guest")
     setUser(null)
-    setToken(null)
     setIsGuest(false)
-  }
+  }, [])
 
   return (
     <AuthContext.Provider value={{
       user,
-      token,
       isLoading,
       isGuest,
       login,

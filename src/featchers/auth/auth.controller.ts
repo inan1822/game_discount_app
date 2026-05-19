@@ -12,6 +12,16 @@ import {
 import { Request, Response } from "express"
 import { getErrorInfo } from "../../shared/utils/AppError.js"
 
+/** Write the JWT into an httpOnly cookie so JS can never read it. */
+function setAuthCookie(res: Response, token: string): void {
+    res.cookie("dislow_token", token, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "lax",
+        maxAge: 2 * 60 * 60 * 1000,  // 2 h — matches JWT expiry
+    })
+}
+
 
 export const register = async (req: Request, res: Response): Promise<void> => {
     try {
@@ -57,54 +67,42 @@ export const resendVerification = async (req: Request, res: Response): Promise<v
     }
 }
 
-export const login = async (req: Request, res: Response) => {
+export const login = async (req: Request, res: Response): Promise<void> => {
     try {
         const result = await loginService(req.body)
 
         if (result.requiresTwoFactor) {
-            return res.status(200).json({
-                message: "2FA code sent to your email"
-            })
+            res.status(200).json({ message: "2FA code sent to your email" })
+            return
         }
 
+        setAuthCookie(res, result.token)
         res.status(200).json({
             status: "200",
             message: "Logged in",
-            data: {
-                token: result.token,
-                userID: result.userID
-            }
+            data: { userID: result.userID }
         })
     } catch (error) {
         const { status, message } = getErrorInfo(error)
-        res.status(status).json({
-            status: String(status),
-            message,
-            data: null
-        })
+        res.status(status).json({ status: String(status), message, data: null })
     }
 }
 
-export const verifyTwoFactor = async (req: Request, res: Response) => {
+export const verifyTwoFactor = async (req: Request, res: Response): Promise<void> => {
     try {
         const result = await verifyTwoFactorService(req.body)
-        res.status(200).json({
-            message: "Login successful as admin",
-            token: result.token
-        })
+        setAuthCookie(res, result.token)
+        res.status(200).json({ message: "Login successful as admin" })
     } catch (error) {
         const { status, message } = getErrorInfo(error)
-        res.status(status).json({
-            status: String(status),
-            message,
-            data: null
-        })
+        res.status(status).json({ status: String(status), message, data: null })
     }
 }
 
-export const logout = async (req: Request, res: Response) => {
+export const logout = async (req: Request, res: Response): Promise<void> => {
     try {
         await logoutService(req.user!.id)
+        res.clearCookie("dislow_token")
         res.status(200).json({
             status: "200",
             message: "Logged out successfully",
@@ -122,7 +120,7 @@ export const logout = async (req: Request, res: Response) => {
 
 export const getMe = async (req: Request, res: Response) => {
     try {
-        const user = await getMeService((req as any).user.id)
+        const user = await getMeService(req.user!.id)
         res.status(200).json({
             status: "200",
             message: "User fetched successfully",

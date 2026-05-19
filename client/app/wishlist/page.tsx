@@ -3,34 +3,13 @@
 import { useRouter } from "next/navigation"
 import { ArrowLeft, Heart } from "lucide-react"
 import { useWishlist } from "@/context/WishlistContext"
-import { useAuth } from "@/context/AuthContext"
 import BottomNav from "@/components/layout/BottomNav"
-import Link from "next/link"
 
+// No manual auth check needed — middleware.ts redirects guests to /login
+// before this component ever renders.
 export default function WishlistPage() {
   const router = useRouter()
-  const { isAuthenticated } = useAuth()
   const { items, toggle, isLoading } = useWishlist()
-
-  if (!isAuthenticated) {
-    return (
-      <div className="min-h-screen flex flex-col items-center justify-center px-6 pb-24">
-        <Heart size={48} className="text-[#AE3BD6] mb-4" />
-        <h2 className="text-white font-bold text-xl mb-2">Sign in to view wishlist</h2>
-        <p className="text-[#9fa0a1] text-sm text-center mb-6">
-          Save your favourite games and track their prices
-        </p>
-        <Link
-          href="/login"
-          className="px-8 py-3 rounded-full font-bold text-white glow-purple"
-          style={{ background: "linear-gradient(135deg, #AE3BD6, #6475D1)" }}
-        >
-          Sign In
-        </Link>
-        <BottomNav />
-      </div>
-    )
-  }
 
   return (
     <div className="relative pb-24 min-h-screen">

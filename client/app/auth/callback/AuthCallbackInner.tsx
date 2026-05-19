@@ -14,14 +14,14 @@ export default function AuthCallbackInner() {
   const searchParams = useSearchParams()
 
   useEffect(() => {
-    const token = searchParams.get("token")
     const error = searchParams.get("error")
 
-    if (token) {
-      localStorage.setItem("dislow_token", token)
+    if (!error) {
+      // Cookie was set by the server on the redirect — just go home.
+      // AuthContext will call /auth/me and populate the user on mount.
       toast.success("Logged in! 🎮")
       router.replace("/")
-    } else if (error) {
+    } else {
       const messages: Record<string, string> = {
         discord_denied: "Discord login was cancelled.",
         discord_failed: "Discord login failed. Try again.",
@@ -31,8 +31,6 @@ export default function AuthCallbackInner() {
         google_failed:  "Google login failed. Try again.",
       }
       toast.error(messages[error] ?? "Login failed. Try again.")
-      router.replace("/login")
-    } else {
       router.replace("/login")
     }
   }, [])

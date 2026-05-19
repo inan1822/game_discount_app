@@ -19,6 +19,9 @@ if (!process.env.JWT_SECRET || process.env.JWT_SECRET.length < 32) {
 if (!process.env.RAWG_API) {
     console.warn("[Startup] RAWG_API key is not set — game data endpoints will fail")
 }
+if (!process.env.ITAD_API_KEY) {
+    console.warn("[ITAD] ITAD_API_KEY not set — ITAD price path disabled")
+}
 
 const app = express()
 
@@ -29,7 +32,8 @@ const allowedOrigins = [
     "http://localhost:3000",
     "http://localhost:3001",
     "http://127.0.0.1:3000",
-    "http://127.0.0.1:3001"
+    "http://127.0.0.1:3001",
+    ...(process.env.CLIENT_URL ? [process.env.CLIENT_URL] : []),
 ]
 
 app.use(cors({
@@ -53,17 +57,15 @@ app.use(hpp({
 
 app.set("trust proxy", 1)
 
+// Generous limiter for the entire /auth prefix (passive routes like /me)
 const authLimiter = rateLimit({
     windowMs: 60 * 1000,
-    limit: 10,
+    limit: 60,
     standardHeaders: true,
     legacyHeaders: false,
-    message: {
-        status: "429",
-        message: "Too many attempts, please try again after a minute",
-        data: null
-    }
+    message: { status: "429", message: "Too many requests, please slow down", data: null }
 })
+
 
 const globalLimiter = rateLimit({
     windowMs: 60 * 1000,
@@ -100,5 +102,6 @@ mongoConnect().then(() => {
         console.log(`DisLow API running on port ${Port}`)
     })
 }).catch(err => {
-    console.log("Failed to connect to DB:", err)
+    console.error("Failed to connect to DB:", err)
+    process.exit(1)
 })

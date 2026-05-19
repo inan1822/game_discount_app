@@ -1,11 +1,12 @@
 import jwt from "jsonwebtoken"
 import crypto from "crypto"
+import mongoose from "mongoose"
 import userModel from "../users/User.model.js"
 import { AppError } from "../../shared/utils/AppError.js"
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-function makeJwt(user: { _id: any; name: string; role: string }) {
+function makeJwt(user: { _id: mongoose.Types.ObjectId | string; name: string; role: string }) {
     if (!process.env.JWT_SECRET) throw new AppError("JWT_SECRET not defined", 500)
     return jwt.sign(
         { id: user._id, name: user.name, role: user.role },

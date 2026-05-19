@@ -36,12 +36,12 @@ const userSchema = new mongoose.Schema<IUser>({
         unique: true,
         lowercase: true
     },
-    sendVerificationCode: String,
+    sendVerificationCode:       { type: String, select: false },
+    sendVerificationCodeExpiry: { type: Date,   select: false },
     isVerified: {
         type: Boolean,
         default: false
     },
-    sendVerificationCodeExpiry: Date,
     password: {
         select: false,
         type: String,
@@ -53,10 +53,10 @@ const userSchema = new mongoose.Schema<IUser>({
             message: "Password must be at least 8 characters long"
         }
     },
-    twoFactorCode: String,
-    twoFactorExpiry: Date,
-    resetPasswordToken: String,
-    resetPasswordExpiry: Date,
+    twoFactorCode:       { type: String, select: false },
+    twoFactorExpiry:     { type: Date,   select: false },
+    resetPasswordToken:  { type: String, select: false },
+    resetPasswordExpiry: { type: Date,   select: false },
     avatar: { type: String },
     discordId: { type: String, sparse: true, index: true },
     steamId:   { type: String, sparse: true, index: true },

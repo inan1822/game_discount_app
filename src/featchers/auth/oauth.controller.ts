@@ -4,6 +4,15 @@ import { getErrorInfo } from "../../shared/utils/AppError.js"
 
 const FRONTEND = process.env.FRONTEND_URL ?? "http://localhost:3000"
 
+function setAuthCookie(res: Response, token: string): void {
+    res.cookie("dislow_token", token, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "lax",
+        maxAge: 2 * 60 * 60 * 1000,
+    })
+}
+
 // ─── Discord ──────────────────────────────────────────────────────────────────
 
 /** GET /api/v1/auth/discord — redirects browser to Discord login page */
@@ -19,7 +28,8 @@ export const discordCallbackHandler = async (req: Request, res: Response) => {
             return res.redirect(`${FRONTEND}/login?error=discord_denied`)
         }
         const token = await discordCallback(code)
-        res.redirect(`${FRONTEND}/auth/callback?token=${token}`)
+        setAuthCookie(res, token)
+        res.redirect(`${FRONTEND}/auth/callback`)
     } catch (error) {
         const { message } = getErrorInfo(error)
         console.error("Discord callback error:", message)
@@ -42,7 +52,8 @@ export const googleCallbackHandler = async (req: Request, res: Response) => {
             return res.redirect(`${FRONTEND}/login?error=google_denied`)
         }
         const token = await googleCallback(code)
-        res.redirect(`${FRONTEND}/auth/callback?token=${token}`)
+        setAuthCookie(res, token)
+        res.redirect(`${FRONTEND}/auth/callback`)
     } catch (error) {
         const { message } = getErrorInfo(error)
         console.error("Google callback error:", message)
@@ -65,7 +76,8 @@ export const steamCallbackHandler = async (req: Request, res: Response) => {
             return res.redirect(`${FRONTEND}/login?error=steam_denied`)
         }
         const token = await steamCallback(query)
-        res.redirect(`${FRONTEND}/auth/callback?token=${token}`)
+        setAuthCookie(res, token)
+        res.redirect(`${FRONTEND}/auth/callback`)
     } catch (error) {
         const { message } = getErrorInfo(error)
         console.error("Steam callback error:", message)

@@ -1,6 +1,6 @@
 import axios from "axios"
-import Fuse  from "fuse.js"
-import fs   from "fs"
+import Fuse from "fuse.js"
+import fs from "fs"
 import path from "path"
 import { AppError } from "../../shared/utils/AppError.js"
 import WishlistModel from "../wishlist/Wishlist.model.js"
@@ -41,9 +41,9 @@ export interface GameSearchResult {
 
 /** CheapShark /games search result */
 interface CsGameCandidate {
-    gameID:     string
-    external:   string   // game title on CheapShark
-    cheapest:   string
+    gameID: string
+    external: string   // game title on CheapShark
+    cheapest: string
     cheapestDealID: string
 }
 
@@ -51,29 +51,36 @@ interface CsGameCandidate {
 interface CsStore { storeID: string; storeName: string; images: { icon: string } }
 
 /** CheapShark /deals entry */
-interface CsDeal  { storeID: string; dealID: string; salePrice: string; normalPrice: string; savings: string }
+interface CsDeal { storeID: string; dealID: string; salePrice: string; normalPrice: string; savings: string }
 
 /** GamerPower raw API response item */
 interface GamerPowerRaw {
-    id:               number
-    title:            string
-    worth:            string
-    thumbnail:        string
-    description:      string
-    instructions:     string
+    id: number
+    title: string
+    worth: string
+    thumbnail: string
+    description: string
+    instructions: string
     open_giveaway_url: string
-    end_date:         string
-    platforms:        string
-    users:            number
+    end_date: string
+    platforms: string
+    users: number
 }
 
-/** ITAD raw deal from /games/prices/v3 */
+/** ITAD raw deal from /games/prices/v3 — field shapes verified against API spec v2.9 */
 interface ItadRawDeal {
-    shop:    { id: string; name: string }
-    price:   { amount: number }
-    regular: { amount: number }
-    cut:     number
-    url:     string
+    shop: { id: number; name: string }   // id is a number (e.g. 61 = Steam, 35 = GOG)
+    price: { amount: number; amountInt: number; currency: string }
+    regular: { amount: number; amountInt: number; currency: string }
+    cut: number
+    voucher: string | null
+    storeLow: { amount: number; amountInt: number; currency: string } | null
+    flag: string | null
+    drm: { id: number; name: string }[]
+    platforms: { id: number; name: string }[]
+    timestamp: string
+    expiry: string | null
+    url: string
 }
 
 // ─── Retry helper ─────────────────────────────────────────────────────────────
@@ -102,9 +109,9 @@ const withRetry = async <T>(
         // a retry that will almost certainly get rate-limited again.
         if (is429 && !retryOn429) throw err
         const rawWait = is429 ? delayMs * 2 : delayMs
-        const wait    = Math.min(rawWait, MAX_RETRY_WAIT)
+        const wait = Math.min(rawWait, MAX_RETRY_WAIT)
         await new Promise(r => setTimeout(r, wait))
-        return withRetry(fn, retries - 1, rawWait, retryOn429)
+        return withRetry(fn, retries - 1, wait, retryOn429)
     }
 }
 
@@ -118,7 +125,7 @@ const withRetry = async <T>(
 // call itself fails in milliseconds (429 → fail-fast). The queue IS the bottleneck.
 
 const CS_MAX_CONCURRENT = 2
-let   csInflight = 0
+let csInflight = 0
 const csQueue: Array<() => void> = []
 
 function acquireCs(timeoutMs = 3000): Promise<boolean> {
@@ -148,32 +155,41 @@ function acquireCs(timeoutMs = 3000): Promise<boolean> {
 }
 
 function releaseCs(): void {
-    csInflight--
-    if (csQueue.length > 0) csQueue.shift()!()
+    // Transfer the slot directly to the next waiter rather than decrement-then-increment.
+    // The old approach (csInflight-- first) left a window where a new acquireCs() call
+    // could see csInflight < CS_MAX_CONCURRENT and grab a third slot before the queued
+    // callback ran. Now: if a waiter exists, call its cb (which increments csInflight
+    // itself); only decrement when nobody is waiting.
+    const next = csQueue.shift()
+    if (next) {
+        next()          // cb does csInflight++ then resolve(true)
+    } else {
+        csInflight--    // no waiters — free the slot
+    }
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 const formatGame = (game: RawgGame): GameSearchResult => ({
-    id:       game.id,
-    slug:     game.slug,
-    name:     game.name,
-    cover:    game.background_image,
-    rating:   game.rating,
-    genres:   game.genres?.map(g => g.name) ?? [],
+    id: game.id,
+    slug: game.slug,
+    name: game.name,
+    cover: game.background_image,
+    rating: game.rating,
+    genres: game.genres?.map(g => g.name) ?? [],
     // Use specific platforms if available, fall back to parent_platforms for broader coverage
     platforms: (game.platforms?.length
         ? game.platforms
         : game.parent_platforms ?? []
     ).map(p => p.platform.name),
-    released:   game.released,
+    released: game.released,
     metacritic: game.metacritic,
 })
 
 /** Returns "YYYY-MM-DD,YYYY-MM-DD" from N years ago to today */
 function dateRange(yearsBack: number): string {
     const today = new Date()
-    const past  = new Date()
+    const past = new Date()
     past.setFullYear(today.getFullYear() - yearsBack)
     const fmt = (d: Date) => d.toISOString().split("T")[0]
     return `${fmt(past)},${fmt(today)}`
@@ -182,7 +198,7 @@ function dateRange(yearsBack: number): string {
 // ─── RAWG Cache ───────────────────────────────────────────────────────────────
 
 const rawgCache = new Map<string, { data: unknown; expiresAt: number }>()
-const RAWG_TTL  = 10 * 60 * 1000  // 10 minutes
+const RAWG_TTL = 10 * 60 * 1000  // 10 minutes
 
 /** Fetch from RAWG only if not cached; otherwise return cached value. */
 async function cachedRawg<T>(key: string, fetcher: () => Promise<T>): Promise<T> {
@@ -202,9 +218,9 @@ export const searchGamesService = async (query: string, page = 1): Promise<GameS
     }
     const { data } = await axios.get(`${RAWG_BASE}/games`, {
         params: {
-            key:               RAWG_KEY,
-            search:            query,
-            page_size:         20,
+            key: RAWG_KEY,
+            search: query,
+            page_size: 20,
             page,
             exclude_additions: true,
         }
@@ -244,10 +260,16 @@ async function findSteamAppIdByTitle(title: string): Promise<string | null> {
             "https://store.steampowered.com/api/storesearch/",
             { params: { term: title, l: "english", cc: "US" }, timeout: 6000 },
         )
-        const norm  = (s: string) => s.toLowerCase().trim()
-        const match = (data.items ?? []).find(item => norm(item.name) === norm(title))
+        const norm = (s: string) => s.toLowerCase().trim()
+        const normed = norm(title)
+        // Accept exact match OR Steam result that starts with our title
+        // e.g. "Grand Theft Auto V" matches "Grand Theft Auto V Enhanced"
+        const match = (data.items ?? []).find(item => {
+            const n = norm(item.name)
+            return n === normed || n.startsWith(normed + " ") || n.startsWith(normed + ":")
+        })
         if (match) {
-            console.log(`[Steam] AppID fallback: "${title}" → ${match.id}`)
+            console.log(`[Steam] AppID fallback: "${title}" → ${match.name} (${match.id})`)
             return save(String(match.id))
         }
         return save(null)
@@ -288,12 +310,12 @@ export const getPopularGamesService = async (page = 1): Promise<GameSearchResult
     return cachedRawg(`popular:${page}`, async () => {
         const { data } = await axios.get(`${RAWG_BASE}/games`, {
             params: {
-                key:               RAWG_KEY,
-                ordering:          "-added",
-                page_size:         20,
+                key: RAWG_KEY,
+                ordering: "-added",
+                page_size: 20,
                 page,
                 exclude_additions: true,
-                metacritic:        "70,100",
+                metacritic: "70,100",
             }
         })
         return (data.results as RawgGame[]).map(formatGame)
@@ -305,10 +327,10 @@ export const getNewGamesService = async (page = 1): Promise<GameSearchResult[]> 
     return cachedRawg(`new:${page}`, async () => {
         const { data } = await axios.get(`${RAWG_BASE}/games`, {
             params: {
-                key:               RAWG_KEY,
-                dates:             dateRange(1),
-                ordering:          "-released",
-                page_size:         20,
+                key: RAWG_KEY,
+                dates: dateRange(1),
+                ordering: "-released",
+                page_size: 20,
                 page,
                 exclude_additions: true,
             }
@@ -322,10 +344,10 @@ export const getTrendedGamesService = async (page = 1): Promise<GameSearchResult
     return cachedRawg(`trended:${page}`, async () => {
         const { data } = await axios.get(`${RAWG_BASE}/games`, {
             params: {
-                key:               RAWG_KEY,
-                dates:             dateRange(3),
-                ordering:          "-added",
-                page_size:         20,
+                key: RAWG_KEY,
+                dates: dateRange(3),
+                ordering: "-added",
+                page_size: 20,
                 page,
                 exclude_additions: true,
             }
@@ -339,12 +361,12 @@ export const getFreeToPlayService = async (): Promise<GameSearchResult[]> => {
     return cachedRawg("free-to-play", async () => {
         const { data } = await axios.get(`${RAWG_BASE}/games`, {
             params: {
-                key:               RAWG_KEY,
-                tags:              "free-to-play",
-                ordering:          "-added",
-                page_size:         20,
+                key: RAWG_KEY,
+                tags: "free-to-play",
+                ordering: "-added",
+                page_size: 20,
                 exclude_additions: true,
-                metacritic:        "60,100",
+                metacritic: "60,100",
             }
         })
         return (data.results as RawgGame[]).map(formatGame)
@@ -356,11 +378,11 @@ export const getHiddenGemsService = async (): Promise<GameSearchResult[]> => {
     return cachedRawg("hidden-gems", async () => {
         const { data } = await axios.get(`${RAWG_BASE}/games`, {
             params: {
-                key:               RAWG_KEY,
-                ordering:          "-rating",
-                page_size:         40,
+                key: RAWG_KEY,
+                ordering: "-rating",
+                page_size: 40,
                 exclude_additions: true,
-                metacritic:        "75,100",
+                metacritic: "75,100",
             }
         })
         // Filter to games with relatively low "added" count — hidden but good
@@ -373,15 +395,15 @@ export const getHiddenGemsService = async (): Promise<GameSearchResult[]> => {
 
 /** DEAL OF THE DAY — best single deal from CheapShark (highest savings %), cached 1 hour */
 export interface DealOfDay {
-    title:       string
-    cover:       string | null
-    salePrice:   string
+    title: string
+    cover: string | null
+    salePrice: string
     normalPrice: string
-    savings:     number
-    storeName:   string
-    storeIcon:   string
-    dealLink:    string
-    gameId:      number | null   // RAWG id if we can match
+    savings: number
+    storeName: string
+    storeIcon: string
+    dealLink: string
+    gameId: number | null   // RAWG id if we can match
 }
 
 let dotdCache: { deal: DealOfDay; expiresAt: number } | null = null
@@ -405,17 +427,17 @@ export const getDealOfDayService = async (): Promise<DealOfDay | null> => {
         if (!top) return null
 
         const storeMap = Object.fromEntries(stores.data.map((s: { storeID: string; storeName: string; images: { icon: string } }) => [s.storeID, s]))
-        const store    = storeMap[top.storeID]
+        const store = storeMap[top.storeID]
 
         // Try to enrich with RAWG cover
-        let cover: string | null  = null
+        let cover: string | null = null
         let gameId: number | null = null
         try {
             const { data: rawgData } = await axios.get(`${RAWG_BASE}/games`, {
                 params: { key: RAWG_KEY, search: top.title, page_size: 1 }
             })
             if (rawgData.results?.[0]) {
-                cover  = rawgData.results[0].background_image
+                cover = rawgData.results[0].background_image
                 gameId = rawgData.results[0].id
             }
         } catch (err) {
@@ -423,14 +445,14 @@ export const getDealOfDayService = async (): Promise<DealOfDay | null> => {
         }
 
         const deal: DealOfDay = {
-            title:       top.title,
+            title: top.title,
             cover,
-            salePrice:   top.salePrice,
+            salePrice: top.salePrice,
             normalPrice: top.normalPrice,
-            savings:     parseFloat(top.savings),
-            storeName:   store?.storeName ?? `Store ${top.storeID}`,
-            storeIcon:   store ? `https://www.cheapshark.com${store.images.icon}` : "",
-            dealLink:    `https://www.cheapshark.com/redirect?dealID=${top.dealID}`,
+            savings: parseFloat(top.savings),
+            storeName: store?.storeName ?? `Store ${top.storeID}`,
+            storeIcon: store ? `https://www.cheapshark.com${store.images.icon}` : "",
+            dealLink: `https://www.cheapshark.com/redirect?dealID=${top.dealID}`,
             gameId,
         }
 
@@ -447,10 +469,10 @@ export const getByGenreService = async (genre: string, page = 1): Promise<GameSe
     return cachedRawg(`by-genre:${genre}:${page}`, async () => {
         const { data } = await axios.get(`${RAWG_BASE}/games`, {
             params: {
-                key:               RAWG_KEY,
-                genres:            genre,
-                ordering:          "-added",
-                page_size:         20,
+                key: RAWG_KEY,
+                genres: genre,
+                ordering: "-added",
+                page_size: 20,
                 page,
                 exclude_additions: true,
             }
@@ -480,7 +502,7 @@ export const getForYouService = async (userId: string): Promise<GameSearchResult
     const genreCount: Record<string, number> = {}
     await Promise.allSettled(
         wishlist.map(async (item) => {
-            const gameData = await cachedRawg<{ genres?: { slug: string }[] }>(`game-genres:${item.gameId}`, async () => {
+            const gameData = await cachedRawg<{ genres?: { slug: string }[] }>(`game:${item.gameId}`, async () => {
                 const { data } = await axios.get(`${RAWG_BASE}/games/${item.gameId}`, {
                     params: { key: RAWG_KEY }
                 })
@@ -500,10 +522,10 @@ export const getForYouService = async (userId: string): Promise<GameSearchResult
     const { results: genreResults } = await cachedRawg<{ results: RawgGame[] }>(`for-you:${topGenre}`, async () => {
         const { data } = await axios.get(`${RAWG_BASE}/games`, {
             params: {
-                key:               RAWG_KEY,
-                genres:            topGenre,
-                ordering:          "-added",
-                page_size:         30,
+                key: RAWG_KEY,
+                genres: topGenre,
+                ordering: "-added",
+                page_size: 30,
                 exclude_additions: true,
             }
         })
@@ -524,7 +546,7 @@ export const getForYouService = async (userId: string): Promise<GameSearchResult
 // Survives nodemon/server restarts — so we never hammer CheapShark after a reload.
 
 type PriceCacheEntry = { price: string | null; expiresAt: number }
-const CACHE_TTL       = 60 * 60 * 1000   // 1 hour
+const CACHE_TTL = 60 * 60 * 1000   // 1 hour
 const PRICE_CACHE_FILE = path.join(process.cwd(), "src/cache/prices.json")
 
 const priceCache = new Map<string, PriceCacheEntry>()
@@ -553,6 +575,17 @@ function savePriceCacheToDisk() {
     }
 }
 
+// Debounced disk write — at most one write per 30 s regardless of how many
+// price fetches complete in that window (avoids per-request fs.writeFileSync).
+let _diskSaveTimer: ReturnType<typeof setTimeout> | null = null
+function scheduleDiskSave() {
+    if (_diskSaveTimer) return          // already scheduled
+    _diskSaveTimer = setTimeout(() => {
+        _diskSaveTimer = null
+        savePriceCacheToDisk()
+    }, 30_000)
+}
+
 loadPriceCacheFromDisk()   // run once at module load
 
 // ─── In-flight request deduplication ─────────────────────────────────────────
@@ -567,7 +600,7 @@ const priceInflight = new Map<string, Promise<string | null>>()
  * "0.00"= in DB and genuinely free (Dota 2, CS2, Warframe)  → card shows "Free"
  */
 export const getGamePriceService = async (title: string): Promise<string | null> => {
-    const key    = title.toLowerCase().trim()
+    const key = title.toLowerCase().trim()
     const cached = priceCache.get(key)
     if (cached && cached.expiresAt > Date.now()) return cached.price
 
@@ -585,23 +618,37 @@ export const getGamePriceService = async (title: string): Promise<string | null>
         try {
             const { data } = await withRetry(
                 () => axios.get("https://www.cheapshark.com/api/1.0/games", {
-                    params: { title, limit: 1 },
+                    params: { title, limit: 5 },
                 }),
                 2,      // 2 retries for transient network errors (not 429)
                 500,
                 false,  // retryOn429 = false → fail-fast on rate-limits
             )
-            const price = (Array.isArray(data) && data[0]?.cheapest != null)
-                ? String(data[0].cheapest)
-                : null
+            // Validate the returned game name against the requested title using Fuse.js.
+            // CheapShark returns the first alphabetical match for "limit: N" — without
+            // validation "GTA" can return "Grand Theft Arcade" instead of "Grand Theft Auto V".
+            let price: string | null = null
+            if (Array.isArray(data) && data.length > 0) {
+                const fuse = new Fuse(data as CsGameCandidate[], {
+                    keys: ["external"],
+                    includeScore: true,
+                    threshold: 0.35,
+                })
+                const hit = fuse.search(title)[0]
+                if (hit && hit.item?.cheapest != null) {
+                    price = String(hit.item.cheapest)
+                }
+            }
             const entry: PriceCacheEntry = { price, expiresAt: Date.now() + CACHE_TTL }
             priceCache.set(key, entry)
-            savePriceCacheToDisk()          // persist immediately after each new price
+            scheduleDiskSave()          // debounced — at most one write per 30 s
             return price
         } catch (err: unknown) {
             const msg = err instanceof Error ? err.message : String(err)
             console.error(`[CheapShark] error for "${title}": ${msg}`)
-            return null   // don't cache errors — allow retry on next load
+            // Cache null for 3 min so repeated requests don't hammer CheapShark again
+            priceCache.set(key, { price: null, expiresAt: Date.now() + 3 * 60 * 1000 })
+            return null
         } finally {
             releaseCs()
         }
@@ -620,12 +667,16 @@ let csStoresCache: CsStore[] | null = null
 let csStoresExpiry = 0
 const CS_STORES_TTL = 24 * 60 * 60 * 1000
 
+// Module-level icon map cache — rebuilt only when the stores list refreshes
+let csIconMapCache: Map<string, string> | null = null
+
 async function getCsStores(): Promise<CsStore[]> {
     if (csStoresCache && Date.now() < csStoresExpiry) return csStoresCache
     try {
         const { data } = await axios.get<CsStore[]>("https://www.cheapshark.com/api/1.0/stores")
-        csStoresCache  = data
+        csStoresCache = data
         csStoresExpiry = Date.now() + CS_STORES_TTL
+        csIconMapCache = null   // invalidate icon map so it rebuilds from fresh stores
         return data
     } catch (err) {
         console.error("[CsStores] Failed to fetch stores list:", err instanceof Error ? err.message : String(err))
@@ -633,92 +684,96 @@ async function getCsStores(): Promise<CsStore[]> {
     }
 }
 
-/** Build a normalised-name → icon-URL map from CheapShark stores (for ITAD deals) */
+/** Build a normalised-name → icon-URL map from CheapShark stores (for ITAD deals).
+ *  Result is cached at module level and only rebuilt when the stores list refreshes. */
 async function buildIconMap(): Promise<Map<string, string>> {
+    if (csIconMapCache) return csIconMapCache
     const stores = await getCsStores()
     const map = new Map<string, string>()
     for (const s of stores) {
         const key = s.storeName.toLowerCase().replace(/[^a-z0-9]/g, "")
         map.set(key, `https://www.cheapshark.com${s.images.icon}`)
     }
+    csIconMapCache = map
     return map
 }
 
-function resolveIcon(shopId: string, shopName: string, iconMap: Map<string, string>): string {
-    const normId   = shopId.toLowerCase().replace(/[^a-z0-9]/g, "")
+function resolveIcon(shopId: number | string, shopName: string, iconMap: Map<string, string>): string {
+    // ITAD shop.id is a number — normalise to string for map lookup
     const normName = shopName.toLowerCase().replace(/[^a-z0-9]/g, "")
-    return iconMap.get(normName) ?? iconMap.get(normId) ?? ""
+    return iconMap.get(normName) ?? ""
 }
 
 // ── ITAD (IsThereAnyDeal) ────────────────────────────────────────────────────
 
 const ITAD_BASE = "https://api.isthereanydeal.com"
 
-let itadToken: string | null = null
-let itadTokenExp = 0
-
-async function getItadToken(): Promise<string | null> {
-    const clientId     = process.env.ITAD_CLIENT_ID
-    const clientSecret = process.env.ITAD_CLIENT_SECRET
-    if (!clientId || !clientSecret) return null
-    if (itadToken && Date.now() < itadTokenExp) return itadToken
-    try {
-        // ITAD OAuth is on the main domain, not a subdomain.
-        // api.isthereanydeal.com/oauth/token  → 404
-        // oauth.isthereanydeal.com/token      → ENOTFOUND (subdomain does not exist)
-        // isthereanydeal.com/oauth/token      → correct per ITAD developer docs
-        const { data } = await axios.post(
-            // Trailing slash required: isthereanydeal.com/oauth/token (no slash) sends a 301
-            // redirect → axios follows it as GET → 405. The slash-version is the canonical URL.
-            "https://isthereanydeal.com/oauth/token/",
-            new URLSearchParams({
-                grant_type:    "client_credentials",
-                client_id:     clientId,
-                client_secret: clientSecret,
-            }),
-            { headers: { "Content-Type": "application/x-www-form-urlencoded" } },
-        )
-        itadToken    = data.access_token as string
-        itadTokenExp = Date.now() + ((data.expires_in as number) - 60) * 1000
-        return itadToken
-    } catch (err) {
-        console.error("[ITAD] Token fetch failed:", err)
-        return null
-    }
+function itadHeaders(): Record<string, string> | null {
+    const key = process.env.ITAD_API_KEY
+    if (!key) return null
+    return { "ITAD-API-Key": key }
 }
 
 // ITAD game ID cache — IDs are permanent, cache 7 days
-const itadIdCache  = new Map<string, { id: string | null; expiresAt: number }>()
-const ITAD_ID_TTL  = 7 * 24 * 60 * 60 * 1000
+const itadIdCache = new Map<string, { id: string | null; expiresAt: number }>()
+const ITAD_ID_TTL = 7 * 24 * 60 * 60 * 1000
 
-async function lookupItadId(steamAppId: string): Promise<string | null> {
+async function lookupItadId(steamAppId: string, gameTitle?: string): Promise<string | null> {
     const hit = itadIdCache.get(steamAppId)
     if (hit && hit.expiresAt > Date.now()) return hit.id
-    const token = await getItadToken()
-    if (!token) return null
+    const headers = itadHeaders()
+    if (!headers) return null
     try {
+        // Primary: appid lookup — most reliable, integer param required (ITAD skill: common mistake is passing string)
         const { data } = await axios.get(`${ITAD_BASE}/games/lookup/v1`, {
-            params:  { shop: "steam", game_id: steamAppId },
-            headers: { Authorization: `Bearer ${token}` },
+            params: { appid: Number(steamAppId) },
+            headers,
+            timeout: 8000,
         })
-        const id = (data.found && data.game?.id) ? String(data.game.id) : null
-        itadIdCache.set(steamAppId, { id, expiresAt: Date.now() + ITAD_ID_TTL })
-        return id
-    } catch {
+        if (data.found && data.game?.id) {
+            const id = String(data.game.id)
+            console.log(`[ITAD] ${steamAppId} → "${data.game.title}" (${id})`)
+            itadIdCache.set(steamAppId, { id, expiresAt: Date.now() + ITAD_ID_TTL })
+            return id
+        }
+
+        // Fallback: title lookup — covers re-released games (e.g. GTA V Enhanced, appid 3240220)
+        // that ITAD hasn't yet indexed under the new Steam appid but does know by title.
+        if (gameTitle) {
+            console.log(`[ITAD] appid ${steamAppId} not found, retrying by title: "${gameTitle}"`)
+            const { data: td } = await axios.get(`${ITAD_BASE}/games/lookup/v1`, {
+                params: { title: gameTitle },
+                headers,
+                timeout: 8000,
+            })
+            if (td.found && td.game?.id) {
+                const id = String(td.game.id)
+                console.log(`[ITAD] title "${gameTitle}" → "${td.game.title}" (${id})`)
+                itadIdCache.set(steamAppId, { id, expiresAt: Date.now() + ITAD_ID_TTL })
+                return id
+            }
+        }
+
+        console.log(`[ITAD] ${steamAppId} → not found`)
+        itadIdCache.set(steamAppId, { id: null, expiresAt: Date.now() + ITAD_ID_TTL })
+        return null
+    } catch (err) {
+        console.warn("[ITAD] lookupItadId failed for", steamAppId,
+            err instanceof Error ? err.message : String(err))
         return null
     }
 }
 
 async function fetchItadDeals(itadId: string): Promise<ItadRawDeal[]> {
-    const token = await getItadToken()
-    if (!token) return []
+    const headers = itadHeaders()
+    if (!headers) return []
     try {
         const { data } = await axios.post<{ id: string; deals: ItadRawDeal[] }[]>(
             `${ITAD_BASE}/games/prices/v3`,
             [itadId],
             {
-                params:  { country: "US" },
-                headers: { Authorization: `Bearer ${token}` },
+                params: { country: "US" },
+                headers,
             },
         )
         if (!Array.isArray(data) || !data[0]?.deals) return []
@@ -731,30 +786,30 @@ async function fetchItadDeals(itadId: string): Promise<ItadRawDeal[]> {
 // ── Shared types ──────────────────────────────────────────────────────────────
 
 export interface DealResult {
-    storeID:     string
-    storeName:   string
-    storeIcon:   string
-    salePrice:   string
+    storeID: string
+    storeName: string
+    storeIcon: string
+    salePrice: string
     normalPrice: string
-    savings:     number
-    dealID:      string
-    dealLink:    string
+    savings: number
+    dealID: string
+    dealLink: string
 }
 
 const dealsCache = new Map<string, { deals: DealResult[]; expiresAt: number }>()
-const DEALS_TTL  = 30 * 60 * 1000
+const DEALS_TTL = 30 * 60 * 1000
 
 // ─── Steam Direct Price ───────────────────────────────────────────────────────
 // Uses the free public Steam Store API — no API key required.
 // Always returns the correct price and a direct link to the game's Steam page.
 
 interface SteamPriceOverview {
-    currency:          string
-    initial:           number   // price in cents (e.g. 999 = $9.99)
-    final:             number
-    discount_percent:  number
+    currency: string
+    initial: number   // price in cents (e.g. 999 = $9.99)
+    final: number
+    discount_percent: number
     initial_formatted: string
-    final_formatted:   string
+    final_formatted: string
 }
 
 interface SteamDetailsEntry {
@@ -785,7 +840,7 @@ export async function getSteamDirectPrice(steamAppId: string): Promise<DealResul
         const { data } = await axios.get<Record<string, SteamDetailsEntry>>(
             "https://store.steampowered.com/api/appdetails",
             {
-                params:  { appids: steamAppId, cc: "us", filters: "price_overview,is_free" },
+                params: { appids: steamAppId, cc: "us", filters: "price_overview,is_free" },
                 timeout: 8000,
             },
         )
@@ -798,14 +853,14 @@ export async function getSteamDirectPrice(steamAppId: string): Promise<DealResul
         // Free games — is_free flag
         if (entry.data.is_free) {
             return save({
-                storeID:     "steam",
-                storeName:   "Steam",
-                storeIcon:   STEAM_ICON,
-                salePrice:   "0.00",
+                storeID: "steam",
+                storeName: "Steam",
+                storeIcon: STEAM_ICON,
+                salePrice: "0.00",
                 normalPrice: "0.00",
-                savings:     0,
-                dealID:      steamAppId,
-                dealLink:    storeLink,
+                savings: 0,
+                dealID: steamAppId,
+                dealLink: storeLink,
             })
         }
 
@@ -813,14 +868,14 @@ export async function getSteamDirectPrice(steamAppId: string): Promise<DealResul
         if (!po) return save(null)   // coming soon, or not available in US
 
         return save({
-            storeID:     "steam",
-            storeName:   "Steam",
-            storeIcon:   STEAM_ICON,
-            salePrice:   (po.final / 100).toFixed(2),
+            storeID: "steam",
+            storeName: "Steam",
+            storeIcon: STEAM_ICON,
+            salePrice: (po.final / 100).toFixed(2),
             normalPrice: (po.initial / 100).toFixed(2),
-            savings:     po.discount_percent,
-            dealID:      steamAppId,
-            dealLink:    storeLink,
+            savings: po.discount_percent,
+            dealID: steamAppId,
+            dealLink: storeLink,
         })
     } catch (err) {
         console.warn(
@@ -836,13 +891,13 @@ export async function getSteamDirectPrice(steamAppId: string): Promise<DealResul
 // Used as a parallel fallback alongside Steam when ITAD is unavailable.
 
 interface GogCatalogProduct {
-    id:    string
-    slug:  string
+    id: string
+    slug: string
     title: string
     price: { final: number; base: number; discount: number } | null
 }
 
-const GOG_ICON      = "https://www.cheapshark.com/img/stores/icons/5.png"
+const GOG_ICON = "https://www.cheapshark.com/img/stores/icons/5.png"
 const gogPriceCache = new Map<string, { deal: DealResult | null; expiresAt: number }>()
 const GOG_PRICE_TTL = 15 * 60 * 1000  // 15 minutes
 
@@ -864,23 +919,23 @@ export async function getGogDirectPrice(title: string): Promise<DealResult | nul
         const { data } = await axios.get<{ products?: GogCatalogProduct[] }>(
             "https://catalog.gog.com/v1/catalog",
             {
-                params:  { query: title, limit: 5, order: "bestselling", productType: "in:game" },
+                params: { query: title, limit: 5, order: "bestselling", productType: "in:game" },
                 timeout: 6000,
             },
         )
-        const norm  = (s: string) => s.toLowerCase().trim()
+        const norm = (s: string) => s.toLowerCase().trim()
         const match = (data.products ?? []).find(p => norm(p.title) === norm(title))
         if (!match?.price) return save(null)
 
         return save({
-            storeID:     "gog",
-            storeName:   "GOG",
-            storeIcon:   GOG_ICON,
-            salePrice:   (match.price.final   / 100).toFixed(2),
-            normalPrice: (match.price.base     / 100).toFixed(2),
-            savings:     match.price.discount,
-            dealID:      match.id,
-            dealLink:    `https://www.gog.com/game/${match.slug}`,
+            storeID: "gog",
+            storeName: "GOG",
+            storeIcon: GOG_ICON,
+            salePrice: (match.price.final / 100).toFixed(2),
+            normalPrice: (match.price.base / 100).toFixed(2),
+            savings: match.price.discount,
+            dealID: match.id,
+            dealLink: `https://www.gog.com/game/${match.slug}`,
         })
     } catch (err) {
         console.warn("[GOG] Price fetch failed for:", title, err instanceof Error ? err.message : String(err))
@@ -913,17 +968,40 @@ function toAcronym(title: string): string {
 /**
  * Bidirectional acronym match — handles abbreviations like GTA ↔ Grand Theft Auto V.
  *
- * Checks three cases:
+ * Checks two cases:
  *   1. acronym(candidate) === normTitle(search).noSpaces   → "gtav" === "gtav"
  *   2. acronym(search)    === normTitle(candidate).noSpaces → reverse
- *   3. acronym(search)    === acronym(candidate)            → both share same acronym
+ *
+ * The third case (acroS === acroC) was intentionally removed: it caused false-positive
+ * collisions when two unrelated games share the same acronym (e.g. "Grand Theft Arcade"
+ * and "Grand Theft Auto" both produce "GTA"), returning the wrong game's deals.
  */
 function acronymMatch(search: string, candidate: string): boolean {
-    const normS  = normTitle(search).replace(/\s/g, "")
-    const normC  = normTitle(candidate).replace(/\s/g, "")
-    const acroS  = toAcronym(search)
-    const acroC  = toAcronym(candidate)
-    return acroC === normS || acroS === normC || acroS === acroC
+    const normS = normTitle(search).replace(/\s/g, "")
+    const normC = normTitle(candidate).replace(/\s/g, "")
+    const acroS = toAcronym(search)
+    const acroC = toAcronym(candidate)
+    return acroC === normS || acroS === normC
+}
+
+// ── Deal-link terminal logger ─────────────────────────────────────────────────
+/** Prints a formatted deal table to the backend terminal every time a game page loads. */
+function logDealsToTerminal(title: string, deals: DealResult[]): void {
+    if (deals.length === 0) {
+        console.log(`[Deals] "${title}" — no deals found`)
+        return
+    }
+    console.log(`[Deals] "${title}" — ${deals.length} deal(s)`)
+    for (const d of deals) {
+        const price  = d.salePrice === "N/A" || d.salePrice === "0.00"
+            ? d.salePrice
+            : `$${d.salePrice}`
+        const saving = typeof d.savings === "number"
+            ? `(${Math.round(d.savings)}% off)`
+            : "(N/A)"
+        const store  = d.storeName.padEnd(16)
+        console.log(`  • ${store} ${price.padEnd(9)} ${saving.padEnd(13)} → ${d.dealLink}`)
+    }
 }
 
 // ── Main service ──────────────────────────────────────────────────────────────
@@ -941,18 +1019,19 @@ export const getGameDealsService = async (
     steamAppId?: string,
 ): Promise<DealResult[]> => {
     const cacheKey = steamAppId ? `steam:${steamAppId}` : `title:${title.toLowerCase().trim()}`
-    const cached   = dealsCache.get(cacheKey)
+    const cached = dealsCache.get(cacheKey)
     if (cached && cached.expiresAt > Date.now()) return cached.deals
 
     const save = (deals: DealResult[]) => {
         dealsCache.set(cacheKey, { deals, expiresAt: Date.now() + DEALS_TTL })
+        logDealsToTerminal(title, deals)
         return deals
     }
 
     // ── Path A: ITAD via Steam AppID ─────────────────────────────────────────
     if (steamAppId) {
         try {
-            const itadId = await lookupItadId(steamAppId)
+            const itadId = await lookupItadId(steamAppId, title)
             if (itadId) {
                 const [rawDeals, iconMap] = await Promise.all([
                     fetchItadDeals(itadId),
@@ -961,16 +1040,23 @@ export const getGameDealsService = async (
                 if (rawDeals.length > 0) {
                     let deals: DealResult[] = rawDeals
                         .map(d => ({
-                            storeID:     d.shop.id,
-                            storeName:   d.shop.name,
-                            storeIcon:   resolveIcon(d.shop.id, d.shop.name, iconMap),
-                            salePrice:   d.price.amount.toFixed(2),
+                            storeID: String(d.shop.id),   // ITAD shop.id is a number; DealResult.storeID is string
+                            storeName: d.shop.name,
+                            storeIcon: resolveIcon(d.shop.id, d.shop.name, iconMap),
+                            salePrice: d.price.amount.toFixed(2),
                             normalPrice: d.regular.amount.toFixed(2),
-                            savings:     d.cut,
-                            dealID:      itadId,
-                            dealLink:    d.url,
+                            savings: d.cut,
+                            dealID: itadId,
+                            dealLink: d.url,
                         }))
-                        .sort((a, b) => parseFloat(a.salePrice) - parseFloat(b.salePrice))
+                        .sort((a, b) => {
+                            // Steam always first; rest sorted cheapest-first
+                            const isSteamA = a.storeName.toLowerCase() === "steam" || a.storeID === "61"
+                            const isSteamB = b.storeName.toLowerCase() === "steam" || b.storeID === "61"
+                            if (isSteamA) return -1
+                            if (isSteamB) return 1
+                            return parseFloat(a.salePrice) - parseFloat(b.salePrice)
+                        })
 
                     // Enrich with IGDB-sourced GOG/Epic deals (runs in background, non-blocking)
                     if (process.env.IGDB_CLIENT_ID) {
@@ -991,9 +1077,33 @@ export const getGameDealsService = async (
             getSteamDirectPrice(steamAppId),
             getGogDirectPrice(title),
         ])
-        const directDeals = [steamDeal, gogDeal]
+
+        // Steam's appdetails API returns success:false for some publishers (e.g. Rockstar/Take-Two)
+        // even when the game is genuinely available on Steam. In that case we synthesize a minimal
+        // deal entry using the known appId so the user always gets a valid Steam store link.
+        const effectiveSteamDeal: DealResult = steamDeal ?? {
+            storeID: "1",
+            storeName: "Steam",
+            storeIcon: STEAM_ICON,
+            salePrice: "N/A",
+            normalPrice: "N/A",
+            savings: 0,
+            dealID: "",
+            dealLink: `https://store.steampowered.com/app/${steamAppId}/`,
+        }
+
+        const directDeals = [effectiveSteamDeal, gogDeal]
             .filter((d): d is DealResult => d !== null)
-            .sort((a, b) => parseFloat(a.salePrice) - parseFloat(b.salePrice))
+            // Pin Steam to position 0; sort the rest by price
+            .sort((a, b) => {
+                if (a.storeID === "1") return -1
+                if (b.storeID === "1") return 1
+                const pa = parseFloat(a.salePrice)
+                const pb = parseFloat(b.salePrice)
+                if (isNaN(pa)) return 1
+                if (isNaN(pb)) return -1
+                return pa - pb
+            })
         return save(directDeals)
     }
 
@@ -1020,12 +1130,19 @@ export const getGameDealsService = async (
         let best: CsGameCandidate | undefined =
             (candidates as CsGameCandidate[]).find(g => normTitle(g.external) === norm)
 
-        // Level 2 — prefix match (one title starts with the other)
-        // "terraria" matches "terraria collectors edition"
+        // Level 2 — prefix match: candidate starts with the search term
+        // "terraria" matches "terraria collectors edition" (candidate is longer)
+        // Guards: both strings must be ≥ 5 chars AND the match must end on a word boundary.
+        // Note: the reverse direction (search starts with candidate, i.e. "grand theft auto v"
+        // matching "grand theft auto") is intentionally NOT checked — it would select the
+        // wrong game when CheapShark has a shorter/older entry in the same franchise.
+        const MIN_PREFIX = 5
         if (!best) best =
             (candidates as CsGameCandidate[]).find(g => {
                 const t = normTitle(g.external)
-                return t.startsWith(norm) || norm.startsWith(t)
+                if (norm.length < MIN_PREFIX || t.length < MIN_PREFIX) return false
+                if (t.startsWith(norm) && (t.length === norm.length || t[norm.length] === " ")) return true
+                return false
             })
 
         // Level 3 — bidirectional acronym match
@@ -1049,14 +1166,14 @@ export const getGameDealsService = async (
         const rawDeals: DealResult[] = rawList.map(d => {
             const store = storeMap[d.storeID]
             return {
-                storeID:     d.storeID,
-                storeName:   store?.storeName ?? `Store ${d.storeID}`,
-                storeIcon:   store ? `https://www.cheapshark.com${store.images.icon}` : "",
-                salePrice:   d.salePrice,
+                storeID: d.storeID,
+                storeName: store?.storeName ?? `Store ${d.storeID}`,
+                storeIcon: store ? `https://www.cheapshark.com${store.images.icon}` : "",
+                salePrice: d.salePrice,
                 normalPrice: d.normalPrice,
-                savings:     parseFloat(d.savings),
-                dealID:      d.dealID,
-                dealLink:    `https://www.cheapshark.com/redirect?dealID=${d.dealID}`,
+                savings: parseFloat(d.savings),
+                dealID: d.dealID,
+                dealLink: `https://www.cheapshark.com/redirect?dealID=${d.dealID}`,
             }
         })
 
@@ -1095,7 +1212,7 @@ export const batchGetPricesService = async (
     const result: Record<string, string | null> = {}
 
     for (let i = 0; i < titles.length; i += BATCH_CONCURRENCY) {
-        const batch   = titles.slice(i, i + BATCH_CONCURRENCY)
+        const batch = titles.slice(i, i + BATCH_CONCURRENCY)
         const settled = await Promise.allSettled(batch.map(t => getGamePriceService(t)))
         settled.forEach((res, idx) => {
             result[batch[idx]] = res.status === "fulfilled" ? res.value : null
@@ -1108,20 +1225,20 @@ export const batchGetPricesService = async (
 // ─── GamerPower Giveaways ─────────────────────────────────────────────────────
 
 export interface GiveawayResult {
-    id:           number
-    title:        string
-    worth:        string
-    thumbnail:    string
-    description:  string
+    id: number
+    title: string
+    worth: string
+    thumbnail: string
+    description: string
     instructions: string
-    claimUrl:     string
-    endDate:      string
-    platforms:    string
-    users:        number
+    claimUrl: string
+    endDate: string
+    platforms: string
+    users: number
 }
 
 const gpCache = { items: [] as GiveawayResult[], expiresAt: 0 }
-const GP_TTL  = 30 * 60 * 1000  // 30 min
+const GP_TTL = 30 * 60 * 1000  // 30 min
 
 export const getGameGiveawaysService = async (title: string): Promise<GiveawayResult[]> => {
     if (Date.now() > gpCache.expiresAt) {
@@ -1131,16 +1248,16 @@ export const getGameGiveawaysService = async (title: string): Promise<GiveawayRe
                 { params: { platform: "pc", type: "game" } },
             )
             gpCache.items = data.map((g: GamerPowerRaw) => ({
-                id:           g.id,
-                title:        g.title,
-                worth:        g.worth,
-                thumbnail:    g.thumbnail,
-                description:  g.description,
+                id: g.id,
+                title: g.title,
+                worth: g.worth,
+                thumbnail: g.thumbnail,
+                description: g.description,
                 instructions: g.instructions,
-                claimUrl:     g.open_giveaway_url,
-                endDate:      g.end_date,
-                platforms:    g.platforms,
-                users:        g.users,
+                claimUrl: g.open_giveaway_url,
+                endDate: g.end_date,
+                platforms: g.platforms,
+                users: g.users,
             }))
             gpCache.expiresAt = Date.now() + GP_TTL
         } catch (err) {
@@ -1158,25 +1275,25 @@ export const getGameGiveawaysService = async (title: string): Promise<GiveawayRe
 
 const IGDB_BASE = "https://api.igdb.com/v4"
 
-let igdbToken    = ""
+let igdbToken = ""
 let igdbTokenExp = 0
+let igdbRefreshPromise: Promise<string | null> | null = null
 
-async function getIgdbToken(): Promise<string | null> {
-    const clientId     = process.env.IGDB_CLIENT_ID
+async function fetchNewIgdbToken(): Promise<string | null> {
+    const clientId = process.env.IGDB_CLIENT_ID
     const clientSecret = process.env.IGDB_CLIENT_SECRET
     if (!clientId || !clientSecret) return null
-    if (igdbToken && Date.now() < igdbTokenExp) return igdbToken
     try {
         const { data } = await axios.post(
             "https://id.twitch.tv/oauth2/token",
             new URLSearchParams({
-                grant_type:    "client_credentials",
-                client_id:     clientId,
+                grant_type: "client_credentials",
+                client_id: clientId,
                 client_secret: clientSecret,
             }),
             { headers: { "Content-Type": "application/x-www-form-urlencoded" } },
         )
-        igdbToken    = data.access_token as string
+        igdbToken = data.access_token as string
         igdbTokenExp = Date.now() + ((data.expires_in as number) - 60) * 1000
         return igdbToken
     } catch (err) {
@@ -1185,26 +1302,36 @@ async function getIgdbToken(): Promise<string | null> {
     }
 }
 
+// Singleton refresh: concurrent callers share one in-flight request instead of
+// each firing their own — prevents Twitch rate-limit hits on simultaneous refreshes.
+async function getIgdbToken(): Promise<string | null> {
+    if (igdbToken && Date.now() < igdbTokenExp) return igdbToken
+    if (!igdbRefreshPromise) {
+        igdbRefreshPromise = fetchNewIgdbToken().finally(() => { igdbRefreshPromise = null })
+    }
+    return igdbRefreshPromise
+}
+
 interface IgdbExternalIds {
-    igdbId:    number
-    gog?:      string
-    epic?:     string
-    xbox?:     string
-    ps?:       string
+    igdbId: number
+    gog?: string
+    epic?: string
+    xbox?: string
+    ps?: string
     nintendo?: string
 }
 
 // IGDB external_games category constants
-const IGDB_CAT_STEAM    = 1
-const IGDB_CAT_GOG      = 5
-const IGDB_CAT_XBOX     = 11
-const IGDB_CAT_EPIC     = 26
+const IGDB_CAT_STEAM = 1
+const IGDB_CAT_GOG = 5
+const IGDB_CAT_XBOX = 11
+const IGDB_CAT_EPIC = 26
 const IGDB_CAT_NINTENDO = 36
-const IGDB_CAT_PS4      = 45
-const IGDB_CAT_PS5      = 69
+const IGDB_CAT_PS4 = 45
+const IGDB_CAT_PS5 = 69
 
 const igdbExtCache = new Map<string, { data: IgdbExternalIds; expiresAt: number }>()
-const IGDB_TTL     = 7 * 24 * 60 * 60 * 1000  // 7 days — IDs are permanent
+const IGDB_TTL = 7 * 24 * 60 * 60 * 1000  // 7 days — IDs are permanent
 
 /**
  * Given a Steam AppID, returns GOG/Epic/Xbox/PS/Nintendo IDs from IGDB.
@@ -1221,7 +1348,7 @@ async function getIgdbExternalIds(steamAppId: string): Promise<IgdbExternalIds |
     const clientId = process.env.IGDB_CLIENT_ID
     if (!clientId) return null
     const headers = {
-        "Client-ID":     clientId,
+        "Client-ID": clientId,
         "Authorization": `Bearer ${token}`,
     }
 
@@ -1244,11 +1371,11 @@ async function getIgdbExternalIds(steamAppId: string): Promise<IgdbExternalIds |
 
         const result: IgdbExternalIds = { igdbId }
         for (const e of (allExt ?? [])) {
-            if (e.category === IGDB_CAT_GOG)                              result.gog      = String(e.uid)
-            if (e.category === IGDB_CAT_EPIC)                             result.epic     = String(e.uid)
-            if (e.category === IGDB_CAT_XBOX)                             result.xbox     = String(e.uid)
-            if (e.category === IGDB_CAT_NINTENDO)                         result.nintendo = String(e.uid)
-            if (e.category === IGDB_CAT_PS4 || e.category === IGDB_CAT_PS5) result.ps    = String(e.uid)
+            if (e.category === IGDB_CAT_GOG) result.gog = String(e.uid)
+            if (e.category === IGDB_CAT_EPIC) result.epic = String(e.uid)
+            if (e.category === IGDB_CAT_XBOX) result.xbox = String(e.uid)
+            if (e.category === IGDB_CAT_NINTENDO) result.nintendo = String(e.uid)
+            if (e.category === IGDB_CAT_PS4 || e.category === IGDB_CAT_PS5) result.ps = String(e.uid)
         }
 
         igdbExtCache.set(key, { data: result, expiresAt: Date.now() + IGDB_TTL })
@@ -1274,38 +1401,46 @@ async function enrichDealsWithIgdb(
 
         const existingStoreIds = new Set(existingDeals.map(d => d.storeID.toLowerCase()))
 
-        const storeAttempts: Array<{ shop: string; uid: string; displayName: string }> = []
-        if (ext.gog  && !existingStoreIds.has("gog"))       storeAttempts.push({ shop: "gog",      uid: ext.gog,  displayName: "GOG" })
-        if (ext.epic && !existingStoreIds.has("epicgames")) storeAttempts.push({ shop: "epicgames", uid: ext.epic, displayName: "Epic Games" })
+        // ITAD numeric shop IDs (from GET /shops/v1 — stable, confirmed in skill)
+        const ITAD_SHOP_ID: Record<string, number> = { gog: 35, epicgames: 26 }
+
+        const storeAttempts: Array<{ shop: string; shopId: number; uid: string; displayName: string }> = []
+        if (ext.gog && !existingStoreIds.has("35"))
+            storeAttempts.push({ shop: "gog", shopId: ITAD_SHOP_ID.gog, uid: ext.gog, displayName: "GOG" })
+        if (ext.epic && !existingStoreIds.has("26"))
+            storeAttempts.push({ shop: "epicgames", shopId: ITAD_SHOP_ID.epicgames, uid: ext.epic, displayName: "Epic Games" })
         if (storeAttempts.length === 0) return existingDeals
 
         const extraDeals: DealResult[] = []
 
-        await Promise.allSettled(storeAttempts.map(async ({ shop, uid, displayName }) => {
+        await Promise.allSettled(storeAttempts.map(async ({ shopId, uid, displayName }) => {
             try {
-                const token = await getItadToken()
-                if (!token) return
-                const { data: lookup } = await axios.get(`${ITAD_BASE}/games/lookup/v1`, {
-                    params:  { shop, game_id: uid },
-                    headers: { Authorization: `Bearer ${token}` },
-                })
-                if (!lookup.found) return
-                const rawDeals = await fetchItadDeals(lookup.game.id as string)
-                const relevant = rawDeals.filter(d =>
-                    d.shop.id === shop ||
-                    d.shop.name.toLowerCase().includes(displayName.toLowerCase())
+                const headers = itadHeaders()
+                if (!headers) return
+                // Skill: use POST /lookup/id/shop/{shopId}/v1 for non-Steam store IDs.
+                // GET /games/lookup/v1 only accepts `appid` (Steam) or `title` — not shop+id pairs.
+                const { data: lookupMap } = await axios.post<Record<string, string | null>>(
+                    `${ITAD_BASE}/lookup/id/shop/${shopId}/v1`,
+                    [uid],
+                    { headers },
                 )
+                const itadId = lookupMap[uid]
+                if (!itadId) return
+                const rawDeals = await fetchItadDeals(itadId)
+                // shop.id is a number — compare numerically against the known shopId
+                const relevant = rawDeals.filter(d => d.shop.id === shopId)
                 for (const d of relevant) {
-                    if (!existingStoreIds.has(d.shop.id.toLowerCase())) {
+                    const sid = String(d.shop.id)
+                    if (!existingStoreIds.has(sid)) {
                         extraDeals.push({
-                            storeID:     d.shop.id,
-                            storeName:   d.shop.name,
-                            storeIcon:   resolveIcon(d.shop.id, d.shop.name, iconMap),
-                            salePrice:   d.price.amount.toFixed(2),
+                            storeID: sid,
+                            storeName: d.shop.name,
+                            storeIcon: resolveIcon(d.shop.id, d.shop.name, iconMap),
+                            salePrice: d.price.amount.toFixed(2),
                             normalPrice: d.regular.amount.toFixed(2),
-                            savings:     d.cut,
-                            dealID:      lookup.game.id as string,
-                            dealLink:    d.url,
+                            savings: d.cut,
+                            dealID: itadId,
+                            dealLink: d.url,
                         })
                     }
                 }
@@ -1350,7 +1485,7 @@ export const getIgdbSummaryService = async (
     const clientId = process.env.IGDB_CLIENT_ID
     if (!clientId) return null
     const headers = {
-        "Client-ID":     clientId,
+        "Client-ID": clientId,
         "Authorization": `Bearer ${token}`,
     }
 
@@ -1372,7 +1507,7 @@ export const getIgdbSummaryService = async (
                 { headers },
             )
             if (searchResults?.length) {
-                const fuse  = new Fuse<{ id: number; name: string }>(searchResults, { keys: ["name"], threshold: 0.3 })
+                const fuse = new Fuse<{ id: number; name: string }>(searchResults, { keys: ["name"], threshold: 0.3 })
                 const match = fuse.search(title)[0]?.item ?? searchResults[0]
                 igdbId = match.id
             }
@@ -1389,7 +1524,7 @@ export const getIgdbSummaryService = async (
             `fields summary,storyline; where id = ${igdbId}; limit 1;`,
             { headers },
         )
-        const game    = gameData?.[0]
+        const game = gameData?.[0]
         const summary = game?.summary || game?.storyline || ""
 
         igdbDescCache.set(cacheKey, { summary, expiresAt: Date.now() + IGDB_DESC_TTL })
@@ -1406,34 +1541,34 @@ export const getIgdbSummaryService = async (
 
 /** Raw shape returned by Steam ISteamNews/GetNewsForApp/v2 */
 interface SteamNewsItem {
-    gid:             string
-    title:           string
-    url:             string
+    gid: string
+    title: string
+    url: string
     is_external_url: boolean
-    author:          string
-    contents:        string
-    feedlabel:       string
-    date:            number   // Unix timestamp (seconds)
-    feedname:        string
-    feed_type:       number
-    appid:           number
+    author: string
+    contents: string
+    feedlabel: string
+    date: number   // Unix timestamp (seconds)
+    feedname: string
+    feed_type: number
+    appid: number
 }
 
 interface SteamNewsResponse {
     appnews?: {
-        appid:     number
+        appid: number
         newsitems: SteamNewsItem[]
     }
 }
 
 export interface GameEvent {
-    id:         string
-    title:      string
-    url:        string
-    author:     string
-    summary:    string   // stripped plain-text excerpt (~200 chars)
-    date:       number   // Unix timestamp (seconds)
-    feedLabel:  string   // e.g. "Community Announcements", "Game Updates"
+    id: string
+    title: string
+    url: string
+    author: string
+    summary: string   // stripped plain-text excerpt (~200 chars)
+    date: number   // Unix timestamp (seconds)
+    feedLabel: string   // e.g. "Community Announcements", "Game Updates"
     isExternal: boolean
 }
 
@@ -1451,7 +1586,7 @@ function stripHtml(html: string): string {
 }
 
 const eventsCache = new Map<string, { items: GameEvent[]; expiresAt: number }>()
-const EVENTS_TTL  = 15 * 60 * 1000  // 15 minutes
+const EVENTS_TTL = 15 * 60 * 1000  // 15 minutes
 
 /**
  * Fetches up to 10 recent Steam news/event items for a game.
@@ -1466,23 +1601,23 @@ export const getGameEventsService = async (steamAppId: string): Promise<GameEven
             "https://api.steampowered.com/ISteamNews/GetNewsForApp/v2/",
             {
                 params: {
-                    appid:     steamAppId,
-                    count:     10,
+                    appid: steamAppId,
+                    count: 10,
                     maxlength: 400,
-                    format:    "json",
+                    format: "json",
                 },
                 timeout: 8000,
             },
         )
 
         const items: GameEvent[] = (data.appnews?.newsitems ?? []).map(n => ({
-            id:         n.gid,
-            title:      n.title,
-            url:        n.url,
-            author:     n.author || "Steam",
-            summary:    stripHtml(n.contents).slice(0, 220),
-            date:       n.date,
-            feedLabel:  n.feedlabel,
+            id: n.gid,
+            title: n.title,
+            url: n.url,
+            author: n.author || "Steam",
+            summary: stripHtml(n.contents).slice(0, 220),
+            date: n.date,
+            feedLabel: n.feedlabel,
             isExternal: n.is_external_url,
         }))
 
@@ -1494,22 +1629,3 @@ export const getGameEventsService = async (steamAppId: string): Promise<GameEven
     }
 }
 
-// ─── Legacy (kept for any existing usages) ────────────────────────────────────
-
-/** @deprecated Use getPopularGamesService — kept for backward compat */
-export const getTrendingGamesService = getPopularGamesService
-
-/** @deprecated Use section-specific services */
-export const getGamesByGenreService = async (genre: string, page = 1): Promise<GameSearchResult[]> => {
-    const { data } = await axios.get(`${RAWG_BASE}/games`, {
-        params: {
-            key:               RAWG_KEY,
-            genres:            genre,
-            page_size:         20,
-            page,
-            ordering:          "-added",
-            exclude_additions: true,
-        }
-    })
-    return (data.results as RawgGame[]).map(formatGame)
-}
