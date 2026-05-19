@@ -6,10 +6,19 @@ import { authMiddleware } from "../../shared/middlewares/shared.middlewares.js"
 import { validateRequest } from "../../shared/middlewares/validateRequst.js"
 import { registerSchema, loginSchema, verifyEmailSchema, verifyTwoFactorSchema, requestPasswordResetSchema, resetPasswordSchema } from "../../shared/validators/auth.schemas.js"
 
-// Strict limiter applied only to credential/token endpoints (login, 2FA, password reset)
+// Strict limiter — credential/token endpoints (login, 2FA, password reset)
 const strictAuthLimiter = rateLimit({
     windowMs: 15 * 60 * 1000,  // 15-minute window
-    limit: 5,
+    limit: 10,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { status: "429", message: "Too many attempts, please try again later", data: null }
+})
+
+// Registration limiter — prevents fake account spam + Gmail quota exhaustion
+const registerLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,  // 15-minute window
+    limit: 10,
     standardHeaders: true,
     legacyHeaders: false,
     message: { status: "429", message: "Too many attempts, please try again later", data: null }
@@ -18,9 +27,9 @@ const strictAuthLimiter = rateLimit({
 const authRouter: Router = Router()
 
 // ─── Email / password ─────────────────────────────────────────────────────────
-authRouter.post("/register", validateRequest(registerSchema, "body"), register)
-authRouter.post("/verify", validateRequest(verifyEmailSchema, "body"), verifyEmail)
-authRouter.post("/resend-verify", validateRequest(requestPasswordResetSchema, "body"), resendVerification)
+authRouter.post("/register", registerLimiter, validateRequest(registerSchema, "body"), register)
+authRouter.post("/verify", strictAuthLimiter, validateRequest(verifyEmailSchema, "body"), verifyEmail)
+authRouter.post("/resend-verify", strictAuthLimiter, validateRequest(requestPasswordResetSchema, "body"), resendVerification)
 authRouter.post("/login", strictAuthLimiter, validateRequest(loginSchema, "body"), login)
 authRouter.post("/admin", strictAuthLimiter, validateRequest(verifyTwoFactorSchema, "body"), verifyTwoFactor)
 authRouter.post("/request-password-reset", strictAuthLimiter, validateRequest(requestPasswordResetSchema, "body"), requestPasswordReset)

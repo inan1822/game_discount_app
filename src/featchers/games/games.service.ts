@@ -764,6 +764,53 @@ async function lookupItadId(steamAppId: string, gameTitle?: string): Promise<str
     }
 }
 
+// ── Console edition search ────────────────────────────────────────────────────
+// ITAD stores PC and console versions as separate game entries. To get Nintendo
+// eShop / Xbox / PlayStation prices we search for edition entries (e.g.
+// "Hollow Knight: Voidheart Edition") and merge their store deals into the PC list.
+
+const ITAD_EDITION_CACHE = new Map<string, { ids: string[]; expiresAt: number }>()
+const ITAD_EDITION_TTL = 6 * 60 * 60 * 1000  // 6 hours
+
+const EDITION_KEYWORDS = ["edition", "enhanced", "remastered", "deluxe", "complete",
+    "definitive", "ultimate", "collection", "bundle"]
+
+/** Returns true only when `foundTitle` is a console/platform edition of `originalTitle`
+ *  (e.g. "Hollow Knight: Voidheart Edition") and NOT a different game or sequel. */
+function isConsoleEdition(foundTitle: string, originalTitle: string): boolean {
+    const ft = foundTitle.toLowerCase()
+    const ot = originalTitle.toLowerCase()
+    if (!ft.startsWith(ot)) return false
+    const suffix = ft.slice(ot.length).trim()
+    if (!suffix) return false  // identical title — already have it
+    return EDITION_KEYWORDS.some(kw => suffix.includes(kw))
+}
+
+async function findConsoleEditionIds(title: string, knownId: string): Promise<string[]> {
+    const key = title.toLowerCase().trim()
+    const hit = ITAD_EDITION_CACHE.get(key)
+    if (hit && hit.expiresAt > Date.now()) return hit.ids
+    const headers = itadHeaders()
+    if (!headers) return []
+    try {
+        const { data } = await axios.get<{ id: string; title: string; type: string }[]>(
+            `${ITAD_BASE}/games/search/v1`,
+            { params: { title, results: 10 }, headers, timeout: 8000 },
+        )
+        const ids = (data ?? [])
+            .filter(g => g.type === "game" && g.id !== knownId && isConsoleEdition(g.title, title))
+            .map(g => {
+                console.log(`[ITAD] console edition found: "${g.title}" (${g.id})`)
+                return g.id
+            })
+        ITAD_EDITION_CACHE.set(key, { ids, expiresAt: Date.now() + ITAD_EDITION_TTL })
+        return ids
+    } catch (err) {
+        console.warn("[ITAD] findConsoleEditionIds failed:", err instanceof Error ? err.message : String(err))
+        return []
+    }
+}
+
 async function fetchItadDeals(itadId: string): Promise<ItadRawDeal[]> {
     const headers = itadHeaders()
     if (!headers) return []
@@ -1061,6 +1108,38 @@ export const getGameDealsService = async (
                     // Enrich with IGDB-sourced GOG/Epic deals (runs in background, non-blocking)
                     if (process.env.IGDB_CLIENT_ID) {
                         deals = await enrichDealsWithIgdb(steamAppId, deals, iconMap)
+                    }
+
+                    // Search ITAD for console editions (e.g. "Hollow Knight: Voidheart Edition")
+                    // to add Nintendo eShop, Xbox, and PlayStation Store deals missing from the PC entry.
+                    const editionIds = await findConsoleEditionIds(title, itadId)
+                    if (editionIds.length > 0) {
+                        const existingStoreIds = new Set(deals.map(d => d.storeID))
+                        const editionDeals = await Promise.all(editionIds.map(fetchItadDeals))
+                        for (const rawEdition of editionDeals) {
+                            for (const d of rawEdition) {
+                                const sid = String(d.shop.id)
+                                if (!existingStoreIds.has(sid)) {
+                                    deals.push({
+                                        storeID: sid,
+                                        storeName: d.shop.name,
+                                        storeIcon: resolveIcon(d.shop.id, d.shop.name, iconMap),
+                                        salePrice: d.price.amount.toFixed(2),
+                                        normalPrice: d.regular.amount.toFixed(2),
+                                        savings: d.cut,
+                                        dealID: d.url,   // use ITAD affiliate URL as dealID so link is correct
+                                        dealLink: d.url,
+                                    })
+                                    existingStoreIds.add(sid)
+                                }
+                            }
+                        }
+                        // Re-sort: Steam first, then cheapest
+                        deals.sort((a, b) => {
+                            if (a.storeID === "61") return -1
+                            if (b.storeID === "61") return 1
+                            return parseFloat(a.salePrice) - parseFloat(b.salePrice)
+                        })
                     }
 
                     return save(deals)

@@ -344,6 +344,41 @@ function GiveawayRow({ giveaway }: { giveaway: GiveawayItem }) {
   )
 }
 
+// ─── Store icon fallbacks ─────────────────────────────────────────────────────
+// CheapShark only has icons for PC stores it tracks. ITAD returns many more
+// stores (Xbox, Nintendo, PlayStation, etc.) that need hardcoded icon URLs.
+// Google's favicon service is reliable for any domain — sz=128 gives a crisp icon
+const G = (domain: string) => `https://www.google.com/s2/favicons?domain=${domain}&sz=128`
+
+const STORE_ICON_FALLBACKS: Record<string, string> = {
+  // Microsoft / Xbox
+  "microsoft store":   G("microsoft.com"),
+  "xbox":              G("xbox.com"),
+  // Nintendo
+  "nintendo eshop":    G("nintendo.com"),
+  "nintendo":          G("nintendo.com"),
+  // PlayStation
+  "playstation store": G("store.playstation.com"),
+  "playstation":       G("store.playstation.com"),
+  // Epic (ITAD name differs slightly from CheapShark)
+  "epic game store":   G("epicgames.com"),
+  "epic games store":  G("epicgames.com"),
+  "epic games":        G("epicgames.com"),
+  // Other stores commonly missing icons
+  "gamesplanet us":    G("us.gamesplanet.com"),
+  "gamesplanet uk":    G("uk.gamesplanet.com"),
+  "gamesplanet fr":    G("fr.gamesplanet.com"),
+  "gamesplanet de":    G("de.gamesplanet.com"),
+  "gamesload":         G("gamesload.com"),
+  "allyouplay":        G("allyouplay.com"),
+  "gamebillet":        G("gamebillet.com"),
+}
+
+function resolveStoreIcon(storeName: string, storeIcon: string): string {
+  if (storeIcon) return storeIcon
+  return STORE_ICON_FALLBACKS[storeName.toLowerCase()] ?? ""
+}
+
 // ─── DiscountRow ──────────────────────────────────────────────────────────────
 // Each row = one store. href goes directly to that store's page for this game.
 // For ITAD deals: direct store URL (e.g. store.steampowered.com/app/105600/).
@@ -376,14 +411,18 @@ function DiscountRow({ deal, isCheapest }: { deal: PriceResult; isCheapest: bool
       }}
     >
       {/* Store icon */}
-      {deal.storeIcon ? (
+      {resolveStoreIcon(deal.storeName, deal.storeIcon) ? (
         <img
-          src={deal.storeIcon}
+          src={resolveStoreIcon(deal.storeName, deal.storeIcon)}
           alt={deal.storeName}
           className="w-7 h-7 object-contain flex-shrink-0 rounded"
         />
       ) : (
-        <div className="w-7 h-7 rounded bg-[#2a2d32] flex-shrink-0" />
+        <div className="w-7 h-7 rounded bg-[#2a2d32] flex-shrink-0 flex items-center justify-center">
+          <span className="text-[10px] font-bold text-white/40">
+            {deal.storeName.charAt(0).toUpperCase()}
+          </span>
+        </div>
       )}
 
       {/* Store name + "Best Deal" badge */}
