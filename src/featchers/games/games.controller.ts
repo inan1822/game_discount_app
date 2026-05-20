@@ -9,6 +9,7 @@ import {
     getForYouService,
     getGamePriceService,
     getGameDealsService,
+    getGameDlcDealsService,
     getFreeToPlayService,
     getHiddenGemsService,
     getDealOfDayService,
@@ -114,6 +115,24 @@ export const getGameDeals = async (req: Request, res: Response): Promise<void> =
             return
         }
         const deals = await getGameDealsService(title, steamAppId)
+        res.status(200).json({ status: "200", message: "OK", data: deals })
+    } catch (error) {
+        const { status, message } = getErrorInfo(error)
+        res.status(status).json({ status: String(status), message, data: null })
+    }
+}
+
+/** DLC Deals — store discounts for every DLC of the given base game.
+ *  Requires ?steamAppId=APPID (DLC list comes from Steam appdetails).
+ */
+export const getGameDlcDeals = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const steamAppId = getString(req.query.steamAppId)
+        if (!steamAppId) {
+            res.status(400).json({ status: "400", message: "steamAppId is required", data: null })
+            return
+        }
+        const deals = await getGameDlcDealsService(steamAppId)
         res.status(200).json({ status: "200", message: "OK", data: deals })
     } catch (error) {
         const { status, message } = getErrorInfo(error)

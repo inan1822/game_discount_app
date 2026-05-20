@@ -256,22 +256,57 @@ async function findSteamAppIdByTitle(title: string): Promise<string | null> {
     }
 
     try {
-        const { data } = await axios.get<{ items?: { id: number; name: string }[] }>(
+        const { data } = await axios.get<{ items?: { id: number; name: string; type?: string }[] }>(
             "https://store.steampowered.com/api/storesearch/",
             { params: { term: title, l: "english", cc: "US" }, timeout: 6000 },
         )
-        const norm = (s: string) => s.toLowerCase().trim()
+
+        // Strip special chars (trademark symbols, punctuation) so "NieR:Automata™"
+        // matches "NieR:Automata". Keep alphanumerics, spaces, collapse runs of spaces.
+        const norm = (s: string) =>
+            s.toLowerCase()
+             .replace(/[^a-z0-9 ]/g, " ")
+             .replace(/\s+/g, " ")
+             .trim()
         const normed = norm(title)
-        // Accept exact match OR Steam result that starts with our title
-        // e.g. "Grand Theft Auto V" matches "Grand Theft Auto V Enhanced"
-        const match = (data.items ?? []).find(item => {
+
+        // Steam returns a mix of base games, DLC, soundtracks, music albums, demos,
+        // bundles, art books, season passes. We only want the base game (`type: "app"`).
+        // Some apps are mislabeled, so we also reject by keyword in the NAME.
+        const REJECT_KEYWORDS = [
+            "dlc", "soundtrack", "ost", "season pass", "season",
+            "expansion", "artbook", "art book", "demo", "bundle",
+            "album", "arrangement", "music", "ep ", "official",
+            "anniversary edition", "yorha edition", "deluxe edition",
+            "complete edition", "ultimate edition", "definitive edition",
+            "game of the year",
+        ]
+        const items = (data.items ?? []).filter(item => {
+            if (item.type && item.type !== "app") return false
             const n = norm(item.name)
-            return n === normed || n.startsWith(normed + " ") || n.startsWith(normed + ":")
+            // Don't reject if the search title itself contains a reject keyword
+            // (e.g. searching "Halo: Combat Evolved Anniversary" should not be filtered)
+            if (REJECT_KEYWORDS.some(kw => normed.includes(kw))) return true
+            return !REJECT_KEYWORDS.some(kw => n.includes(kw))
         })
+
+        // 1. Exact match wins (most reliable signal)
+        // 2. Otherwise pick the SHORTEST name among items that contain our title —
+        //    base games have the shortest name (e.g. "NieR:Automata" beats
+        //    "NieR:Automata Game of the YoRHa Edition")
+        let match = items.find(item => norm(item.name) === normed)
+        if (!match) {
+            const candidates = items
+                .filter(item => norm(item.name).includes(normed))
+                .sort((a, b) => a.name.length - b.name.length)
+            match = candidates[0]
+        }
+
         if (match) {
             console.log(`[Steam] AppID fallback: "${title}" → ${match.name} (${match.id})`)
             return save(String(match.id))
         }
+        console.log(`[Steam] AppID fallback: "${title}" → no valid base-game match (${(data.items ?? []).length} item(s) returned, ${items.length} after filtering)`)
         return save(null)
     } catch (err) {
         console.warn("[Steam] AppID search failed for:", title, err instanceof Error ? err.message : String(err))
@@ -841,10 +876,26 @@ export interface DealResult {
     savings: number
     dealID: string
     dealLink: string
+    /** Set when this row represents a DLC discount rather than the base game. */
+    dlcName?: string
 }
 
 const dealsCache = new Map<string, { deals: DealResult[]; expiresAt: number }>()
 const DEALS_TTL = 30 * 60 * 1000
+
+// ─── G2A Marketplace ─────────────────────────────────────────────────────────
+// G2A does NOT expose a public buyer-side search API. Their `integration-api`
+// is for sellers only (requires OAuth + partner registration). The internal
+// `integration/products` endpoint used by their own website blocks server-side
+// requests (timeout / 404). Synthetic per-platform G2A search links are built
+// in the frontend instead — see `buildPCFallbacks` / `buildSearchDeals` /
+// `buildPSDeals` in `client/app/game/[id]/page.tsx`.
+//
+// This stub exists only so older call sites compile without changes; it always
+// returns []. Callers should treat G2A as having no backend data.
+export async function fetchG2ADeals(_title: string): Promise<DealResult[]> {
+    return []
+}
 
 // ─── Steam Direct Price ───────────────────────────────────────────────────────
 // Uses the free public Steam Store API — no API key required.
@@ -933,63 +984,6 @@ export async function getSteamDirectPrice(steamAppId: string): Promise<DealResul
     }
 }
 
-// ─── GOG Direct Price ─────────────────────────────────────────────────────────
-// GOG has a public catalog API that returns current prices, no key required.
-// Used as a parallel fallback alongside Steam when ITAD is unavailable.
-
-interface GogCatalogProduct {
-    id: string
-    slug: string
-    title: string
-    price: { final: number; base: number; discount: number } | null
-}
-
-const GOG_ICON = "https://www.cheapshark.com/img/stores/icons/5.png"
-const gogPriceCache = new Map<string, { deal: DealResult | null; expiresAt: number }>()
-const GOG_PRICE_TTL = 15 * 60 * 1000  // 15 minutes
-
-/**
- * Fetches the current GOG price for a game by exact title match.
- * No API key required. Returns null when the game isn't on GOG or has no price.
- */
-export async function getGogDirectPrice(title: string): Promise<DealResult | null> {
-    const key = title.toLowerCase().trim()
-    const hit = gogPriceCache.get(key)
-    if (hit && hit.expiresAt > Date.now()) return hit.deal
-
-    const save = (deal: DealResult | null) => {
-        gogPriceCache.set(key, { deal, expiresAt: Date.now() + GOG_PRICE_TTL })
-        return deal
-    }
-
-    try {
-        const { data } = await axios.get<{ products?: GogCatalogProduct[] }>(
-            "https://catalog.gog.com/v1/catalog",
-            {
-                params: { query: title, limit: 5, order: "bestselling", productType: "in:game" },
-                timeout: 6000,
-            },
-        )
-        const norm = (s: string) => s.toLowerCase().trim()
-        const match = (data.products ?? []).find(p => norm(p.title) === norm(title))
-        if (!match?.price) return save(null)
-
-        return save({
-            storeID: "gog",
-            storeName: "GOG",
-            storeIcon: GOG_ICON,
-            salePrice: (match.price.final / 100).toFixed(2),
-            normalPrice: (match.price.base / 100).toFixed(2),
-            savings: match.price.discount,
-            dealID: match.id,
-            dealLink: `https://www.gog.com/game/${match.slug}`,
-        })
-    } catch (err) {
-        console.warn("[GOG] Price fetch failed for:", title, err instanceof Error ? err.message : String(err))
-        return save(null)
-    }
-}
-
 // ── Title matching helpers ────────────────────────────────────────────────────
 
 /** Lowercase, strip punctuation, collapse spaces */
@@ -1067,7 +1061,10 @@ export const getGameDealsService = async (
 ): Promise<DealResult[]> => {
     const cacheKey = steamAppId ? `steam:${steamAppId}` : `title:${title.toLowerCase().trim()}`
     const cached = dealsCache.get(cacheKey)
-    if (cached && cached.expiresAt > Date.now()) return cached.deals
+    if (cached && cached.expiresAt > Date.now()) {
+        console.log(`[Cache] serving "${title}" from file cache`)
+        return cached.deals
+    }
 
     const save = (deals: DealResult[]) => {
         dealsCache.set(cacheKey, { deals, expiresAt: Date.now() + DEALS_TTL })
@@ -1150,12 +1147,9 @@ export const getGameDealsService = async (
         }
 
         // ITAD unavailable, not configured, or returned no deals for this game.
-        // Run Steam + GOG direct fetches in parallel — both are free, no key needed.
-        // Never fall through to CheapShark for Steam games (corrupted gameID mappings).
-        const [steamDeal, gogDeal] = await Promise.all([
-            getSteamDirectPrice(steamAppId),
-            getGogDirectPrice(title),
-        ])
+        // Fetch Steam direct price. GOG is covered by ITAD when the game is on GOG —
+        // no fallback needed (GOG is a curated store, not a marketplace).
+        const steamDeal = await getSteamDirectPrice(steamAppId)
 
         // Steam's appdetails API returns success:false for some publishers (e.g. Rockstar/Take-Two)
         // even when the game is genuinely available on Steam. In that case we synthesize a minimal
@@ -1171,19 +1165,7 @@ export const getGameDealsService = async (
             dealLink: `https://store.steampowered.com/app/${steamAppId}/`,
         }
 
-        const directDeals = [effectiveSteamDeal, gogDeal]
-            .filter((d): d is DealResult => d !== null)
-            // Pin Steam to position 0; sort the rest by price
-            .sort((a, b) => {
-                if (a.storeID === "1") return -1
-                if (b.storeID === "1") return 1
-                const pa = parseFloat(a.salePrice)
-                const pb = parseFloat(b.salePrice)
-                if (isNaN(pa)) return 1
-                if (isNaN(pb)) return -1
-                return pa - pb
-            })
-        return save(directDeals)
+        return save([effectiveSteamDeal])
     }
 
     // ── Path B: CheapShark — only used for games with no Steam presence ───────
@@ -1264,15 +1246,168 @@ export const getGameDealsService = async (
                 byStore.set(deal.storeID, deal)
         }
 
-        return save(
-            [...byStore.values()].sort((a, b) => parseFloat(a.salePrice) - parseFloat(b.salePrice))
+        const csDeals = [...byStore.values()].sort(
+            (a, b) => parseFloat(a.salePrice) - parseFloat(b.salePrice)
         )
+
+        return save(csDeals)
     } catch (err) {
         console.error("[GameDeals] CheapShark path failed:", err instanceof Error ? err.message : String(err))
         return []
     } finally {
         releaseCs()
     }
+}
+
+// ─── DLC deals ────────────────────────────────────────────────────────────────
+// Show which DLCs of a game are currently on sale. Flow:
+//   1. Steam appdetails → base game's `dlc: number[]` list (DLC appIDs)
+//   2. For each DLC appID → resolve ITAD UUID via /games/lookup/v1?appid=
+//   3. Batch POST /games/prices/v3 with all UUIDs (one call → all DLC prices)
+//   4. Return one DealResult per DLC × store, tagged with `dlcName` so the UI can
+//      group/display the DLC title alongside the store row.
+
+interface SteamDlcDetailsEntry {
+    success: boolean
+    data?: {
+        name?: string
+        type?: string
+        dlc?: number[]
+    }
+}
+
+const dlcDealsCache = new Map<string, { deals: DealResult[]; expiresAt: number }>()
+const DLC_DEALS_TTL = 30 * 60 * 1000   // 30 min, same as base game deals
+const itadAppidLookupCache = new Map<number, { id: string | null; title: string | null; expiresAt: number }>()
+const ITAD_APPID_TTL = 7 * 24 * 60 * 60 * 1000
+
+async function lookupItadGameByAppid(appid: number): Promise<{ id: string; title: string } | null> {
+    const hit = itadAppidLookupCache.get(appid)
+    if (hit && hit.expiresAt > Date.now()) {
+        return hit.id && hit.title ? { id: hit.id, title: hit.title } : null
+    }
+    const headers = itadHeaders()
+    if (!headers) return null
+    try {
+        const { data } = await axios.get(`${ITAD_BASE}/games/lookup/v1`, {
+            params: { appid },
+            headers,
+            timeout: 8000,
+        })
+        if (data.found && data.game?.id && data.game?.title) {
+            itadAppidLookupCache.set(appid, {
+                id: String(data.game.id),
+                title: String(data.game.title),
+                expiresAt: Date.now() + ITAD_APPID_TTL,
+            })
+            return { id: String(data.game.id), title: String(data.game.title) }
+        }
+        itadAppidLookupCache.set(appid, { id: null, title: null, expiresAt: Date.now() + ITAD_APPID_TTL })
+        return null
+    } catch {
+        return null
+    }
+}
+
+/**
+ * Returns store deals for every DLC of the given base game that currently has
+ * a real price on at least one store. Only callable when a steamAppId is known
+ * (DLC lists are sourced from Steam appdetails — no ITAD-only equivalent).
+ *
+ * Behaviour:
+ *   • Empty array when the game has no DLC, when ITAD has no DLC pricing, or
+ *     when the steamAppId is missing.
+ *   • Each row has `dlcName` set; UI groups/labels by DLC.
+ */
+export const getGameDlcDealsService = async (
+    steamAppId: string,
+): Promise<DealResult[]> => {
+    const cacheKey = `dlc:${steamAppId}`
+    const cached = dlcDealsCache.get(cacheKey)
+    if (cached && cached.expiresAt > Date.now()) {
+        console.log(`[DLC] serving "${steamAppId}" from cache (${cached.deals.length} deal(s))`)
+        return cached.deals
+    }
+    const save = (deals: DealResult[]) => {
+        dlcDealsCache.set(cacheKey, { deals, expiresAt: Date.now() + DLC_DEALS_TTL })
+        console.log(`[DLC] "${steamAppId}" → ${deals.length} DLC deal(s)`)
+        return deals
+    }
+
+    // 1. Get DLC list from Steam
+    let dlcAppIds: number[] = []
+    try {
+        const { data } = await axios.get<Record<string, SteamDlcDetailsEntry>>(
+            "https://store.steampowered.com/api/appdetails",
+            { params: { appids: steamAppId, cc: "us", filters: "basic" }, timeout: 8000 },
+        )
+        const entry = data[steamAppId]
+        if (!entry?.success || !entry.data?.dlc?.length) return save([])
+        dlcAppIds = entry.data.dlc.slice(0, 40)   // cap to 40 to limit API calls
+    } catch (err) {
+        console.warn("[DLC] Steam appdetails failed:", err instanceof Error ? err.message : String(err))
+        return save([])
+    }
+
+    if (dlcAppIds.length === 0) return save([])
+
+    // 2. Resolve each DLC appid → ITAD UUID + title
+    const lookups = await Promise.all(dlcAppIds.map(lookupItadGameByAppid))
+    const dlcMeta = lookups
+        .map((l, i) => l ? { appid: dlcAppIds[i], itadId: l.id, name: l.title } : null)
+        .filter((x): x is { appid: number; itadId: string; name: string } => x !== null)
+
+    if (dlcMeta.length === 0) return save([])
+
+    // 3. Batch ITAD prices for all DLC UUIDs
+    const headers = itadHeaders()
+    if (!headers) return save([])
+
+    let priceData: { id: string; deals: ItadRawDeal[] }[] = []
+    try {
+        const ids = dlcMeta.map(d => d.itadId)
+        const { data } = await axios.post<{ id: string; deals: ItadRawDeal[] }[]>(
+            `${ITAD_BASE}/games/prices/v3`,
+            ids,
+            { params: { country: "US" }, headers, timeout: 10000 },
+        )
+        priceData = Array.isArray(data) ? data : []
+    } catch (err) {
+        console.warn("[DLC] ITAD prices failed:", err instanceof Error ? err.message : String(err))
+        return save([])
+    }
+
+    // 4. Build DealResult[] — one row per DLC × store, tagged with dlcName.
+    //    Only include DLCs that have at least one real deal (filters out 0-deal entries).
+    const iconMap = await buildIconMap()
+    const byId = new Map(dlcMeta.map(d => [d.itadId, d]))
+    const out: DealResult[] = []
+
+    for (const entry of priceData) {
+        const meta = byId.get(entry.id)
+        if (!meta || !entry.deals?.length) continue
+        for (const d of entry.deals) {
+            out.push({
+                storeID: String(d.shop.id),
+                storeName: d.shop.name,
+                storeIcon: resolveIcon(d.shop.id, d.shop.name, iconMap),
+                salePrice: d.price.amount.toFixed(2),
+                normalPrice: d.regular.amount.toFixed(2),
+                savings: d.cut,
+                dealID: `dlc-${meta.appid}-${d.shop.id}`,
+                dealLink: d.url,
+                dlcName: meta.name,
+            })
+        }
+    }
+
+    // Sort: discounted first (biggest cut), then cheapest. Keeps real sales on top.
+    out.sort((a, b) => {
+        if (b.savings !== a.savings) return b.savings - a.savings
+        return parseFloat(a.salePrice) - parseFloat(b.salePrice)
+    })
+
+    return save(out)
 }
 
 // ─── Batch price fetching — concurrency-capped ───────────────────────────────

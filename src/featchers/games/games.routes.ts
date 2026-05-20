@@ -11,6 +11,7 @@ import {
     getGamesByGenre,
     getGamePrice,
     getGameDeals,
+    getGameDlcDeals,
     getFreeToPlay,
     getHiddenGems,
     getDealOfDay,
@@ -47,6 +48,9 @@ gamesRouter.post("/batch-prices", authMiddleware, batchPrices)
 
 // GET /api/v1/games/deals?title=TITLE  → all store deals (game detail page)
 gamesRouter.get("/deals", getGameDeals)
+
+// GET /api/v1/games/dlc-deals?steamAppId=APPID → DLC-only store discounts
+gamesRouter.get("/dlc-deals", getGameDlcDeals)
 
 // GET /api/v1/games/free-to-play
 gamesRouter.get("/free-to-play", getFreeToPlay)

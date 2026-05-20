@@ -33,7 +33,7 @@ export default function AuthCallbackInner() {
       toast.error(messages[error] ?? "Login failed. Try again.")
       router.replace("/login")
     }
-  }, [])
+  }, [searchParams, router])
 
   return (
     <div className="flex h-screen w-screen items-center justify-center bg-[#1E2532]">

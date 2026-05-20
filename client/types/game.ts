@@ -81,4 +81,6 @@ export interface PriceResult {
   savings: number
   dealID: string
   dealLink: string
+  /** Set when this row represents a DLC discount (returned by /games/dlc-deals). */
+  dlcName?: string
 }

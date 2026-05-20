@@ -64,7 +64,16 @@ export const verifyEmailService = async ({ email, code }: { email: string, code:
         throw new AppError("Verification code has expired", 400)
     }
 
-    if (user.sendVerificationCode !== hashCode(code)) {
+    // Timing-safe comparison: `!==` on hex strings is short-circuit; an attacker
+    // measuring server response time could infer matching prefix length and brute-force
+    // the 6-digit code. crypto.timingSafeEqual compares in constant time.
+    const storedHash = Buffer.from(user.sendVerificationCode ?? "", "hex")
+    const incomingHash = Buffer.from(hashCode(code), "hex")
+    if (
+        storedHash.length === 0 ||
+        storedHash.length !== incomingHash.length ||
+        !crypto.timingSafeEqual(storedHash, incomingHash)
+    ) {
         throw new AppError("Invalid code", 400)
     }
 

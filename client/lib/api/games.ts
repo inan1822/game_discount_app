@@ -65,6 +65,22 @@ export const getGameDeals = async (
   }
 }
 
+/**
+ * DLC Deals — store discounts for every DLC of the given base game.
+ * Requires a Steam AppID (DLC list comes from Steam appdetails).
+ * Returns empty array when the game has no DLC or no DLC pricing.
+ */
+export const getGameDlcDeals = async (
+  steamAppId: string,
+): Promise<import("@/types/game").PriceResult[]> => {
+  try {
+    const { data } = await api.get("/games/dlc-deals", { params: { steamAppId } })
+    return data.data ?? []
+  } catch {
+    return []
+  }
+}
+
 /** Free to Play */
 export const getFreeToPlayGames = async (): Promise<Game[]> => {
   const { data } = await api.get("/games/free-to-play")
@@ -106,7 +122,7 @@ export const getByGenreGames = async (genre: string, page = 1): Promise<Game[]> 
 
 /**
  * Batch price fetch — POST /games/batch-prices
- * Requires: user must be logged in (Bearer token injected by axios interceptor).
+ * Requires: user must be logged in (httpOnly cookie sent automatically via withCredentials).
  * Fetches prices for up to 20 game titles in a single round-trip.
  * Returns a map of { title → price | null }.
  */
