@@ -12,6 +12,7 @@ interface AuthContextType {
   register: (name: string, email: string, password: string) => Promise<void>
   loginAsGuest: () => void
   logout: () => Promise<void>
+  updateUser: (patch: Partial<User>) => void
   isAuthenticated: boolean
 }
 
@@ -57,6 +58,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setIsGuest(true)
   }, [])
 
+  const updateUser = useCallback((patch: Partial<User>) => {
+    setUser(prev => prev ? { ...prev, ...patch } : null)
+  }, [])
+
   const logout = useCallback(async () => {
     try {
       // Ask the server to clear the DB token and the httpOnly cookie
@@ -78,6 +83,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       register,
       loginAsGuest,
       logout,
+      updateUser,
       isAuthenticated: !!user
     }}>
       {children}

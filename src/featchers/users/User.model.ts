@@ -19,7 +19,16 @@ export interface IUser extends mongoose.Document {
     twoFactorExpiry?: Date
     resetPasswordToken?: string
     resetPasswordExpiry?: Date
+    pendingEmail?: string
+    pendingEmailCode?: string
+    pendingEmailExpiry?: Date
     role: "user" | "admin"
+    following: mongoose.Types.ObjectId[]
+    followers: mongoose.Types.ObjectId[]
+    notificationPrefs: {
+        events: boolean
+        discounts: boolean
+    }
 }
 
 const userSchema = new mongoose.Schema<IUser>({
@@ -65,7 +74,16 @@ const userSchema = new mongoose.Schema<IUser>({
         type: String,
         enum: ["user", "admin"],
         default: "user"
-    }
+    },
+    pendingEmail:        { type: String, select: false },
+    pendingEmailCode:    { type: String, select: false },
+    pendingEmailExpiry:  { type: Date,   select: false },
+    following: { type: [{ type: mongoose.Schema.Types.ObjectId, ref: "user" }], default: [] },
+    followers: { type: [{ type: mongoose.Schema.Types.ObjectId, ref: "user" }], default: [] },
+    notificationPrefs: {
+        events:    { type: Boolean, default: true },
+        discounts: { type: Boolean, default: true },
+    },
 }, { timestamps: true })
 
 userSchema.index({ role: 1 })

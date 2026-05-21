@@ -4,6 +4,8 @@ import authRouter from "./src/featchers/auth/auth.routes.js"
 import userRouter from "./src/featchers/users/users.routes.js"
 import gamesRouter from "./src/featchers/games/games.routes.js"
 import wishlistRouter from "./src/featchers/wishlist/wishlist.routes.js"
+import notificationsRouter from "./src/featchers/notifications/notifications.routes.js"
+import supportRouter from "./src/featchers/support/support.routes.js"
 import mongoConnect from "./src/config/db.js"
 import rateLimit from "express-rate-limit"
 import cors from "cors"
@@ -84,6 +86,8 @@ app.use("/api/v1/auth", authLimiter, authRouter)
 app.use("/api/v1/users", globalLimiter, userRouter)
 app.use("/api/v1/games", globalLimiter, gamesRouter)
 app.use("/api/v1/wishlist", globalLimiter, wishlistRouter)
+app.use("/api/v1/notifications", globalLimiter, notificationsRouter)
+app.use("/api/v1/support",       globalLimiter, supportRouter)
 
 app.get("/", (_req, res) => {
     res.status(200).json({ status: "ok", message: "DisLow API is running" })

@@ -24,6 +24,8 @@ import {
   type DealOfDay as DealOfDayType,
 } from "@/lib/api/games"
 import { getWishlist, addToWishlist, removeFromWishlist } from "@/lib/api/wishlist"
+import { useUnreadCount } from "@/hooks/useUnreadCount"
+import NotificationDot from "@/components/ui/NotificationDot"
 import type { Game, WishlistItem } from "@/types/game"
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -103,6 +105,7 @@ function NavGlowItem({
   active,
   locked,
   delay,
+  dot,
   onClick,
 }: {
   icon:    React.ElementType
@@ -110,6 +113,7 @@ function NavGlowItem({
   active:  boolean
   locked:  boolean
   delay:   number
+  dot?:    React.ReactNode
   onClick: () => void
 }) {
   const ref                       = useRef<HTMLButtonElement>(null)
@@ -174,15 +178,16 @@ function NavGlowItem({
       />
 
       <Icon size={15} style={{ position: "relative", zIndex: 1 }} />
-      <span style={{ position: "relative", zIndex: 1 }}>{label}</span>
+      <span style={{ position: "relative", zIndex: 1, flex: 1, textAlign: "left" }}>{label}</span>
       {locked && (
         <span
-          className="ml-auto text-[8px] px-1 py-0.5 rounded"
+          className="text-[8px] px-1 py-0.5 rounded"
           style={{ background: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.2)", position: "relative", zIndex: 1 }}
         >
           Login
         </span>
       )}
+      {dot && <span style={{ position: "relative", zIndex: 1 }}>{dot}</span>}
     </motion.button>
   )
 }
@@ -294,6 +299,7 @@ export default function HomePage() {
   const router           = useRouter()
   const { user, logout } = useAuth()
   const isLoggedIn       = !!user
+  const { counts: unreadCounts } = useUnreadCount()
 
   const [activeTab,    setActiveTab]    = useState<Tab>("Popular")
   const [activeNav,    setActiveNav]    = useState("Home")
@@ -569,6 +575,10 @@ export default function HomePage() {
                 active={activeNav === label}
                 locked={!isLoggedIn && AUTH_NAV.has(label)}
                 delay={0.1 + i * 0.05}
+                dot={label === "Notifications" && isLoggedIn
+                  ? <NotificationDot events={unreadCounts.events} discounts={unreadCounts.discounts} />
+                  : undefined
+                }
                 onClick={() => handleNavClick(label, href)}
               />
             ))}

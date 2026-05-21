@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx tsc *)",
+      "Skill(anthropic-skills:dislow-code-review)",
+      "Skill(anthropic-skills:dislow-code-review:*)",
+      "Bash(node -e \"const p=require\\('./package.json'\\); const d={...p.dependencies,...p.devDependencies}; ['multer','sharp','cloudinary'].forEach\\(k=>console.log\\(k,d[k]||'NOT FOUND'\\)\\)\")",
+      "Bash(dir \"C:\\\\FULLSTACK\\\\lessons\\\\AI Figma\\\\gaming-app\\\\src\")",
+      "Bash(dir \"C:\\\\FULLSTACK\\\\lessons\\\\AI Figma\\\\gaming-app\" /b)",
+      "Bash(node -e \"const m = require\\('mongoose'\\); console.log\\(typeof m.FilterQuery, Object.keys\\(m\\).filter\\(k => k.includes\\('Filter'\\)\\)\\)\")"
+    ]
+  }
+}
