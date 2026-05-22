@@ -10,7 +10,7 @@ import {
   Users, User, Star, LogIn, X, ChevronDown,
 } from "lucide-react"
 import { useAuth } from "@/context/AuthContext"
-import { BackgroundGradientAnimation } from "@/components/ui/BackgroundGradientAnimation"
+import PageBackground from "@/components/ui/PageBackground"
 import GameCard from "@/components/game/GameCard"
 import PopularCarousel from "@/components/game/PopularCarousel"
 import NewBentoGrid from "@/components/game/NewBentoGrid"
@@ -545,11 +545,7 @@ export default function HomePage() {
 
   return (
     <main className="relative w-screen h-screen overflow-hidden" style={{ background: "#1E2532" }}>
-      <BackgroundGradientAnimation />
-      <img src="/icons/auth-bg-top.svg" aria-hidden
-        className="absolute inset-0 w-full h-full pointer-events-none object-cover"
-        style={{ zIndex: 2 }}
-      />
+      <PageBackground />
 
       <div className="relative flex h-full" style={{ zIndex: 3 }}>
 

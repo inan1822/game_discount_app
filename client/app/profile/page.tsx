@@ -11,7 +11,7 @@ import {
   LogOut,
 } from "lucide-react"
 import { useAuth } from "@/context/AuthContext"
-import { BackgroundGradientAnimation } from "@/components/ui/BackgroundGradientAnimation"
+import PageBackground from "@/components/ui/PageBackground"
 import StatsRow from "@/components/profile/StatsRow"
 import AvatarPicker from "@/components/profile/AvatarPicker"
 import PreferenceToggle from "@/components/profile/PreferenceToggle"
@@ -151,13 +151,7 @@ export default function ProfilePage() {
 
   return (
     <main className="relative w-screen h-screen overflow-hidden" style={{ background: "#1E2532" }}>
-      <BackgroundGradientAnimation />
-      <img
-        src="/icons/auth-bg-top.svg"
-        aria-hidden
-        className="absolute inset-0 w-full h-full pointer-events-none object-cover"
-        style={{ zIndex: 2 }}
-      />
+      <PageBackground />
 
       <div className="relative flex h-full" style={{ zIndex: 3 }}>
         {/* ══════════ SIDEBAR ══════════ */}

@@ -26,3 +26,58 @@ export interface AuthResponse {
     userID: string
   }
 }
+
+// ─── Friends system ─────────────────────────────────────────────────────────
+
+export type Relationship =
+  | "self"
+  | "following"
+  | "requested"
+  | "they-requested-me"
+  | "follows-me"
+  | "friends"
+  | "none"
+
+export interface FriendListItem {
+  _id: string
+  displayName: string
+  avatarUrl: string | null
+  isOnline: boolean
+  sharedGamesCount: number
+  sharedFriendsCount: number
+}
+
+export interface FollowRequestUser {
+  _id: string
+  displayName: string
+  avatarUrl: string | null
+}
+
+export interface UserSearchResult {
+  _id: string
+  displayName: string
+  avatarUrl: string | null
+  isPrivate: boolean
+  relationship: Relationship
+}
+
+export interface FriendProfileFavorite {
+  gameId: string
+  gameName: string
+  gameCover: string | null
+  gameSlug: string
+}
+
+export interface FriendProfile {
+  _id: string
+  displayName: string
+  avatarUrl: string | null
+  isPrivate: boolean
+  isOnline: boolean
+  followingCount: number
+  followersCount: number
+  sharedFriendsCount: number
+  sharedGamesCount: number
+  relationship: Relationship
+  favorites: FriendProfileFavorite[] | null
+}

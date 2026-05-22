@@ -8,7 +8,7 @@ import { Eye, EyeOff } from "lucide-react"
 import { toast } from "react-toastify"
 import { useAuth } from "@/context/AuthContext"
 import { SparkleButton } from "@/components/ui/SparkleButton"
-import { BackgroundGradientAnimation } from "@/components/ui/BackgroundGradientAnimation"
+import PageBackground from "@/components/ui/PageBackground"
 import { CircularGallery, GalleryItem } from "@/components/ui/CircularGallery"
 
 // ─── Game covers for the circular gallery ────────────────────────────────────
@@ -135,18 +135,7 @@ export default function LoginPage() {
       className="relative flex flex-col h-screen w-screen overflow-hidden"
       style={{ background: "#1E2532" }}
     >
-      {/* Layer 1 ── Animated gradient blobs ── */}
-      <BackgroundGradientAnimation />
-
-      {/* Layer 2 ── Gallery (game covers rotating in 3D) lives inside its own section below */}
-
-      {/* Layer 3 ── Auth background top layer SVG (purple→cyan tint, covers full page) ── */}
-      <img
-        src="/icons/auth-bg-top.svg"
-        aria-hidden="true"
-        className="absolute inset-0 w-full h-full pointer-events-none"
-        style={{ zIndex: 2, objectFit: "cover" }}
-      />
+      <PageBackground />
 
       {/* Layer 4 ── Login card (always on top) ───────────────────────── z:3 ── */}
       <div

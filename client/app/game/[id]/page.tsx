@@ -10,7 +10,7 @@ import {
 import { getGameById, getGameDeals, getGameDlcDeals, getGameGiveaways, getGameEvents } from "@/lib/api/games"
 import { addToWishlist, removeFromWishlist, getWishlist } from "@/lib/api/wishlist"
 import { useAuth } from "@/context/AuthContext"
-import { BackgroundGradientAnimation } from "@/components/ui/BackgroundGradientAnimation"
+import PageBackground from "@/components/ui/PageBackground"
 import type { Game, PriceResult, GiveawayItem, GameEvent } from "@/types/game"
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -1183,13 +1183,7 @@ export default function GameDetailPage() {
 
   return (
     <main className="relative w-screen h-screen overflow-hidden" style={{ background: "#12131A" }}>
-      <BackgroundGradientAnimation />
-      <img
-        src="/icons/auth-bg-top.svg"
-        aria-hidden
-        className="absolute inset-0 w-full h-full pointer-events-none object-cover"
-        style={{ zIndex: 2 }}
-      />
+      <PageBackground />
 
       <div className="relative flex h-full" style={{ zIndex: 3 }}>
 
