@@ -92,7 +92,14 @@ export const verifyTwoFactor = async (req: Request, res: Response): Promise<void
     try {
         const result = await verifyTwoFactorService(req.body)
         setAuthCookie(res, result.token)
-        res.status(200).json({ message: "Login successful as admin" })
+        // Token is also returned in the body so external auth integrations
+        // (e.g. next-auth in the CRM) can place it in their session — the
+        // cookie still covers same-origin storefront flows.
+        res.status(200).json({
+            status: "200",
+            message: "Login successful as admin",
+            data: { token: result.token, userID: result.userID, role: "admin" }
+        })
     } catch (error) {
         const { status, message } = getErrorInfo(error)
         res.status(status).json({ status: String(status), message, data: null })

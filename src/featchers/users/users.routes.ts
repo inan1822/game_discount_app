@@ -6,6 +6,12 @@ import { getUser, getAll, deleteUser, updateUser, promoteToAdmin, deleteMyUser, 
 import { uploadAvatarSingle } from "./avatar.middleware.js"
 import { validateRequest } from "../../shared/middlewares/validateRequst.js"
 import { editProfileSchema, changePasswordSchema, confirmPendingEmailSchema, deleteAccountSchema } from "../../shared/validators/profile.schemas.js"
+import { friendIdParamSchema, requesterIdParamSchema, userSearchQuerySchema } from "../../shared/validators/friends.schemas.js"
+import {
+    listFollowing, listFollowers, listRequests,
+    follow, unfollow, acceptRequest, declineRequest,
+    searchUsers, getPublicProfile,
+} from "./friends.controller.js"
 
 // Strict limiter for sensitive profile mutation endpoints (5 req / 15 min per IP)
 const profileMutateLimiter = rateLimit({
@@ -23,6 +29,24 @@ const deleteAccountLimiter = rateLimit({
     standardHeaders: true,
     legacyHeaders: false,
     message: { status: "429", message: "Too many delete attempts. Please try again tomorrow.", data: null },
+})
+
+// Follow/accept actions — 30 per hour per IP (spam prevention)
+const followActionLimiter = rateLimit({
+    windowMs: 60 * 60 * 1000,
+    limit: 30,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { status: "429", message: "Too many follow actions, please slow down", data: null },
+})
+
+// User search — 60 per minute per IP (autocomplete fires often)
+const userSearchLimiter = rateLimit({
+    windowMs: 60 * 1000,
+    limit: 60,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { status: "429", message: "Too many search requests", data: null },
 })
 
 const userRouter: Router = Router()
@@ -56,6 +80,60 @@ userRouter.delete("/me/providers/:provider", profileMutateLimiter, authMiddlewar
 
 // Delete own account — password + confirm phrase required
 userRouter.delete("/me/account", deleteAccountLimiter, authMiddleware, validateRequest(deleteAccountSchema, "body"), deleteAccount)
+
+// ─── Friends system ───────────────────────────────────────────────────────────
+// All friends routes are scoped by req.user.id — never trust a userId from body.
+
+userRouter.get("/me/following", authMiddleware, listFollowing)
+userRouter.get("/me/followers", authMiddleware, listFollowers)
+userRouter.get("/me/requests",  authMiddleware, listRequests)
+
+// User search (autocomplete)
+userRouter.get(
+    "/search",
+    userSearchLimiter,
+    authMiddleware,
+    validateRequest(userSearchQuerySchema, "query"),
+    searchUsers,
+)
+
+// Public profile of another user (with privacy gating on favorites)
+userRouter.get(
+    "/:id/profile",
+    authMiddleware,
+    validateRequest(friendIdParamSchema, "params"),
+    getPublicProfile,
+)
+
+// Follow / unfollow (unfollow also cancels outgoing requests)
+userRouter.post(
+    "/:id/follow",
+    followActionLimiter,
+    authMiddleware,
+    validateRequest(friendIdParamSchema, "params"),
+    follow,
+)
+userRouter.delete(
+    "/:id/follow",
+    authMiddleware,
+    validateRequest(friendIdParamSchema, "params"),
+    unfollow,
+)
+
+// Accept / decline incoming request (param is the requester's user id)
+userRouter.post(
+    "/requests/:requesterId/accept",
+    followActionLimiter,
+    authMiddleware,
+    validateRequest(requesterIdParamSchema, "params"),
+    acceptRequest,
+)
+userRouter.delete(
+    "/requests/:requesterId/decline",
+    authMiddleware,
+    validateRequest(requesterIdParamSchema, "params"),
+    declineRequest,
+)
 
 // Get user by id (public)
 userRouter.get("/:id", getUser)

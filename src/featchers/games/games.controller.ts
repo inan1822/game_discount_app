@@ -17,6 +17,7 @@ import {
     batchGetPricesService,
     getGameGiveawaysService,
     getGameEventsService,
+    getCardPricesService,
 } from "./games.service.js"
 
 const getString = (val: unknown): string => {
@@ -108,13 +109,15 @@ export const getForYou = async (req: Request, res: Response): Promise<void> => {
  */
 export const getGameDeals = async (req: Request, res: Response): Promise<void> => {
     try {
-        const title      = getString(req.query.title)
-        const steamAppId = getString(req.query.steamAppId) || undefined
+        const title       = getString(req.query.title)
+        const steamAppId  = getString(req.query.steamAppId)  || undefined
+        const rawYear     = getString(req.query.releaseYear)  || ""
+        const releaseYear = rawYear ? (parseInt(rawYear, 10) || undefined) : undefined
         if (!title) {
             res.status(400).json({ status: "400", message: "title is required", data: null })
             return
         }
-        const deals = await getGameDealsService(title, steamAppId)
+        const deals = await getGameDealsService(title, steamAppId, releaseYear)
         res.status(200).json({ status: "200", message: "OK", data: deals })
     } catch (error) {
         const { status, message } = getErrorInfo(error)
@@ -262,6 +265,33 @@ export const getGameGiveaways = async (req: Request, res: Response): Promise<voi
         }
         const giveaways = await getGameGiveawaysService(title)
         res.status(200).json({ status: "200", message: "OK", data: giveaways })
+    } catch (error) {
+        const { status, message } = getErrorInfo(error)
+        res.status(status).json({ status: String(status), message, data: null })
+    }
+}
+
+/**
+ * POST /api/v1/games/card-prices
+ * Body: { games: Array<{ id: number; name: string; steamAppId?: string }> }
+ * Returns: { [gameId]: CardPrice | null }
+ * No auth required — results are public price data.
+ */
+export const cardPrices = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const { games } = req.body as { games?: unknown }
+        if (!Array.isArray(games) || games.length === 0) {
+            res.status(400).json({ status: "400", message: "games must be a non-empty array", data: null })
+            return
+        }
+        if (games.length > 50) {
+            res.status(400).json({ status: "400", message: "Maximum 50 games per request", data: null })
+            return
+        }
+        const prices = await getCardPricesService(
+            games.slice(0, 50) as Array<{ id: number; name: string; steamAppId?: string; released?: string }>
+        )
+        res.status(200).json({ status: "200", message: "OK", data: prices })
     } catch (error) {
         const { status, message } = getErrorInfo(error)
         res.status(status).json({ status: String(status), message, data: null })

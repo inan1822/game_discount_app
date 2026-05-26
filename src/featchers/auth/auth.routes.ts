@@ -24,6 +24,17 @@ const registerLimiter = rateLimit({
     message: { status: "429", message: "Too many attempts, please try again later", data: null }
 })
 
+// Verify-2FA limiter — DEDICATED bucket per security checklist #4.
+// A shared limiter with /login lets an attacker burn login attempts to lock out a
+// real admin's verification window. Separate buckets = each endpoint gets its own.
+const verify2faLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    limit: 5,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { status: "429", message: "Too many verification attempts, please try again later", data: null }
+})
+
 const authRouter: Router = Router()
 
 // ─── Email / password ─────────────────────────────────────────────────────────
@@ -31,7 +42,7 @@ authRouter.post("/register", registerLimiter, validateRequest(registerSchema, "b
 authRouter.post("/verify", strictAuthLimiter, validateRequest(verifyEmailSchema, "body"), verifyEmail)
 authRouter.post("/resend-verify", strictAuthLimiter, validateRequest(requestPasswordResetSchema, "body"), resendVerification)
 authRouter.post("/login", strictAuthLimiter, validateRequest(loginSchema, "body"), login)
-authRouter.post("/admin", strictAuthLimiter, validateRequest(verifyTwoFactorSchema, "body"), verifyTwoFactor)
+authRouter.post("/admin", verify2faLimiter, validateRequest(verifyTwoFactorSchema, "body"), verifyTwoFactor)
 authRouter.post("/request-password-reset", strictAuthLimiter, validateRequest(requestPasswordResetSchema, "body"), requestPasswordReset)
 authRouter.post("/reset-password", strictAuthLimiter, validateRequest(resetPasswordSchema, "body"), resetPassword)
 authRouter.post("/logout", authMiddleware, logout)

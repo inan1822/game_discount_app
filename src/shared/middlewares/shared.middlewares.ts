@@ -30,7 +30,17 @@ export const authMiddleware = async (req: Request, res: Response, next: NextFunc
         if (!user || user.token !== inputToken) {
             return res.status(401).json({ message: "Token is invalid or expired" })
         }
-        req.user = decoded
+        // Always use the DB role — allows admin promotions to take effect
+        // without requiring the user to log out and back in.
+        req.user = { ...decoded, role: user.role }
+
+        // Throttled presence ping — only touch DB once per minute per user.
+        // Fire-and-forget so the auth check stays fast.
+        const lastSeen = user.lastSeenAt?.getTime() ?? 0
+        if (Date.now() - lastSeen > 60_000) {
+            userModel.updateOne({ _id: user._id }, { $set: { lastSeenAt: new Date() } })
+                .catch(() => { /* presence is best-effort */ })
+        }
 
         next();
 

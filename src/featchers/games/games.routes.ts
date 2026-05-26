@@ -17,6 +17,7 @@ import {
     getDealOfDay,
     getByGenre,
     batchPrices,
+    cardPrices,
     getGameGiveaways,
     getGameEvents,
 } from "./games.controller.js"
@@ -45,6 +46,9 @@ gamesRouter.get("/price", getGamePrice)
 
 // POST /api/v1/games/batch-prices  → body: { titles: string[] } → { [title]: price | null }
 gamesRouter.post("/batch-prices", authMiddleware, batchPrices)
+
+// POST /api/v1/games/card-prices → body: { games: [{id,name,steamAppId?}] } → { [id]: CardPrice | null }
+gamesRouter.post("/card-prices", cardPrices)
 
 // GET /api/v1/games/deals?title=TITLE  → all store deals (game detail page)
 gamesRouter.get("/deals", getGameDeals)

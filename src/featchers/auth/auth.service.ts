@@ -157,7 +157,7 @@ export const verifyTwoFactorService = async ({ email, code }: { email: string, c
 
     await userModel.findByIdAndUpdate(user._id, { token })
 
-    return { token }
+    return { token, userID: user._id }
 }
 
 export const logoutService = async (userId: string) => {

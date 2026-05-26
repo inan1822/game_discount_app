@@ -4,7 +4,7 @@ import { Model } from "mongoose"
 export interface INotification extends mongoose.Document {
     _id: mongoose.Types.ObjectId
     userId: mongoose.Types.ObjectId
-    type: "event" | "discount"
+    type: "event" | "discount" | "announcement"
     title: string
     body: string
     gameId: number | null
@@ -16,7 +16,7 @@ export interface INotification extends mongoose.Document {
 
 const notificationSchema = new mongoose.Schema<INotification>({
     userId:   { type: mongoose.Schema.Types.ObjectId, ref: "user", required: true, index: true },
-    type:     { type: String, enum: ["event", "discount"], required: true },
+    type:     { type: String, enum: ["event", "discount", "announcement"], required: true },
     title:    { type: String, required: true, maxlength: 200 },
     body:     { type: String, default: "" },
     gameId:   { type: Number, default: null },

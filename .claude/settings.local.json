@@ -7,7 +7,32 @@
       "Bash(node -e \"const p=require\\('./package.json'\\); const d={...p.dependencies,...p.devDependencies}; ['multer','sharp','cloudinary'].forEach\\(k=>console.log\\(k,d[k]||'NOT FOUND'\\)\\)\")",
       "Bash(dir \"C:\\\\FULLSTACK\\\\lessons\\\\AI Figma\\\\gaming-app\\\\src\")",
       "Bash(dir \"C:\\\\FULLSTACK\\\\lessons\\\\AI Figma\\\\gaming-app\" /b)",
-      "Bash(node -e \"const m = require\\('mongoose'\\); console.log\\(typeof m.FilterQuery, Object.keys\\(m\\).filter\\(k => k.includes\\('Filter'\\)\\)\\)\")"
+      "Bash(node -e \"const m = require\\('mongoose'\\); console.log\\(typeof m.FilterQuery, Object.keys\\(m\\).filter\\(k => k.includes\\('Filter'\\)\\)\\)\")",
+      "Skill(anthropic-skills:skill-creator)",
+      "Skill(anthropic-skills:skill-creator:*)",
+      "Bash(mkdir -p \"C:\\\\FULLSTACK\\\\lessons\\\\AI Figma\\\\gaming-app\\\\client\\\\app\\\\friends\\\\[id]\")",
+      "Bash(mkdir -p \"C:/Users/banan/.claude/skills/gaming-crm-builder/references\")",
+      "Bash(ls \"C:/Users/banan/AppData/Roaming/Claude/local-agent-mode-sessions/skills-plugin/41ecb9a3-67a1-477e-b2c2-5c359e61cfb5/a553fb43-4d6c-43d5-ae4d-a51325d0b912/skills/skill-creator/scripts/\" 2>/dev/null | head)",
+      "Read(//c/Users/banan/AppData/Roaming/Claude/local-agent-mode-sessions/skills-plugin/41ecb9a3-67a1-477e-b2c2-5c359e61cfb5/a553fb43-4d6c-43d5-ae4d-a51325d0b912/skills/skill-creator/**)",
+      "Bash(python -m scripts.package_skill \"C:/Users/banan/.claude/skills/gaming-crm-builder\")",
+      "Bash(where py *)",
+      "Bash(where python3 *)",
+      "Bash(py --version)",
+      "PowerShell(Get-Command py,python,python3 -ErrorAction SilentlyContinue)",
+      "Bash(Get-ChildItem -Path \"C:\\\\FULLSTACK\\\\lessons\\\\AI Figma\\\\gaming-app\\\\src\\\\featchers\" -Recurse -Directory)",
+      "Bash(Select-Object -ExpandProperty FullName)",
+      "Bash(cd /mnt/c/FULLSTACK/lessons && find \"AI Figma/gaming-app/client/components/ui\" -type f -name \"*.tsx\" -o -name \"*.ts\" | grep -E \"\\(table|select|textarea|form\\)\")",
+      "Bash(cp \"C:/FULLSTACK/lessons/AI Figma/gaming-app/client/lib/api/admin.ts\" \"C:/FULLSTACK/lessons/AI Figma/gaming-app/client/lib/api/admin.ts.bak\")",
+      "Bash(npm install *)",
+      "Bash(mkdir -p \"C:/FULLSTACK/lessons/AI Figma/gaming-app/client/app/shop\" \"C:/FULLSTACK/lessons/AI Figma/gaming-app/client/app/shop/[id]\" \"C:/FULLSTACK/lessons/AI Figma/gaming-app/client/app/checkout\" \"C:/FULLSTACK/lessons/AI Figma/gaming-app/client/app/checkout/success\" \"C:/FULLSTACK/lessons/AI Figma/gaming-app/client/app/account/orders\" \"C:/FULLSTACK/lessons/AI Figma/gaming-app/client/components/shop\")",
+      "Bash(Get-ChildItem \"C:\\\\FULLSTACK\\\\lessons\\\\AI Figma\\\\gaming-app\" -Filter \".env*\" -Force)",
+      "Bash(Get-ChildItem \"C:\\\\FULLSTACK\\\\lessons\\\\AI Figma\\\\gaming-app\\\\client\" -Filter \".env*\" -Force)",
+      "Bash(grep -v \"^$\")",
+      "Bash(node -e ' *)",
+      "Bash(dir \"C:\\\\FULLSTACK\\\\lessons\\\\AI Figma\\\\gaming-app\\\\client\" /b)",
+      "Bash(node -e \"const s = require\\('fs'\\).readFileSync\\('src/featchers/games/games.service.ts','utf8'\\).split\\('\\\\n'\\).slice\\(1406,1410\\).join\\('\\\\n'\\); console.log\\(JSON.stringify\\(s\\)\\)\")",
+      "Bash(node -e \"const fs=require\\('fs'\\);const p='src/featchers/games/games.service.ts';let s=fs.readFileSync\\(p,'utf8'\\);s=s.replace\\(/\\\\.normalize\\\\\\(\\\\\"NFD\\\\\"\\\\\\)\\\\.replace\\\\\\(\\\\/\\\\[[^\\\\]]+\\\\]\\\\/g, \\\\\"\\\\\"\\\\\\)/, '.normalize\\(\\\\\"NFD\\\\\"\\).replace\\(/[\\\\\\\\u0300-\\\\\\\\u036f]/g, \\\\\"\\\\\"\\)'\\);fs.writeFileSync\\(p,s\\);console.log\\('done'\\);\")",
+      "Bash(node -e \"const s = require\\('fs'\\).readFileSync\\('src/featchers/games/games.service.ts','utf8'\\); console.log\\(s.split\\('\\\\n'\\)[1408]\\)\")"
     ]
   }
 }

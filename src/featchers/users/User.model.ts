@@ -25,9 +25,17 @@ export interface IUser extends mongoose.Document {
     role: "user" | "admin"
     following: mongoose.Types.ObjectId[]
     followers: mongoose.Types.ObjectId[]
+    followRequests: {
+        incoming: mongoose.Types.ObjectId[]
+        outgoing: mongoose.Types.ObjectId[]
+    }
+    isPrivate: boolean
+    isBanned: boolean
+    lastSeenAt: Date
     notificationPrefs: {
         events: boolean
         discounts: boolean
+        discountThreshold: number  // minimum % off to trigger a discount notification
     }
 }
 
@@ -80,13 +88,24 @@ const userSchema = new mongoose.Schema<IUser>({
     pendingEmailExpiry:  { type: Date,   select: false },
     following: { type: [{ type: mongoose.Schema.Types.ObjectId, ref: "user" }], default: [] },
     followers: { type: [{ type: mongoose.Schema.Types.ObjectId, ref: "user" }], default: [] },
+    followRequests: {
+        incoming: { type: [{ type: mongoose.Schema.Types.ObjectId, ref: "user" }], default: [] },
+        outgoing: { type: [{ type: mongoose.Schema.Types.ObjectId, ref: "user" }], default: [] },
+    },
+    isPrivate:  { type: Boolean, default: false },
+    isBanned:   { type: Boolean, default: false },
+    lastSeenAt: { type: Date,    default: Date.now },
     notificationPrefs: {
-        events:    { type: Boolean, default: true },
-        discounts: { type: Boolean, default: true },
+        events:            { type: Boolean, default: true },
+        discounts:         { type: Boolean, default: true },
+        discountThreshold: { type: Number,  default: 10, min: 0, max: 100 },
     },
 }, { timestamps: true })
 
 userSchema.index({ role: 1 })
+// Case-insensitive prefix search on display name (Add Friend tab).
+// Collation strength 2 = case-insensitive, accent-insensitive.
+userSchema.index({ name: 1 }, { collation: { locale: "en", strength: 2 } })
 
 userSchema.set("toJSON", {
     transform: (_doc, ret) => {

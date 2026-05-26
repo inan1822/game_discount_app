@@ -197,10 +197,15 @@ export const disconnectProvider = async (req: Request, res: Response) => {
 
 export const updateNotificationPrefs = async (req: Request, res: Response) => {
     try {
-        const { events, discounts } = req.body as { events?: boolean; discounts?: boolean }
-        const update: Record<string, boolean> = {}
+        const { events, discounts, discountThreshold } = req.body as {
+            events?: boolean; discounts?: boolean; discountThreshold?: number
+        }
+        const update: Record<string, boolean | number> = {}
         if (typeof events === "boolean")    update["notificationPrefs.events"]    = events
         if (typeof discounts === "boolean") update["notificationPrefs.discounts"] = discounts
+        if (typeof discountThreshold === "number" && discountThreshold >= 0 && discountThreshold <= 100) {
+            update["notificationPrefs.discountThreshold"] = Math.round(discountThreshold)
+        }
 
         if (Object.keys(update).length === 0) {
             return res.status(400).json({ status: "400", message: "No valid fields provided", data: null })

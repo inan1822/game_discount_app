@@ -2,7 +2,7 @@ import nodemailer from "nodemailer"
 import dotenv from "dotenv"
 dotenv.config()
 
-const transporter = nodemailer.createTransport({
+export const transporter = nodemailer.createTransport({
     service: "gmail",
 
     auth: {
@@ -10,6 +10,66 @@ const transporter = nodemailer.createTransport({
         pass: process.env.EMAIL_PASS
     }
 })
+
+const FROM = `"DisLow Store" <${process.env.EMAIL_USER}>`
+const SITE_URL = process.env.CLIENT_URL || "http://localhost:3000"
+
+// Used by checkout (paid orders, BEFORE webhook delivers the key)
+export const sendPaidConfirmationEmail = async (
+    to: string,
+    productName: string,
+    finalPrice: number,
+    orderId: string,
+): Promise<void> => {
+    await transporter.sendMail({
+        from: FROM,
+        to,
+        subject: `Order confirmed — ${productName} — #${orderId.slice(-8).toUpperCase()}`,
+        html: `
+            <div style="font-family:sans-serif;max-width:480px;margin:0 auto;background:#12131a;color:#fff;border-radius:12px;padding:32px">
+                <h1 style="color:#6475D1;font-size:20px;margin-bottom:8px">Payment confirmed</h1>
+                <p style="color:#b3bade;margin-bottom:24px">Your payment was successful. Your key will arrive in a separate email once the transaction settles.</p>
+                <div style="background:#1c1e2a;border:1px solid rgba(188,188,201,0.15);border-radius:10px;padding:20px;margin-bottom:24px">
+                    <p style="color:#9fa0a1;font-size:12px;margin-bottom:4px">PRODUCT</p>
+                    <p style="color:#fff;font-weight:700;font-size:16px;margin-bottom:16px">${productName}</p>
+                    <p style="color:#9fa0a1;font-size:12px;margin-bottom:4px">AMOUNT PAID</p>
+                    <p style="color:#44d62c;font-weight:800;font-size:20px">$${finalPrice.toFixed(2)}</p>
+                </div>
+                <p style="color:#9fa0a1;font-size:12px">Order ID: #${orderId.slice(-8).toUpperCase()}</p>
+                <p style="color:#9fa0a1;font-size:12px;margin-top:12px">Track your order at <a href="${SITE_URL}/account/orders" style="color:#6475D1">DisLow</a>.</p>
+            </div>
+        `,
+    })
+}
+
+// Used by free-product checkout AND webhook (post-payment) AND admin resend.
+// Same content/look-and-feel for both — single source of truth.
+export const sendKeyDeliveryEmail = async (
+    to: string,
+    productName: string,
+    code: string,
+    orderId: string,
+): Promise<void> => {
+    await transporter.sendMail({
+        from: FROM,
+        to,
+        subject: `Your key for ${productName} — Order #${orderId.slice(-8).toUpperCase()}`,
+        html: `
+            <div style="font-family:sans-serif;max-width:480px;margin:0 auto;background:#12131a;color:#fff;border-radius:12px;padding:32px">
+                <h1 style="color:#44d62c;font-size:20px;margin-bottom:8px">Your key is ready</h1>
+                <p style="color:#b3bade;margin-bottom:24px">Thanks for your purchase on DisLow. Here is your product key:</p>
+                <div style="background:#1c1e2a;border:1px solid rgba(188,188,201,0.15);border-radius:10px;padding:20px;text-align:center;margin-bottom:24px">
+                    <p style="color:#9fa0a1;font-size:12px;margin-bottom:8px">PRODUCT</p>
+                    <p style="color:#fff;font-weight:700;font-size:16px;margin-bottom:20px">${productName}</p>
+                    <p style="color:#9fa0a1;font-size:12px;margin-bottom:8px">YOUR KEY</p>
+                    <p style="color:#44d62c;font-family:monospace;font-size:20px;font-weight:700;letter-spacing:2px;word-break:break-all">${code}</p>
+                </div>
+                <p style="color:#9fa0a1;font-size:12px">Order ID: #${orderId.slice(-8).toUpperCase()}</p>
+                <p style="color:#9fa0a1;font-size:12px;margin-top:12px">View your purchase history at <a href="${SITE_URL}/account/orders" style="color:#6475D1">DisLow</a>.</p>
+            </div>
+        `,
+    })
+}
 
 export const sendVerificationEmail = async (to: string, code: string): Promise<void> => {
     try {
