@@ -35,17 +35,6 @@ export const getForYouGames = async (): Promise<Game[]> => {
   return data.data
 }
 
-/** Price — cheapest single price for home-page cards. null = not found → show Unknown */
-export const getGamePrice = async (title: string): Promise<string | null> => {
-  try {
-    const { data } = await api.get("/games/price", { params: { title } })
-    // backend returns { price: string } or { price: null }
-    return data.data?.price ?? null
-  } catch {
-    return null
-  }
-}
-
 /**
  * Deals — all store deals for the game detail page.
  * Passes steamAppId when available → backend uses ITAD for exact matching.
@@ -54,10 +43,12 @@ export const getGamePrice = async (title: string): Promise<string | null> => {
 export const getGameDeals = async (
   title: string,
   steamAppId?: string,
+  releaseYear?: string,
 ): Promise<import("@/types/game").PriceResult[]> => {
   try {
     const params: Record<string, string> = { title }
-    if (steamAppId) params.steamAppId = steamAppId
+    if (steamAppId)  params.steamAppId  = steamAppId
+    if (releaseYear) params.releaseYear = releaseYear
     const { data } = await api.get("/games/deals", { params })
     return data.data ?? []
   } catch {
@@ -121,17 +112,17 @@ export const getByGenreGames = async (genre: string, page = 1): Promise<Game[]> 
 }
 
 /**
- * Batch price fetch — POST /games/batch-prices
- * Requires: user must be logged in (httpOnly cookie sent automatically via withCredentials).
- * Fetches prices for up to 20 game titles in a single round-trip.
- * Returns a map of { title → price | null }.
+ * Card Prices — POST /games/card-prices
+ * Fetches ITAD-sourced prices (with discount %) for home-page game cards.
+ * Accepts up to 50 games per request. No auth required.
+ * Returns { [gameId]: CardPrice | null } — null = not in any tracked store.
  */
-export const batchGetPrices = async (
-  titles: string[],
-): Promise<Record<string, string | null>> => {
-  if (titles.length === 0) return {}
+export const getCardPrices = async (
+  games: Array<{ id: number; name: string; steamAppId?: string; released?: string }>,
+): Promise<Record<number, import("@/types/game").CardPrice | null>> => {
+  if (games.length === 0) return {}
   try {
-    const { data } = await api.post("/games/batch-prices", { titles })
+    const { data } = await api.post("/games/card-prices", { games })
     return data.data ?? {}
   } catch {
     return {}
@@ -163,11 +154,4 @@ export const getGameGiveaways = async (title: string): Promise<GiveawayItem[]> =
   } catch {
     return []
   }
-}
-
-// Legacy — kept for any existing pages that import these
-export const getTrendingGames   = getPopularGames
-export const getGamesByGenre    = async (genre: string, page = 1): Promise<Game[]> => {
-  const { data } = await api.get("/games/genre", { params: { genre, page } })
-  return data.data
 }

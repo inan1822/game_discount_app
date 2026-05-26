@@ -22,7 +22,11 @@ export async function getAvatarGallery(): Promise<string[]> {
   return data.data as string[]
 }
 
-export async function updateNotificationPrefs(prefs: { events?: boolean; discounts?: boolean }): Promise<void> {
+export async function updateNotificationPrefs(prefs: {
+  events?: boolean
+  discounts?: boolean
+  discountThreshold?: number
+}): Promise<void> {
   await api.patch("/users/me/notification-prefs", prefs)
 }
 

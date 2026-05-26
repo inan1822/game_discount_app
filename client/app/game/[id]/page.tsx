@@ -5,24 +5,27 @@ import { useParams, useRouter } from "next/navigation"
 import { motion, AnimatePresence } from "framer-motion"
 import {
   ArrowLeft, Heart, Home, BellRing, Search as SearchIcon,
-  Users, User, LogIn, ExternalLink, Tag, Zap, Calendar, Monitor,
+  Users, User, LogIn, ExternalLink, Tag, Zap, Calendar, Monitor, ShoppingCart, Receipt,
 } from "lucide-react"
 import { getGameById, getGameDeals, getGameDlcDeals, getGameGiveaways, getGameEvents } from "@/lib/api/games"
 import { addToWishlist, removeFromWishlist, getWishlist } from "@/lib/api/wishlist"
+import { fetchStoreProductsByGame } from "@/lib/api/shop"
 import { useAuth } from "@/context/AuthContext"
 import PageBackground from "@/components/ui/PageBackground"
 import type { Game, PriceResult, GiveawayItem, GameEvent } from "@/types/game"
+import type { Product } from "@/types/admin"
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const AUTH_NAV = new Set(["Notifications", "Friends", "Profile"])
+const AUTH_NAV = new Set(["Notifications", "Friends", "Profile", "Purchases"])
 
 const NAV = [
-  { icon: Home,        label: "Home",          href: "/"              },
-  { icon: BellRing,    label: "Notifications",  href: "/notifications" },
-  { icon: SearchIcon,  label: "Search",         href: "/search"        },
-  { icon: Users,       label: "Friends",        href: "/friends"       },
-  { icon: User,        label: "Profile",        href: "/profile"       },
+  { icon: Home,        label: "Home",          href: "/"               },
+  { icon: BellRing,    label: "Notifications", href: "/notifications"  },
+  { icon: SearchIcon,  label: "Search",        href: "/search"         },
+  { icon: Receipt,     label: "Purchases",     href: "/account/orders" },
+  { icon: Users,       label: "Friends",       href: "/friends"        },
+  { icon: User,        label: "Profile",       href: "/profile"        },
 ] as const
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
@@ -1037,6 +1040,9 @@ export default function GameDetailPage() {
   const [inWishlist,    setInWishlist]    = useState(false)
   const [wishlistBusy,  setWishlistBusy]  = useState(false)
   const [selectedPlatform, setSelectedPlatform] = useState<ConsolePlatform>("pc")
+  // DisLow own-store keys for this game
+  const [storeProducts,        setStoreProducts]        = useState<Product[]>([])
+  const [loadingStoreProducts, setLoadingStoreProducts] = useState(false)
   // DLC-only mode — when true, the deals list shows DLC discounts instead of
   // base-game deals. Lazy-fetched the first time it's enabled and cached.
   const [dlcOnly,         setDlcOnly]         = useState(false)
@@ -1075,6 +1081,16 @@ export default function GameDetailPage() {
     setDlcOnly(false)
   }, [id])
 
+  // Fetch DisLow's own keys for this game (by numeric RAWG id)
+  useEffect(() => {
+    if (!id) return
+    setLoadingStoreProducts(true)
+    fetchStoreProductsByGame(id)
+      .then(p => setStoreProducts(p))
+      .catch(() => setStoreProducts([]))
+      .finally(() => setLoadingStoreProducts(false))
+  }, [id])
+
   // Stable router reference for useEffect deps
   const routerPush = useCallback((path: string) => router.push(path), [router])
 
@@ -1086,12 +1102,23 @@ export default function GameDetailPage() {
     setLoadingEvents(true)
 
     getGameById(id)
-      .then(g => {
+      .then(raw => {
+        // Coerce platforms/genres to clean string[] — bad upstream data caused
+        // "p.toLowerCase is not a function" crashes downstream.
+        const g: Game = {
+          ...raw,
+          platforms: Array.isArray(raw.platforms)
+            ? raw.platforms.filter((p): p is string => typeof p === "string")
+            : [],
+          genres: Array.isArray(raw.genres)
+            ? raw.genres.filter((x): x is string => typeof x === "string")
+            : [],
+        }
         setGame(g)
 
         // Deals + giveaways in parallel (both use game title / steamAppId)
         Promise.all([
-          getGameDeals(g.name, g.steamAppId).catch(() => []),
+          getGameDeals(g.name, g.steamAppId, g.released?.slice(0, 4)).catch(() => []),
           getGameGiveaways(g.name).catch(() => []),
         ]).then(([d, gv]) => {
           setDeals(d as PriceResult[])
@@ -1148,7 +1175,7 @@ export default function GameDetailPage() {
   // Console platforms — if the game is on PS/Xbox/Switch we render the console
   // buttons section even when there are no PC deals, so the tab is never blank.
   const hasConsolePlatforms = (game?.platforms ?? []).some(p => {
-    const lp = p.toLowerCase()
+    const lp = typeof p === "string" ? p.toLowerCase() : ""
     return lp.includes("xbox") || lp.includes("playstation") || lp.includes("nintendo")
   })
 
@@ -1176,7 +1203,9 @@ export default function GameDetailPage() {
     : null
 
   // No content to show in discounts tab
-  const discountsEmpty = !loadingDeals && deals.length === 0 && giveaways.length === 0 && !hasConsolePlatforms
+  const discountsEmpty = !loadingDeals && !loadingStoreProducts &&
+    deals.length === 0 && giveaways.length === 0 && !hasConsolePlatforms &&
+    storeProducts.length === 0
 
   if (loadingGame) return <PageSkeleton />
   if (!game) return null
@@ -1464,6 +1493,41 @@ export default function GameDetailPage() {
                       <EmptyDiscounts />
                     ) : (
                       <>
+                        {/* ── DisLow own-store keys ── */}
+                        {(loadingStoreProducts || storeProducts.length > 0) && (
+                          <div className="mb-5">
+                            <p
+                              className="text-[9px] font-bold tracking-widest mb-3"
+                              style={{ color: "#6475D1" }}
+                            >
+                              {loadingStoreProducts
+                                ? "BUY FROM DISLOW · LOADING…"
+                                : `BUY FROM DISLOW · ${storeProducts.length} LISTING${storeProducts.length !== 1 ? "S" : ""}`}
+                            </p>
+                            {loadingStoreProducts ? (
+                              <div className="flex flex-col gap-2">
+                                {[...Array(2)].map((_, i) => (
+                                  <div key={i} className="h-14 rounded-[14px] bg-[#1c1e2a] animate-pulse" />
+                                ))}
+                              </div>
+                            ) : (
+                              <div className="flex flex-col gap-2">
+                                {storeProducts.map(p => (
+                                  <DisLowKeyRow
+                                    key={p._id}
+                                    product={p}
+                                    onBuy={() => router.push(`/checkout?productId=${p._id}`)}
+                                  />
+                                ))}
+                              </div>
+                            )}
+                            <div
+                              className="my-4"
+                              style={{ height: 1, background: "rgba(188,188,201,0.08)" }}
+                            />
+                          </div>
+                        )}
+
                         {/* Console platform filter chips — Xbox / Nintendo / PlayStation */}
                         <ConsoleButtons
                           platforms={game.platforms}
@@ -1623,6 +1687,82 @@ function EmptyDiscounts() {
         This game may be console-exclusive or not currently on sale.
       </p>
     </div>
+  )
+}
+
+// ─── DisLow Key Row ───────────────────────────────────────────────────────────
+// Shown at the top of the Discounts tab for products we sell directly.
+
+function DisLowKeyRow({ product, onBuy }: { product: Product; onBuy: () => void }) {
+  const [hovered, setHovered] = useState(false)
+
+  const categoryLabel: Record<string, string> = {
+    gamekey: "Game Key", giftcard: "Gift Card",
+    subscription: "Subscription", dlc: "DLC", currency: "Currency",
+  }
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, x: 8 }}
+      animate={{ opacity: 1, x: 0 }}
+      className="flex items-center gap-3 rounded-[14px] px-4 py-3"
+      style={{
+        background: hovered ? "rgba(100,117,209,0.15)" : "rgba(100,117,209,0.08)",
+        border: "1px solid rgba(100,117,209,0.30)",
+        backdropFilter: "blur(8px)",
+        WebkitBackdropFilter: "blur(8px)",
+        transition: "background 0.2s",
+      }}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+    >
+      {/* DisLow logo bubble */}
+      <div
+        className="flex items-center justify-center flex-shrink-0 rounded-[8px]"
+        style={{ width: 32, height: 32, background: "rgba(100,117,209,0.20)" }}
+      >
+        <img src="/icons/logo.svg" alt="DisLow" style={{ width: 18, height: 18 }} />
+      </div>
+
+      {/* Info */}
+      <div className="flex flex-col min-w-0 flex-1">
+        <div className="flex items-center gap-2">
+          <span className="text-white text-sm font-semibold">DisLow</span>
+          <span
+            className="text-[9px] font-bold px-1.5 py-0.5 rounded-full flex-shrink-0"
+            style={{ background: "rgba(100,117,209,0.25)", color: "#8899E8" }}
+          >
+            INSTANT DELIVERY
+          </span>
+        </div>
+        <span className="text-[10px]" style={{ color: "rgba(255,255,255,0.35)" }}>
+          {product.platform} · {categoryLabel[product.category] ?? product.category}
+          {" · "}{product.availableKeys} key{product.availableKeys !== 1 ? "s" : ""} in stock
+        </span>
+      </div>
+
+      {/* Price + CTA */}
+      <div className="flex items-center gap-2.5 flex-shrink-0 ml-auto">
+        <span className="text-white font-bold text-sm">${product.price.toFixed(2)}</span>
+        <motion.button
+          type="button"
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
+          onClick={onBuy}
+          className="flex items-center gap-1.5 text-[11px] font-semibold px-3 py-1.5 rounded-[8px]"
+          style={{
+            background: "#6475D1",
+            color: "#fff",
+            border: "none",
+            cursor: "pointer",
+            boxShadow: "0 2px 10px rgba(100,117,209,0.30)",
+          }}
+        >
+          <ShoppingCart size={11} />
+          Buy Key
+        </motion.button>
+      </div>
+    </motion.div>
   )
 }
 

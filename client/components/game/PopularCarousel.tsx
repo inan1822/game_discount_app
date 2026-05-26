@@ -11,7 +11,8 @@ import { useRef, useLayoutEffect, useState, useEffect, useCallback } from "react
 import { useRouter } from "next/navigation"
 import { ChevronRight, ChevronLeft } from "lucide-react"
 import type { Game } from "@/types/game"
-import { RankBadge, StarButton, formatPrice } from "./GameCard"
+import { StarButton } from "./GameCard"
+import { useCardPrice } from "@/hooks/useCardPrice"
 import { SectionHeading } from "@/components/ui/SectionHeading"
 
 // ─── Layout constants ─────────────────────────────────────────────────────────
@@ -36,24 +37,27 @@ function platformLabel(p: string): string {
 // ─── PopularTile ──────────────────────────────────────────────────────────────
 
 function PopularTile({
-  game, rank, price, isFavorited, onToggleFavorite,
+  game, rank, isFavorited, onToggleFavorite,
   index, scrollX, cardWidth,
 }: {
   game:             Game
   rank:             number
-  price:            string | undefined
   isFavorited:      boolean
   onToggleFavorite: (e: React.MouseEvent) => void
   index:            number
   scrollX:          ReturnType<typeof useScroll>["scrollX"]
   cardWidth:        number
 }) {
-  const router       = useRouter()
-  const reduce       = useReducedMotion()
-  const priceDisplay = formatPrice(price)
-  const platforms    = [...new Set(game.platforms.map(platformLabel))].slice(0, 3)
+  const router    = useRouter()
+  const reduce    = useReducedMotion()
+  const price     = useCardPrice(game)
+  const platforms = [...new Set(game.platforms.map(platformLabel))].slice(0, 3)
 
-  // scrollX value when this card is perfectly centred
+  // scrollX value when this card is perfectly centred.
+  // Derivation: scrollLeft_centered = paddingLeft + i*step + cardWidth/2 - clientWidth/2.
+  // With paddingLeft = sidePadding and clientWidth ≈ containerBorderBoxWidth,
+  // AND sidePadding = (containerBorderBoxWidth - cardWidth)/2 (our setup),
+  // those terms collapse and centeredAt = i * (cardWidth + GAP).
   const centeredAt = index * (cardWidth + GAP)
 
   // Normalised: 0 = centred, −1 = one card to the right, +1 = one card to the left
@@ -62,11 +66,13 @@ function PopularTile({
   // ── Transforms — adapted from ScrollTiltedGrid to horizontal axis ───────────
   // Values are intentionally moderate so side cards remain clearly visible.
 
-  // Brightness: side cards clearly dimmed, centre is full
-  const bright   = useTransform(progress, [-1, 0, 1], [0.38, 1, 0.38])
+  // Brightness: side cards clearly dimmed, centre is full.
+  // Flat dead-zone around 0 so the centered card stays at brightness 1 even
+  // when scroll position doesn't perfectly snap to an integer multiple.
+  const bright   = useTransform(progress, [-1, -0.15, 0.15, 1], [0.38, 1, 1, 0.38])
 
-  // Blur: noticeable on sides, none at centre
-  const blur     = useTransform(progress, [-1, 0, 1], [4, 0, 4])
+  // Blur: noticeable on sides, ZERO across the centre dead-zone (same reason).
+  const blur     = useTransform(progress, [-1, -0.15, 0.15, 1], [4, 0, 0, 4])
 
   // rotateY — the main tilt; 18° is visible but keeps side cards readable
   const rotateY  = useTransform(progress, [-1, 0, 1], [-18, 0, 18])
@@ -98,13 +104,12 @@ function PopularTile({
         style={{ ...cardStyle, position: "relative", cursor: "pointer" }}
         onClick={() => router.push(`/game/${game.id}`)}
       >
-        <RankBadge rank={rank} />
         <StarButton isFavorited={isFavorited} onToggle={onToggleFavorite} />
         {game.cover && (
           <img src={game.cover} alt={game.name} loading="lazy" className="absolute inset-0 w-full h-full object-cover" />
         )}
         <div className="absolute inset-0" style={{ background: "linear-gradient(to top,rgba(0,0,0,0.88) 0%,transparent 55%)" }} />
-        <TileInfo game={game} priceDisplay={priceDisplay} platforms={platforms} />
+        <TileInfo game={game} price={price} platforms={platforms} />
       </div>
     )
   }
@@ -131,9 +136,6 @@ function PopularTile({
         } as any}
         onClick={() => router.push(`/game/${game.id}`)}
       >
-        {/* Rank badge */}
-        <RankBadge rank={rank} />
-
         {/* Favourite star */}
         <StarButton isFavorited={isFavorited} onToggle={onToggleFavorite} />
 
@@ -155,7 +157,7 @@ function PopularTile({
           style={{ background: "linear-gradient(to top,rgba(0,0,0,0.88) 0%,rgba(0,0,0,0.15) 55%,transparent 100%)" }}
         />
 
-        <TileInfo game={game} priceDisplay={priceDisplay} platforms={platforms} />
+        <TileInfo game={game} price={price} platforms={platforms} />
       </motion.div>
     </div>
   )
@@ -163,43 +165,52 @@ function PopularTile({
 
 // ─── Bottom info bar ──────────────────────────────────────────────────────────
 
-function TileInfo({ game, priceDisplay, platforms }: {
-  game:         Game
-  priceDisplay: string | null
-  platforms:    string[]
+function TileInfo({ game, price, platforms }: {
+  game:      Game
+  price:     ReturnType<typeof useCardPrice>
+  platforms: string[]
 }) {
   return (
     <div className="absolute bottom-0 left-0 right-0 px-5 py-4">
-      <div className="flex items-start justify-between gap-2 mb-1">
-        <p className="text-white font-bold text-[16px] leading-tight line-clamp-2 flex-1">{game.name}</p>
-        {game.rating > 0 && (
-          <p className="text-[#AE3BD6] text-[13px] font-bold flex-shrink-0">★ {game.rating.toFixed(1)}</p>
-        )}
-      </div>
+      <p className="text-white font-bold text-[17px] leading-tight line-clamp-2 mb-1">{game.name}</p>
       {game.genres.length > 0 && (
-        <p className="text-[11px] mb-2.5 truncate" style={{ color: "rgba(255,255,255,0.45)" }}>
+        <p className="text-[12px] mb-2.5 truncate" style={{ color: "rgba(255,255,255,0.50)" }}>
           {game.genres.slice(0, 3).join(" · ")}
         </p>
       )}
       <div className="flex items-center justify-between gap-2">
         <div className="flex gap-1.5 flex-wrap">
           {platforms.map(p => (
-            <span key={p} className="text-[10px] font-semibold px-2 py-0.5"
+            <span key={p} className="text-[11px] font-semibold px-2 py-0.5"
               style={{ background: "rgba(255,255,255,0.10)", color: "rgba(255,255,255,0.65)", borderRadius: 5 }}>
               {p}
             </span>
           ))}
         </div>
-        {priceDisplay && (
-          <span className="font-bold flex-shrink-0" style={{
-            color:    priceDisplay === "Free"    ? "#48BCF9"
-                    : priceDisplay === "Unknown" ? "rgba(255,255,255,0.30)"
-                    : "#5BDE8A",
-            fontSize: priceDisplay === "Unknown" ? 11 : 16,
-          }}>
-            {priceDisplay}
+        <div className="flex items-center gap-1.5 flex-shrink-0">
+          {price && price.cut > 0 && (
+            <span className="font-bold text-[12px] px-1.5 py-0.5"
+              style={{ background: "rgba(68,214,44,0.15)", color: "#44d62c", borderRadius: 4 }}>
+              -{price.cut}%
+            </span>
+          )}
+          <span className="font-bold"
+            style={{
+              color:    price === undefined ? "rgba(255,255,255,0.18)"
+                      : price === null      ? "rgba(255,255,255,0.30)"
+                      : price.isFree        ? "#48BCF9"
+                      : "#5BDE8A",
+              fontSize: price != null && price !== undefined ? 16 : 12,
+            }}>
+            {price === undefined
+              ? "···"
+              : price === null
+              ? "Unknown"
+              : price.isFree
+              ? "Free"
+              : `$${price.price.toFixed(2)}`}
           </span>
-        )}
+        </div>
       </div>
     </div>
   )
@@ -238,10 +249,9 @@ function NavBtn({ dir, onClick }: { dir: "prev" | "next"; onClick: () => void })
 // ─── PopularCarousel ──────────────────────────────────────────────────────────
 
 export default function PopularCarousel({
-  games, prices, wishlistIds, onToggleFavorite, onSeeAll, delay = 0,
+  games, wishlistIds, onToggleFavorite, onSeeAll, delay = 0,
 }: {
   games:            Game[]
-  prices:           Record<number, string>
   wishlistIds:      Set<string>
   onToggleFavorite: (e: React.MouseEvent, game: Game) => void
   onSeeAll:         () => void
@@ -251,10 +261,17 @@ export default function PopularCarousel({
   const [containerWidth, setContainerWidth] = useState(960)
   const [currentIndex, setCurrentIndex]     = useState(0)
 
-  // Measure the scroll container's width and keep it updated on resize
+  // Measure the scroll container's BORDER-BOX width (includes padding).
+  // CRITICAL: must NOT use contentRect.width — that gives the content-box,
+  // which shrinks when padding grows. Since sidePadding depends on this width,
+  // using content-box creates a ResizeObserver feedback loop: padding grows →
+  // content-box shrinks → padding recomputes → infinite layout thrash.
   useLayoutEffect(() => {
     if (!containerRef.current) return
-    const ro = new ResizeObserver(([e]) => setContainerWidth(e.contentRect.width))
+    const ro = new ResizeObserver(([e]) => {
+      const w = e.borderBoxSize?.[0]?.inlineSize ?? e.contentRect.width
+      setContainerWidth(w)
+    })
     ro.observe(containerRef.current)
     return () => ro.disconnect()
   }, [])
@@ -263,10 +280,18 @@ export default function PopularCarousel({
   // containerWidth = SIDE_PEEK + GAP + cardWidth + GAP + SIDE_PEEK
   const cardWidth = Math.min(750, Math.max(240, containerWidth - 2 * (SIDE_PEEK + GAP)))
 
+  // Padding ensures card 0 (and last) can be centred even at scroll start/end.
+  // CRITICAL: must equal (containerWidth - cardWidth) / 2 so the CSS scroll-snap
+  // position equals i * (cardWidth + GAP) — which is what `progress` assumes.
+  // Without this, on wide screens cardWidth caps at 750 while padding stays at
+  // SIDE_PEEK+GAP, causing the snapped card to have non-zero progress → it ends
+  // up off-center and slightly blurred.
+  const sidePadding = Math.max(SIDE_PEEK + GAP, (containerWidth - cardWidth) / 2)
+
   // scrollX MotionValue from the container's native horizontal scroll
   const { scrollX } = useScroll({ container: containerRef })
 
-  // Keep currentIndex in sync with native scroll (e.g. touch swipe)
+  // Keep currentIndex in sync with native scroll (e.g. touch swipe).
   useEffect(() => {
     return scrollX.on("change", (v: number) => {
       const idx = Math.round(v / (cardWidth + GAP))
@@ -274,19 +299,23 @@ export default function PopularCarousel({
     })
   }, [scrollX, cardWidth, games.length])
 
-  // Re-snap to current card when container resizes (prevents blur on stretch)
+  // Re-snap to current card when container resizes (prevents blur on stretch).
   useEffect(() => {
     if (!containerRef.current) return
-    containerRef.current.scrollTo({ left: currentIndex * (cardWidth + GAP), behavior: "instant" as ScrollBehavior })
-  }, [cardWidth])
-
-  // Padding ensures card 0 (and last) can be centred even at scroll start/end
-  const sidePadding = SIDE_PEEK + GAP
+    containerRef.current.scrollTo({
+      left: currentIndex * (cardWidth + GAP),
+      behavior: "instant" as ScrollBehavior,
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cardWidth, sidePadding])
 
   const scrollTo = useCallback((idx: number) => {
     if (!containerRef.current) return
     const clamped = Math.max(0, Math.min(idx, games.length - 1))
-    containerRef.current.scrollTo({ left: clamped * (cardWidth + GAP), behavior: "smooth" })
+    containerRef.current.scrollTo({
+      left: clamped * (cardWidth + GAP),
+      behavior: "smooth",
+    })
   }, [cardWidth, games.length])
 
   if (games.length === 0) return null
@@ -300,8 +329,17 @@ export default function PopularCarousel({
     >
       <SectionHeading title="Popular" onSeeAll={onSeeAll} delay={delay} />
 
-      {/* Carousel wrapper — overflow:hidden clips any cards beyond the 2 side ones */}
-      <div className="relative overflow-hidden" style={{ paddingTop: 8 }}>
+      {/* Carousel wrapper — overflow:hidden clips any cards beyond the 2 side ones.
+          mask-image fades the section's own pixels to transparent at the left and
+          right edges (not an overlay — the content itself is masked). */}
+      <div
+        className="relative overflow-hidden"
+        style={{
+          paddingTop: 8,
+          maskImage:        "linear-gradient(to right, transparent 0%, #000 8%, #000 92%, transparent 100%)",
+          WebkitMaskImage:  "linear-gradient(to right, transparent 0%, #000 8%, #000 92%, transparent 100%)",
+        }}
+      >
 
         {/* Prev / Next buttons */}
         {currentIndex > 0 && <NavBtn dir="prev" onClick={() => scrollTo(currentIndex - 1)} />}
@@ -325,7 +363,6 @@ export default function PopularCarousel({
               key={game.id}
               game={game}
               rank={i + 1}
-              price={prices[game.id]}
               isFavorited={wishlistIds.has(String(game.id))}
               onToggleFavorite={(e) => { e.stopPropagation(); onToggleFavorite(e, game) }}
               index={i}

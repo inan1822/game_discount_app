@@ -72,6 +72,14 @@ export interface GameEvent {
   isExternal: boolean
 }
 
+/** ITAD-sourced price for home-page cards — includes discount percentage */
+export interface CardPrice {
+  price:   number   // current sale price (USD)
+  regular: number   // regular (non-sale) price
+  cut:     number   // 0–100 discount percentage (0 = no discount)
+  isFree:  boolean  // true when game is free-to-play (price === 0)
+}
+
 export interface PriceResult {
   storeID: string
   storeName: string

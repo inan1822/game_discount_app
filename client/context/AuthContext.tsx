@@ -4,11 +4,18 @@ import { createContext, useContext, useState, useEffect, useCallback, ReactNode 
 import api from "@/lib/api/axios"
 import type { User } from "@/types/user"
 
+interface LoginResult {
+  /** True when the backend asked for a 2FA OTP (admin accounts). Caller must
+   *  then collect the code and call verifyTwoFactor(). */
+  requiresTwoFactor: boolean
+}
+
 interface AuthContextType {
   user: User | null
   isLoading: boolean
   isGuest: boolean
-  login: (email: string, password: string) => Promise<void>
+  login: (email: string, password: string) => Promise<LoginResult>
+  verifyTwoFactor: (email: string, code: string) => Promise<User | null>
   register: (name: string, email: string, password: string) => Promise<void>
   loginAsGuest: () => void
   logout: () => Promise<void>
@@ -42,11 +49,26 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     fetchMe()
   }, [fetchMe])
 
-  const login = useCallback(async (email: string, password: string) => {
-    await api.post("/auth/login", { email, password })
-    // Server sets the httpOnly cookie; just fetch the user profile
-    await fetchMe()
+  const login = useCallback(async (email: string, password: string): Promise<LoginResult> => {
+    const { data } = await api.post("/auth/login", { email, password })
+    // Admin accounts: backend returns `{ message: "2FA code sent to your email" }`
+    // with no cookie set. The caller must collect the OTP and call verifyTwoFactor.
+    // Regular users: backend sets the httpOnly cookie and returns userID.
+    const requiresTwoFactor = !data?.data?.userID
+    if (!requiresTwoFactor) {
+      await fetchMe()
+    }
+    return { requiresTwoFactor }
   }, [fetchMe])
+
+  const verifyTwoFactor = useCallback(async (email: string, code: string): Promise<User | null> => {
+    await api.post("/auth/admin", { email, code })
+    // Cookie is set server-side. Pull /me to populate the context with the
+    // admin user, then return it so callers can branch on user.role.
+    const { data } = await api.get("/auth/me")
+    setUser(data.data)
+    return data.data
+  }, [])
 
   const register = useCallback(async (name: string, email: string, password: string) => {
     await api.post("/auth/register", { name, email, password })
@@ -80,6 +102,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       isLoading,
       isGuest,
       login,
+      verifyTwoFactor,
       register,
       loginAsGuest,
       logout,

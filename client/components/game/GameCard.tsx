@@ -3,11 +3,11 @@
 import { useRouter } from "next/navigation"
 import { motion } from "framer-motion"
 import type { Game } from "@/types/game"
+import { useCardPrice } from "@/hooks/useCardPrice"
 
 interface GameCardProps {
   game:              Game
   rank?:             number
-  price?:            string | null
   isFavorited?:      boolean
   onToggleFavorite?: (e: React.MouseEvent) => void
 }
@@ -91,24 +91,42 @@ export function StarButton({
   )
 }
 
-/** Format price string: "0.00" → "Free", "unknown" → "Unknown", null/undefined → nothing yet */
-export function formatPrice(price: string | null | undefined): string | null {
-  if (price == null) return null          // not yet fetched — show nothing
-  if (price === "unknown") return "Unknown"
-  if (parseFloat(price) === 0) return "Free"
-  return `$${price}`
+/**
+ * Steam-style rating chip data: prefer Metacritic (0–100, authoritative critic
+ * score), fall back to RAWG user rating × 20 to get the same 0–100 scale that
+ * Steam uses for its review summary percentage.
+ * Returns null when we have no real data — we never fabricate a number.
+ */
+export function deriveRating(game: Game): { label: string; pct: number; source: "mc" | "user" } | null {
+  if (typeof game.metacritic === "number" && game.metacritic > 0) {
+    return { label: String(game.metacritic), pct: game.metacritic, source: "mc" }
+  }
+  if (typeof game.rating === "number" && game.rating > 0) {
+    const pct = Math.round(game.rating * 20)
+    return { label: `${pct}%`, pct, source: "user" }
+  }
+  return null
+}
+
+/** Steam-style color thresholds: green ≥75, yellow 40–74, red <40 */
+export function ratingColor(pct: number): string {
+  if (pct >= 75) return "#5BDE8A"
+  if (pct >= 40) return "#F5C84B"
+  return "#E26A6A"
 }
 
 export default function GameCard({
   game,
   rank,
-  price,
   isFavorited = false,
   onToggleFavorite,
 }: GameCardProps) {
-  const router    = useRouter()
-  const platforms = [...new Set(game.platforms.map(platformLabel))].slice(0, 3)
-  const priceDisplay = formatPrice(price)
+  const router = useRouter()
+  const price  = useCardPrice(game)
+  const safePlatforms = Array.isArray(game.platforms)
+    ? game.platforms.filter((p): p is string => typeof p === "string")
+    : []
+  const platforms = [...new Set(safePlatforms.map(platformLabel))].slice(0, 3)
 
   return (
     <motion.div
@@ -118,8 +136,7 @@ export default function GameCard({
       className="relative flex-shrink-0 cursor-pointer select-none group/card"
       style={{ width: 280 }}
     >
-      {rank !== undefined && <RankBadge rank={rank} />}
-      {onToggleFavorite && (
+          {onToggleFavorite && (
         <StarButton isFavorited={isFavorited} onToggle={onToggleFavorite} />
       )}
 
@@ -152,45 +169,38 @@ export default function GameCard({
 
         {/* Info bar — glassmorphic strip over the image */}
         <div
-          className="absolute bottom-0 left-0 right-0 px-3 py-2.5"
+          className="absolute bottom-0 left-0 right-0 px-3 py-3"
           style={{
-            background:           "rgba(28,30,42,0.70)",
+            background:           "rgba(28,30,42,0.75)",
             backdropFilter:       "blur(8px)",
             WebkitBackdropFilter: "blur(8px)",
             borderRadius:         "0 0 10px 10px",
           }}
         >
-          {/* Name + rating */}
-          <div className="flex items-start justify-between gap-1">
-            <p className="text-white text-[14px] font-semibold leading-tight truncate flex-1">
-              {game.name}
-            </p>
-            {game.rating > 0 && (
-              <p className="text-[#AE3BD6] text-[12px] font-bold flex-shrink-0">
-                ★ {game.rating.toFixed(1)}
-              </p>
-            )}
-          </div>
+          {/* Name */}
+          <p className="text-white text-[15px] font-bold leading-tight truncate">
+            {game.name}
+          </p>
 
           {/* Genre */}
           {game.genres.length > 0 && (
-            <p className="text-[11px] mt-0.5 truncate" style={{ color: "rgba(255,255,255,0.4)" }}>
-              {game.genres.slice(0, 2).join(", ")}
+            <p className="text-[12px] mt-1 truncate" style={{ color: "rgba(255,255,255,0.45)" }}>
+              {game.genres.slice(0, 2).join(" · ")}
             </p>
           )}
 
           {/* Platforms + price */}
-          <div className="flex items-center justify-between mt-1.5 gap-1">
-            <div className="flex gap-1 flex-wrap">
+          <div className="flex items-center justify-between mt-2 gap-1">
+            <div className="flex gap-1.5 flex-wrap">
               {platforms.length > 0 ? (
                 platforms.map(p => (
                   <span
                     key={p}
-                    className="text-[10px] font-semibold px-1.5 py-0.5"
+                    className="text-[11px] font-semibold px-2 py-0.5"
                     style={{
-                      background:   "rgba(255,255,255,0.08)",
-                      color:        "rgba(255,255,255,0.55)",
-                      borderRadius: 4,
+                      background:   "rgba(255,255,255,0.09)",
+                      color:        "rgba(255,255,255,0.60)",
+                      borderRadius: 5,
                     }}
                   >
                     {p}
@@ -198,11 +208,11 @@ export default function GameCard({
                 ))
               ) : (
                 <span
-                  className="text-[10px] font-semibold px-1.5 py-0.5"
+                  className="text-[11px] font-semibold px-2 py-0.5"
                   style={{
                     background:   "rgba(255,255,255,0.06)",
-                    color:        "rgba(255,255,255,0.3)",
-                    borderRadius: 4,
+                    color:        "rgba(255,255,255,0.35)",
+                    borderRadius: 5,
                   }}
                 >
                   Multi
@@ -210,22 +220,35 @@ export default function GameCard({
               )}
             </div>
 
-            {/* Price — Free=blue, paid=green, Unknown=dim */}
-            {priceDisplay && (
+            {/* Price + discount badge — always shown */}
+            <div className="flex items-center gap-1.5 flex-shrink-0">
+              {price && price.cut > 0 && (
+                <span
+                  className="font-bold text-[11px] px-1.5 py-0.5"
+                  style={{ background: "rgba(68,214,44,0.15)", color: "#44d62c", borderRadius: 4 }}
+                >
+                  -{price.cut}%
+                </span>
+              )}
               <span
-                className="font-bold flex-shrink-0"
+                className="font-bold"
                 style={{
-                  color: priceDisplay === "Free"
-                    ? "#48BCF9"
-                    : priceDisplay === "Unknown"
-                    ? "rgba(255,255,255,0.3)"
-                    : "#5BDE8A",
-                  fontSize: priceDisplay === "Unknown" ? 10 : 13,
+                  color: price === undefined ? "rgba(255,255,255,0.18)"
+                       : price === null      ? "rgba(255,255,255,0.30)"
+                       : price.isFree        ? "#48BCF9"
+                       : "#5BDE8A",
+                  fontSize: price != null && price !== undefined ? 14 : 11,
                 }}
               >
-                {priceDisplay}
+                {price === undefined
+                  ? "···"
+                  : price === null
+                  ? "Unknown"
+                  : price.isFree
+                  ? "Free"
+                  : `$${price.price.toFixed(2)}`}
               </span>
-            )}
+            </div>
           </div>
         </div>
       </div>

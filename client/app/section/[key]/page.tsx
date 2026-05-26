@@ -10,9 +10,9 @@ import {
 import { useAuth } from "@/context/AuthContext"
 import PageBackground from "@/components/ui/PageBackground"
 import GameCard from "@/components/game/GameCard"
-import { getPopularGames, getNewGames, getTrendedGames, getForYouGames } from "@/lib/api/games"
+import { getPopularGames, getNewGames, getTrendedGames, getForYouGames, getCardPrices } from "@/lib/api/games"
 import { getWishlist, addToWishlist, removeFromWishlist } from "@/lib/api/wishlist"
-import type { Game, WishlistItem } from "@/types/game"
+import type { Game, WishlistItem, CardPrice } from "@/types/game"
 
 // ─── Section metadata ─────────────────────────────────────────────────────────
 const SLUG_META: Record<string, { label: string; paginated: boolean }> = {
@@ -46,14 +46,6 @@ const fadeUp = (delay = 0, y = 20) => ({
   transition: { duration: 0.5, ease: "easeOut", delay },
 })
 
-async function fetchCheapestPrice(title: string): Promise<string | null> {
-  try {
-    const res = await fetch(`https://www.cheapshark.com/api/1.0/games?title=${encodeURIComponent(title)}&limit=1`)
-    if (!res.ok) return null
-    const d = await res.json()
-    return Array.isArray(d) && d[0]?.cheapest ? (d[0].cheapest as string) : null
-  } catch { return null }
-}
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 export default function SectionPage() {
@@ -69,7 +61,7 @@ export default function SectionPage() {
 
   const [activeNav,   setActiveNav]   = useState("Home")
   const [games,       setGames]       = useState<Game[]>([])
-  const [prices,      setPrices]      = useState<Record<number, string>>({})
+  const [prices,      setPrices]      = useState<Record<number, CardPrice | null>>({})
   const [wishlistIds, setWishlistIds] = useState<Set<string>>(new Set())
   const [page,        setPage]        = useState(1)
   const [hasMore,     setHasMore]     = useState(paginated)
@@ -164,15 +156,16 @@ export default function SectionPage() {
   // ── Price fetching (background, new games only) ───────────────────────────
   useEffect(() => {
     if (!games.length) return
-    const unseen = games.filter(g => !prices[g.id]).slice(0, 30)
+    const unseen = games.filter(g => !(g.id in prices)).slice(0, 30)
     if (!unseen.length) return
     ;(async () => {
-      for (let i = 0; i < unseen.length; i += 5) {
-        const r = await Promise.all(
-          unseen.slice(i, i + 5).map(g => fetchCheapestPrice(g.name).then(p => ({ id: g.id, price: p })))
+      for (let i = 0; i < unseen.length; i += 20) {
+        const batch = unseen.slice(i, i + 20)
+        const result = await getCardPrices(
+          batch.map(g => ({ id: g.id, name: g.name, steamAppId: g.steamAppId }))
         )
-        setPrices(p => { const n = { ...p }; r.forEach(({ id, price }) => { if (price) n[id] = price }); return n })
-        if (i + 5 < unseen.length) await new Promise(r => setTimeout(r, 300))
+        setPrices(p => ({ ...p, ...result }))
+        if (i + 20 < unseen.length) await new Promise(r => setTimeout(r, 300))
       }
     })()
   }, [games.length])
@@ -353,7 +346,6 @@ export default function SectionPage() {
                       <GameCard
                         game={game}
                         rank={i + 1}
-                        price={prices[game.id] ?? null}
                         isFavorited={wishlistIds.has(String(game.id))}
                         onToggleFavorite={e => handleToggleFavorite(e, game)}
                       />

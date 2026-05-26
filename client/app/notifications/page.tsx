@@ -2,25 +2,15 @@
 
 import { useEffect, useRef, useState, useCallback } from "react"
 import { useRouter } from "next/navigation"
-import Link from "next/link"
-import { motion } from "framer-motion"
-import {
-  Home, BellRing, Search as SearchIcon, Users, User, CheckCheck,
-} from "lucide-react"
+import { BellRing, CheckCheck } from "lucide-react"
 import { useAuth } from "@/context/AuthContext"
 import { useUnreadCount } from "@/hooks/useUnreadCount"
 import PageBackground from "@/components/ui/PageBackground"
-import NotificationDot from "@/components/ui/NotificationDot"
+import AppSidebar from "@/components/layout/AppSidebar"
 import {
   getNotifications, markRead, markAllRead, deleteNotification,
 } from "@/lib/api/notifications"
 import type { Notification } from "@/types/notification"
-
-const glassStyle = {
-  background: "rgba(30, 38, 51, 0.70)",
-  backdropFilter: "blur(6px)",
-  WebkitBackdropFilter: "blur(6px)",
-} as const
 
 const cardStyle = {
   background: "rgba(28,30,42,0.70)",
@@ -29,47 +19,6 @@ const cardStyle = {
   backdropFilter: "blur(8px)",
   WebkitBackdropFilter: "blur(8px)",
 } as const
-
-const NAV = [
-  { icon: Home,        label: "Home",          href: "/"              },
-  { icon: BellRing,    label: "Notifications", href: "/notifications" },
-  { icon: SearchIcon,  label: "Search",        href: "/search"        },
-  { icon: Users,       label: "Friends",       href: "/friends"       },
-  { icon: User,        label: "Profile",       href: "/profile"       },
-] as const
-
-function NavItem({ icon: Icon, label, active, dot, onClick }: {
-  icon: React.ElementType
-  label: string
-  active: boolean
-  dot?: React.ReactNode
-  onClick: () => void
-}) {
-  return (
-    <motion.button
-      onClick={onClick}
-      whileTap={{ scale: 0.97 }}
-      className="w-full flex items-center gap-3 px-3 py-2.5 mb-0.5 text-[16px] font-medium relative"
-      style={{
-        borderRadius: 10,
-        color: active ? "#48BCF9" : "rgba(255,255,255,0.45)",
-        background: active ? "rgba(52,82,229,0.13)" : "transparent",
-        border: "none",
-        cursor: "pointer",
-      }}
-    >
-      {active && (
-        <div
-          className="absolute left-0 top-1/2 -translate-y-1/2"
-          style={{ width: 3, height: 20, background: "#48BCF9", borderRadius: "0 4px 4px 0" }}
-        />
-      )}
-      <Icon size={15} />
-      <span className="flex-1 text-left">{label}</span>
-      {dot}
-    </motion.button>
-  )
-}
 
 function formatRelative(iso: string): string {
   const ms = Date.now() - new Date(iso).getTime()
@@ -83,7 +32,7 @@ function formatRelative(iso: string): string {
 
 export default function NotificationsPage() {
   const router       = useRouter()
-  const { user, isLoading, logout } = useAuth()
+  const { user, isLoading } = useAuth()
   const { counts, refresh: refreshCounts } = useUnreadCount()
 
   const [tab, setTab] = useState<"all" | "events" | "discounts">("all")
@@ -162,44 +111,7 @@ export default function NotificationsPage() {
       <PageBackground />
 
       <div className="relative flex h-full" style={{ zIndex: 3 }}>
-        {/* ══════════ SIDEBAR ══════════ */}
-        <aside
-          className="flex flex-col flex-shrink-0 h-full"
-          style={{ width: 240, ...glassStyle, borderRight: "1px solid rgba(255,255,255,0.05)" }}
-        >
-          <div className="flex items-center gap-3 px-5 pt-6 pb-5">
-            <img src="/icons/logo.svg" alt="" style={{ width: 30, height: 30 }} />
-            <span className="text-white font-bold text-[17px] tracking-wide">DisLow</span>
-          </div>
-
-          <div className="px-3 mb-1">
-            <p className="text-[9px] font-bold tracking-[0.12em] px-3 mb-2" style={{ color: "rgba(255,255,255,0.25)" }}>MENU</p>
-            {NAV.map(({ icon, label, href }) => (
-              <NavItem
-                key={label}
-                icon={icon}
-                label={label}
-                active={label === "Notifications"}
-                dot={label === "Notifications"
-                  ? <NotificationDot events={counts.events} discounts={counts.discounts} />
-                  : undefined
-                }
-                onClick={() => router.push(href)}
-              />
-            ))}
-          </div>
-
-          <div className="flex-1" />
-
-          <button
-            onClick={logout}
-            className="flex items-center gap-3 px-8 py-5 text-[16px] font-medium"
-            style={{ color: "rgba(255,255,255,0.35)", borderTop: "1px solid rgba(255,255,255,0.05)", background: "transparent", border: "none", cursor: "pointer", width: "100%", borderTopWidth: 1, borderTopStyle: "solid", borderTopColor: "rgba(255,255,255,0.05)" }}
-          >
-            <div className="w-2.5 h-2.5 rounded-full bg-[#FF6B4A]" />
-            log out
-          </button>
-        </aside>
+        <AppSidebar />
 
         {/* ══════════ CONTENT ══════════ */}
         <div className="flex-1 min-w-0 overflow-y-auto" style={{ scrollbarWidth: "none" }}>

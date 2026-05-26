@@ -79,7 +79,7 @@ const DiscordIcon = () => (
 // ─── Page ─────────────────────────────────────────────────────────────────────
 export default function LoginPage() {
   const router = useRouter()
-  const { login, loginAsGuest } = useAuth()
+  const { login, verifyTwoFactor, loginAsGuest } = useAuth()
 
   // If middleware redirected here from a protected page, go back there after login
   const searchParams = typeof window !== "undefined"
@@ -102,15 +102,38 @@ export default function LoginPage() {
   const [remember, setRemember]         = useState(false)
   const [loading, setLoading]           = useState(false)
 
+  // Admin login adds an OTP step in the same card — see [[feedback-admin-single-login]]
+  const [step, setStep] = useState<"creds" | "otp">("creds")
+  const [otp, setOtp]   = useState("")
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
     try {
-      await login(form.email, form.password)
-      toast.success("Welcome back! 🎮")
-      router.push(returnTo)
+      const { requiresTwoFactor } = await login(form.email, form.password)
+      if (requiresTwoFactor) {
+        setStep("otp")
+        toast.info("Verification code sent to your email")
+      } else {
+        toast.success("Welcome back! 🎮")
+        router.push(returnTo)
+      }
     } catch (err: any) {
       toast.error(err?.response?.data?.message ?? "Login failed")
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleVerify = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setLoading(true)
+    try {
+      const user = await verifyTwoFactor(form.email, otp)
+      toast.success("Welcome back, admin")
+      router.push(user?.role === "admin" ? "/admin" : returnTo)
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message ?? "Invalid or expired code")
     } finally {
       setLoading(false)
     }
@@ -173,107 +196,149 @@ export default function LoginPage() {
             {/* Title */}
             <motion.div className="mb-6" {...fadeUp(0.2)}>
               <h1 style={{ fontSize: 28, fontWeight: 800, color: "#fff", marginBottom: 4 }}>
-                Welcome back
+                {step === "creds" ? "Welcome back" : "Verify it's you"}
               </h1>
-              <p style={{ fontSize: 13, color: "#9fa0a1" }}>Sign in to your DisLow account</p>
+              <p style={{ fontSize: 13, color: "#9fa0a1" }}>
+                {step === "creds"
+                  ? "Sign in to your DisLow account"
+                  : <>We sent a 6-digit code to <span style={{ color: "#fff" }}>{form.email}</span></>}
+              </p>
             </motion.div>
 
-            <form onSubmit={handleSubmit} className="space-y-4">
-              {/* Email */}
-              <motion.div {...fadeUp(0.3)}>
-                <input
-                  type="email"
-                  placeholder="Email address"
-                  value={form.email}
-                  onChange={e => setForm(p => ({ ...p, email: e.target.value }))}
-                  required
-                  className="auth-input"
-                />
-              </motion.div>
-
-              {/* Password */}
-              <motion.div {...fadeUp(0.35)}>
-                <div className="relative">
+            {step === "creds" ? (
+              <form onSubmit={handleSubmit} className="space-y-4">
+                {/* Email */}
+                <motion.div {...fadeUp(0.3)}>
                   <input
-                    type={showPassword ? "text" : "password"}
-                    placeholder="Password"
-                    value={form.password}
-                    onChange={e => setForm(p => ({ ...p, password: e.target.value }))}
+                    type="email"
+                    placeholder="Email address"
+                    value={form.email}
+                    onChange={e => setForm(p => ({ ...p, email: e.target.value }))}
                     required
-                    className="auth-input pr-12"
+                    className="auth-input"
                   />
+                </motion.div>
+
+                {/* Password */}
+                <motion.div {...fadeUp(0.35)}>
+                  <div className="relative">
+                    <input
+                      type={showPassword ? "text" : "password"}
+                      placeholder="Password"
+                      value={form.password}
+                      onChange={e => setForm(p => ({ ...p, password: e.target.value }))}
+                      required
+                      className="auth-input pr-12"
+                    />
+                    <button
+                      type="button"
+                      tabIndex={-1}
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-4 top-1/2 -translate-y-1/2 text-[#9fa0a1] hover:text-white transition-colors"
+                    >
+                      {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                    </button>
+                  </div>
+                </motion.div>
+
+                {/* Remember + Forgot */}
+                <motion.div className="flex items-center justify-between" {...fadeUp(0.4)}>
+                  <label className="flex items-center gap-2 cursor-pointer select-none">
+                    <button
+                      type="button"
+                      onClick={() => setRemember(!remember)}
+                      className="w-[18px] h-[18px] rounded-full border-2 transition-all flex items-center justify-center flex-shrink-0"
+                      style={{
+                        borderColor: remember ? "#AE3BD6" : "rgba(188,188,201,0.4)",
+                        background:  remember ? "#AE3BD6" : "transparent",
+                      }}
+                    >
+                      {remember && (
+                        <svg width="9" height="7" viewBox="0 0 10 8" fill="none">
+                          <path d="M1 4L3.5 6.5L9 1" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                        </svg>
+                      )}
+                    </button>
+                    <span style={{ fontSize: 13, color: "#9fa0a1" }}>remember</span>
+                  </label>
+                  <Link
+                    href="/forgot-password"
+                    className="transition-colors hover:text-white"
+                    style={{ fontSize: 13, color: "#9fa0a1" }}
+                  >
+                    forgot password?
+                  </Link>
+                </motion.div>
+
+                {/* Social buttons */}
+                <motion.div className="flex justify-center gap-8 pt-1 pb-1" {...fadeUp(0.70)}>
+                  <SocialBtn icon={<GoogleIcon />}  label="Google"  onClick={() => handleSocialLogin("google")} />
+                  <SocialBtn icon={<SteamIcon />}   label="Steam"   onClick={() => handleSocialLogin("steam")} />
+                  <SocialBtn icon={<DiscordIcon />} label="Discord" onClick={() => handleSocialLogin("discord")} />
+                </motion.div>
+
+                {/* Login button — always fades in LAST */}
+                <motion.div {...fadeUp(0.85)} className="pt-1">
+                  <SparkleButton label="Login" type="submit" loading={loading} />
+                </motion.div>
+              </form>
+            ) : (
+              <form onSubmit={handleVerify} className="space-y-4">
+                <motion.div {...fadeUp(0.3)}>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    autoComplete="one-time-code"
+                    maxLength={6}
+                    placeholder="6-digit code"
+                    value={otp}
+                    onChange={e => setOtp(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                    required
+                    className="auth-input"
+                    style={{ textAlign: "center", letterSpacing: "0.4em", fontSize: 18 }}
+                  />
+                </motion.div>
+
+                <motion.div {...fadeUp(0.5)} className="pt-1">
+                  <SparkleButton label="Verify" type="submit" loading={loading} />
+                </motion.div>
+
+                <motion.div {...fadeUp(0.6)} className="text-center">
                   <button
                     type="button"
-                    tabIndex={-1}
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-4 top-1/2 -translate-y-1/2 text-[#9fa0a1] hover:text-white transition-colors"
+                    onClick={() => { setStep("creds"); setOtp("") }}
+                    className="text-xs transition-colors hover:text-white"
+                    style={{ color: "rgba(255,255,255,0.45)" }}
                   >
-                    {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                    ← back to login
                   </button>
-                </div>
-              </motion.div>
-
-              {/* Remember + Forgot */}
-              <motion.div className="flex items-center justify-between" {...fadeUp(0.4)}>
-                <label className="flex items-center gap-2 cursor-pointer select-none">
-                  <button
-                    type="button"
-                    onClick={() => setRemember(!remember)}
-                    className="w-[18px] h-[18px] rounded-full border-2 transition-all flex items-center justify-center flex-shrink-0"
-                    style={{
-                      borderColor: remember ? "#AE3BD6" : "rgba(188,188,201,0.4)",
-                      background:  remember ? "#AE3BD6" : "transparent",
-                    }}
-                  >
-                    {remember && (
-                      <svg width="9" height="7" viewBox="0 0 10 8" fill="none">
-                        <path d="M1 4L3.5 6.5L9 1" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                      </svg>
-                    )}
-                  </button>
-                  <span style={{ fontSize: 13, color: "#9fa0a1" }}>remember</span>
-                </label>
-                <Link
-                  href="/forgot-password"
-                  className="transition-colors hover:text-white"
-                  style={{ fontSize: 13, color: "#9fa0a1" }}
-                >
-                  forgot password?
-                </Link>
-              </motion.div>
-
-              {/* Social buttons */}
-              <motion.div className="flex justify-center gap-8 pt-1 pb-1" {...fadeUp(0.70)}>
-                <SocialBtn icon={<GoogleIcon />}  label="Google"  onClick={() => handleSocialLogin("google")} />
-                <SocialBtn icon={<SteamIcon />}   label="Steam"   onClick={() => handleSocialLogin("steam")} />
-                <SocialBtn icon={<DiscordIcon />} label="Discord" onClick={() => handleSocialLogin("discord")} />
-              </motion.div>
-
-              {/* Login button — always fades in LAST */}
-              <motion.div {...fadeUp(0.85)} className="pt-1">
-                <SparkleButton label="Login" type="submit" loading={loading} />
-              </motion.div>
-            </form>
+                </motion.div>
+              </form>
+            )}
 
             {/* Register link */}
-            <motion.p className="text-center mt-4" style={{ fontSize: 13, color: "#9fa0a1" }} {...fadeUp(0.92)}>
-              don&apos;t have an account?{" "}
-              <Link href="/register" className="font-semibold hover:text-white transition-colors" style={{ color: "#999FFA" }}>
-                register
-              </Link>
-            </motion.p>
+            {step === "creds" && (
+              <>
+                <motion.p className="text-center mt-4" style={{ fontSize: 13, color: "#9fa0a1" }} {...fadeUp(0.92)}>
+                  don&apos;t have an account?{" "}
+                  <Link href="/register" className="font-semibold hover:text-white transition-colors" style={{ color: "#999FFA" }}>
+                    register
+                  </Link>
+                </motion.p>
 
-            {/* Guest access */}
-            <motion.div className="text-center mt-3" {...fadeUp(0.97)}>
-              <button
-                type="button"
-                onClick={() => { loginAsGuest(); router.push("/") /* guests go home, not protected pages */ }}
-                className="text-xs transition-colors hover:text-white"
-                style={{ color: "rgba(255,255,255,0.35)" }}
-              >
-                continue as guest →
-              </button>
-            </motion.div>
+                {/* Guest access */}
+                <motion.div className="text-center mt-3" {...fadeUp(0.97)}>
+                  <button
+                    type="button"
+                    onClick={() => { loginAsGuest(); router.push("/") /* guests go home, not protected pages */ }}
+                    className="text-xs transition-colors hover:text-white"
+                    style={{ color: "rgba(255,255,255,0.35)" }}
+                  >
+                    continue as guest →
+                  </button>
+                </motion.div>
+              </>
+            )}
           </div>
         </motion.div>
       </div>

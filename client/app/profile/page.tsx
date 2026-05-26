@@ -3,28 +3,19 @@
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
-import { motion } from "framer-motion"
 import {
-  Home, BellRing, Search as SearchIcon, Users, User,
   ChevronRight, Pencil, Lock, Link2,
   HelpCircle, MessageSquare, Bug, FileText, ScrollText, Download, Trash2,
   LogOut,
 } from "lucide-react"
 import { useAuth } from "@/context/AuthContext"
 import PageBackground from "@/components/ui/PageBackground"
+import AppSidebar from "@/components/layout/AppSidebar"
 import StatsRow from "@/components/profile/StatsRow"
 import AvatarPicker from "@/components/profile/AvatarPicker"
 import PreferenceToggle from "@/components/profile/PreferenceToggle"
-import NotificationDot from "@/components/ui/NotificationDot"
-import { useUnreadCount } from "@/hooks/useUnreadCount"
 import { getMyStats, updateNotificationPrefs, type MyStats } from "@/lib/api/users"
 import { toast } from "react-toastify"
-
-const glassStyle = {
-  background: "rgba(30, 38, 51, 0.70)",
-  backdropFilter: "blur(6px)",
-  WebkitBackdropFilter: "blur(6px)",
-} as const
 
 const cardStyle = {
   background: "rgba(28,30,42,0.70)",
@@ -33,14 +24,6 @@ const cardStyle = {
   backdropFilter: "blur(8px)",
   WebkitBackdropFilter: "blur(8px)",
 } as const
-
-const NAV = [
-  { icon: Home,       label: "Home",          href: "/"              },
-  { icon: BellRing,   label: "Notifications", href: "/notifications" },
-  { icon: SearchIcon, label: "Search",        href: "/search"        },
-  { icon: Users,      label: "Friends",       href: "/friends"       },
-  { icon: User,       label: "Profile",       href: "/profile"       },
-] as const
 
 const ACCOUNT_LINKS = [
   { icon: Pencil, label: "Edit Profile",    href: "/profile/edit"     },
@@ -57,35 +40,6 @@ const SUPPORT_LINKS = [
   { icon: Download,      label: "Export My Data",  href: "/profile/support/export"   },
   { icon: Trash2,        label: "Delete Account",  href: "/profile/delete"           },
 ] as const
-
-function NavItem({
-  icon: Icon, label, active, dot, onClick,
-}: { icon: React.ElementType; label: string; active: boolean; dot?: React.ReactNode; onClick: () => void }) {
-  return (
-    <motion.button
-      onClick={onClick}
-      whileTap={{ scale: 0.97 }}
-      className="w-full flex items-center gap-3 px-3 py-2.5 mb-0.5 text-[16px] font-medium relative"
-      style={{
-        borderRadius: 10,
-        color: active ? "#48BCF9" : "rgba(255,255,255,0.45)",
-        background: active ? "rgba(52,82,229,0.13)" : "transparent",
-        border: "none",
-        cursor: "pointer",
-      }}
-    >
-      {active && (
-        <div
-          className="absolute left-0 top-1/2 -translate-y-1/2"
-          style={{ width: 3, height: 20, background: "#48BCF9", borderRadius: "0 4px 4px 0" }}
-        />
-      )}
-      <Icon size={15} />
-      <span className="flex-1 text-left">{label}</span>
-      {dot}
-    </motion.button>
-  )
-}
 
 function LinkRow({
   icon: Icon, label, href,
@@ -106,11 +60,20 @@ function LinkRow({
 export default function ProfilePage() {
   const router = useRouter()
   const { user, isLoading, logout, updateUser } = useAuth()
-  const { counts } = useUnreadCount()
 
   const [stats, setStats] = useState<MyStats>({ following: 0, followers: 0, favorites: 0 })
   const [statsLoading, setStatsLoading] = useState(true)
   const [pickerOpen, setPickerOpen] = useState(false)
+
+  const [threshold, setThreshold] = useState<number>(10)
+  const [thresholdSaving, setThresholdSaving] = useState(false)
+
+  // Sync threshold once user data is available
+  useEffect(() => {
+    if (user?.notificationPrefs?.discountThreshold != null) {
+      setThreshold(user.notificationPrefs.discountThreshold)
+    }
+  }, [user?.notificationPrefs?.discountThreshold])
 
   const handlePrefChange = async (pref: "events" | "discounts", next: boolean) => {
     try {
@@ -119,6 +82,18 @@ export default function ProfilePage() {
     } catch {
       toast.error("Failed to update preference")
       throw new Error("pref update failed") // causes PreferenceToggle to revert
+    }
+  }
+
+  const handleThresholdCommit = async (value: number) => {
+    setThresholdSaving(true)
+    try {
+      await updateNotificationPrefs({ discountThreshold: value })
+      updateUser({ notificationPrefs: { ...user!.notificationPrefs!, discountThreshold: value } })
+    } catch {
+      toast.error("Failed to save threshold")
+    } finally {
+      setThresholdSaving(false)
     }
   }
 
@@ -154,49 +129,7 @@ export default function ProfilePage() {
       <PageBackground />
 
       <div className="relative flex h-full" style={{ zIndex: 3 }}>
-        {/* ══════════ SIDEBAR ══════════ */}
-        <aside
-          className="flex flex-col flex-shrink-0 h-full"
-          style={{ width: 240, ...glassStyle, borderRight: "1px solid rgba(255,255,255,0.05)" }}
-        >
-          <div className="flex items-center gap-3 px-5 pt-6 pb-5">
-            <img src="/icons/logo.svg" alt="" style={{ width: 30, height: 30 }} />
-            <span className="text-white font-bold text-[17px] tracking-wide">DisLow</span>
-          </div>
-
-          <div className="px-3 mb-1">
-            <p
-              className="text-[9px] font-bold tracking-[0.12em] px-3 mb-2"
-              style={{ color: "rgba(255,255,255,0.25)" }}
-            >
-              MENU
-            </p>
-            {NAV.map(({ icon, label, href }) => (
-              <NavItem
-                key={label}
-                icon={icon}
-                label={label}
-                active={label === "Profile"}
-                dot={label === "Notifications"
-                  ? <NotificationDot events={counts.events} discounts={counts.discounts} />
-                  : undefined
-                }
-                onClick={() => router.push(href)}
-              />
-            ))}
-          </div>
-
-          <div className="flex-1" />
-
-          <button
-            onClick={logout}
-            className="flex items-center gap-3 px-8 py-5 text-[16px] font-medium hover:text-white transition-colors"
-            style={{ color: "rgba(255,255,255,0.35)", borderTop: "1px solid rgba(255,255,255,0.05)" }}
-          >
-            <div className="w-2.5 h-2.5 rounded-full bg-[#FF6B4A]" />
-            log out
-          </button>
-        </aside>
+        <AppSidebar />
 
         {/* ══════════ AVATAR PICKER MODAL ══════════ */}
         {pickerOpen && (
@@ -321,6 +254,44 @@ export default function ProfilePage() {
                   accentColor="#44d62c"
                   onChange={(next) => handlePrefChange("discounts", next)}
                 />
+
+                {/* Discount threshold slider */}
+                <div className="px-4 py-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <div>
+                      <p className="text-white text-[13px] font-medium">Minimum discount</p>
+                      <p className="text-[11px] mt-0.5" style={{ color: "rgba(255,255,255,0.40)" }}>
+                        Only notify when a game drops by at least this much
+                      </p>
+                    </div>
+                    <span
+                      className="text-[15px] font-bold flex-shrink-0 ml-4"
+                      style={{ color: thresholdSaving ? "rgba(255,255,255,0.4)" : "#44d62c", minWidth: 40, textAlign: "right" }}
+                    >
+                      {threshold}%
+                    </span>
+                  </div>
+                  <input
+                    type="range"
+                    min={5}
+                    max={80}
+                    step={5}
+                    value={threshold}
+                    onChange={e => setThreshold(Number(e.target.value))}
+                    onMouseUp={e => handleThresholdCommit(Number((e.target as HTMLInputElement).value))}
+                    onTouchEnd={e => handleThresholdCommit(Number((e.target as HTMLInputElement).value))}
+                    disabled={thresholdSaving}
+                    className="w-full h-1.5 rounded-full appearance-none cursor-pointer"
+                    style={{
+                      accentColor: "#44d62c",
+                      background: `linear-gradient(to right, #44d62c ${((threshold - 5) / 75) * 100}%, rgba(255,255,255,0.12) ${((threshold - 5) / 75) * 100}%)`,
+                    }}
+                  />
+                  <div className="flex justify-between mt-1.5">
+                    <span className="text-[9px]" style={{ color: "rgba(255,255,255,0.25)" }}>5%</span>
+                    <span className="text-[9px]" style={{ color: "rgba(255,255,255,0.25)" }}>80%</span>
+                  </div>
+                </div>
               </div>
             </section>
 

@@ -1,6 +1,7 @@
 export interface NotificationPrefs {
   events: boolean
   discounts: boolean
+  discountThreshold?: number
 }
 
 export interface User {

@@ -7,7 +7,7 @@ import { useDebouncedCallback } from "use-debounce"
 import {
   SlidersHorizontal, Search, Bell,
   Home, BellRing, Search as SearchIcon,
-  Users, User, Star, LogIn, X, ChevronDown,
+  Users, User, Star, LogIn, X, ChevronDown, Receipt, Shield,
 } from "lucide-react"
 import { useAuth } from "@/context/AuthContext"
 import PageBackground from "@/components/ui/PageBackground"
@@ -19,27 +19,29 @@ import DealOfTheDay from "@/components/game/DealOfTheDay"
 import ByGenre from "@/components/game/ByGenre"
 import { SectionHeading } from "@/components/ui/SectionHeading"
 import {
-  getPopularGames, getNewGames, getTrendedGames, getForYouGames, searchGames, getGameById, getGamePrice,
-  getFreeToPlayGames, getHiddenGemsGames, getDealOfDay,
+  getPopularGames, getNewGames, getTrendedGames, getForYouGames, searchGames, getGameById,
+  getFreeToPlayGames, getHiddenGemsGames, getDealOfDay, getCardPrices,
   type DealOfDay as DealOfDayType,
 } from "@/lib/api/games"
+import { primeCache } from "@/hooks/useCardPrice"
 import { getWishlist, addToWishlist, removeFromWishlist } from "@/lib/api/wishlist"
 import { useUnreadCount } from "@/hooks/useUnreadCount"
 import NotificationDot from "@/components/ui/NotificationDot"
-import type { Game, WishlistItem } from "@/types/game"
+import NotificationPopover from "@/components/notifications/NotificationPopover"
+import type { Game, WishlistItem, CardPrice } from "@/types/game"
 
 // ─── Constants ────────────────────────────────────────────────────────────────
-const TABS = ["Popular", "New", "Trended", "Favorites", "For you"] as const
-type Tab = typeof TABS[number]
-
-const AUTH_NAV = new Set(["Notifications", "Friends", "Profile"])
+// "Favorites" lives in the sidebar now (under Notifications); "For you" was removed.
+const AUTH_NAV = new Set(["Notifications", "Favorites", "Friends", "Profile", "Purchases"])
 
 const NAV = [
-  { icon: Home,        label: "Home",         href: "/"              },
-  { icon: BellRing,    label: "Notifications", href: "/notifications" },
-  { icon: SearchIcon,  label: "Search",        href: "/search"        },
-  { icon: Users,       label: "Friends",       href: "/friends"       },
-  { icon: User,        label: "Profile",       href: "/profile"       },
+  { icon: Home,        label: "Home",          href: "/"               },
+  { icon: BellRing,    label: "Notifications", href: "/notifications"  },
+  { icon: Star,        label: "Favorites",     href: "/wishlist"       },
+  { icon: SearchIcon,  label: "Search",        href: "/search"         },
+  { icon: Receipt,     label: "Purchases",     href: "/account/orders" },
+  { icon: Users,       label: "Friends",       href: "/friends"        },
+  { icon: User,        label: "Profile",       href: "/profile"        },
 ] as const
 
 const ALL_SECTIONS = [
@@ -55,13 +57,22 @@ const ALL_SECTIONS = [
 ] as const
 
 // ─── Filters ─────────────────────────────────────────────────────────────────
-const FILTER_DATE     = ["All time",      "Last year",  "Last 3 years"] as const
-const FILTER_PRICE    = ["Any price",     "Free",       "Under $20",    "Under $60"] as const
+const CURRENT_YEAR    = new Date().getFullYear()
 const FILTER_STYLE    = ["All genres",    "Action",     "RPG",          "Adventure", "Shooter", "Strategy", "Indie"] as const
 const FILTER_PLATFORM = ["All platforms", "PC",         "PS5",          "Xbox",      "Switch"] as const
 
-interface Filters { date: string; price: string; genre: string; platform: string }
-const DEFAULT_FILTERS: Filters = { date: "All time", price: "Any price", genre: "All genres", platform: "All platforms" }
+interface Filters {
+  dateRange:  [number, number]   // [startYear, endYear]
+  priceRange: [number, number]   // [minPrice, maxPrice]
+  genre:    string
+  platform: string
+}
+const DEFAULT_FILTERS: Filters = {
+  dateRange:  [1990, CURRENT_YEAR],
+  priceRange: [0, 100],
+  genre:      "All genres",
+  platform:   "All platforms",
+}
 
 // ─── Styles / helpers ─────────────────────────────────────────────────────────
 const glassStyle = {
@@ -69,6 +80,19 @@ const glassStyle = {
   backdropFilter: "blur(6px)",
   WebkitBackdropFilter: "blur(6px)",
 } as const
+
+// Header glass — lighter opacity (50%) so the floating bar reads as glass,
+// not as a solid strip. Sidebar keeps glassStyle (70%) for legibility.
+const headerGlass = {
+  background: "rgba(30, 38, 51, 0.50)",
+  backdropFilter: "blur(10px)",
+  WebkitBackdropFilter: "blur(10px)",
+} as const
+
+// Beyond 16:9 (typical 1920×1080 and wider), cap the content column so
+// cards don't stretch across an ultrawide screen — center it instead.
+const CONTENT_MAX_WIDTH = 1600
+const CONTENT_SIDE_PADDING = 96
 
 const fadeUp = (delay = 0, y = 20) => ({
   initial:    { opacity: 0, y },
@@ -88,14 +112,6 @@ function matchesPlatform(platforms: string[], target: string) {
     if (target === "Switch") return l.includes("nintendo")
     return false
   })
-}
-
-/**
- * Thin wrapper — delegates to the backend which proxies CheapShark.
- * Returns null when the game isn't found → card shows "Unknown".
- */
-async function fetchCheapestPrice(title: string): Promise<string | null> {
-  return getGamePrice(title)
 }
 
 // ─── Nav Glow Item ────────────────────────────────────────────────────────────
@@ -192,13 +208,117 @@ function NavGlowItem({
   )
 }
 
+// ─── Range Slider ─────────────────────────────────────────────────────────────
+function RangeSlider({
+  min, max, value, onChange, formatLabel,
+  accentColor = "#3452E5",
+}: {
+  min: number; max: number
+  value: [number, number]
+  onChange: (v: [number, number]) => void
+  formatLabel: (v: number) => string
+  accentColor?: string
+}) {
+  const trackRef = useRef<HTMLDivElement>(null)
+  const [dragging, setDragging] = useState<"min" | "max" | null>(null)
+
+  const pct = (v: number) => ((v - min) / (max - min)) * 100
+
+  const getValueFromX = (clientX: number) => {
+    const rect = trackRef.current?.getBoundingClientRect()
+    if (!rect) return min
+    const ratio = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width))
+    return Math.round(min + ratio * (max - min))
+  }
+
+  const handleTrackClick = (e: React.MouseEvent) => {
+    const v = getValueFromX(e.clientX)
+    const dMin = Math.abs(v - value[0])
+    const dMax = Math.abs(v - value[1])
+    if (dMin <= dMax) onChange([Math.min(v, value[1]), value[1]])
+    else              onChange([value[0], Math.max(v, value[0])])
+  }
+
+  useEffect(() => {
+    if (!dragging) return
+    const move = (e: MouseEvent | TouchEvent) => {
+      const clientX = "touches" in e ? e.touches[0].clientX : e.clientX
+      const v = getValueFromX(clientX)
+      if (dragging === "min") onChange([Math.min(v, value[1] - 1), value[1]])
+      else                    onChange([value[0], Math.max(v, value[0] + 1)])
+    }
+    const up = () => setDragging(null)
+    window.addEventListener("mousemove", move)
+    window.addEventListener("mouseup", up)
+    window.addEventListener("touchmove", move)
+    window.addEventListener("touchend", up)
+    return () => {
+      window.removeEventListener("mousemove", move)
+      window.removeEventListener("mouseup", up)
+      window.removeEventListener("touchmove", move)
+      window.removeEventListener("touchend", up)
+    }
+  }, [dragging, value, onChange])
+
+  const minPct = pct(value[0])
+  const maxPct = pct(value[1])
+
+  return (
+    <div className="flex flex-col gap-2">
+      {/* Labels */}
+      <div className="flex justify-between text-[11px] font-semibold" style={{ color: accentColor }}>
+        <span>{formatLabel(value[0])}</span>
+        <span>{formatLabel(value[1])}</span>
+      </div>
+      {/* Track */}
+      <div
+        ref={trackRef}
+        onClick={handleTrackClick}
+        className="relative h-1 rounded-full cursor-pointer select-none"
+        style={{ background: "rgba(255,255,255,0.10)" }}
+      >
+        {/* Filled range */}
+        <div className="absolute top-0 bottom-0 rounded-full pointer-events-none"
+          style={{ left: `${minPct}%`, right: `${100 - maxPct}%`, background: accentColor, opacity: 0.85 }} />
+        {/* Min thumb */}
+        <div
+          onMouseDown={e => { e.preventDefault(); setDragging("min") }}
+          onTouchStart={e => { e.preventDefault(); setDragging("min") }}
+          className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-4 h-4 rounded-full cursor-grab active:cursor-grabbing"
+          style={{
+            left: `${minPct}%`,
+            background: "#fff",
+            boxShadow: `0 0 0 2px ${accentColor}`,
+            zIndex: 2,
+          }}
+        />
+        {/* Max thumb */}
+        <div
+          onMouseDown={e => { e.preventDefault(); setDragging("max") }}
+          onTouchStart={e => { e.preventDefault(); setDragging("max") }}
+          className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-4 h-4 rounded-full cursor-grab active:cursor-grabbing"
+          style={{
+            left: `${maxPct}%`,
+            background: "#fff",
+            boxShadow: `0 0 0 2px ${accentColor}`,
+            zIndex: 2,
+          }}
+        />
+      </div>
+    </div>
+  )
+}
+
 // ─── Filter Dropdown ──────────────────────────────────────────────────────────
 function FilterDropdown({ filters, onChange, onClose }: {
   filters:  Filters
   onChange: (f: Filters) => void
   onClose:  () => void
 }) {
-  const set = (k: keyof Filters, v: string) => onChange({ ...filters, [k]: v })
+  const setGenre    = (v: string)           => onChange({ ...filters, genre: v })
+  const setPlatform = (v: string)           => onChange({ ...filters, platform: v })
+  const setDate     = (v: [number, number]) => onChange({ ...filters, dateRange: v })
+  const setPrice    = (v: [number, number]) => onChange({ ...filters, priceRange: v })
 
   const Pill = ({ label, active, onClick }: { label: string; active: boolean; onClick: () => void }) => (
     <motion.button
@@ -207,21 +327,28 @@ function FilterDropdown({ filters, onChange, onClose }: {
       className="text-[11px] font-medium px-2.5 py-1"
       style={{
         borderRadius: 7,
-        background: active ? "rgba(174,59,214,0.22)" : "rgba(255,255,255,0.05)",
-        color:       active ? "#CF6EF5"               : "rgba(255,255,255,0.5)",
-        border:      active ? "1px solid rgba(174,59,214,0.4)" : "1px solid transparent",
+        background: active ? "rgba(52,82,229,0.28)" : "rgba(255,255,255,0.05)",
+        color:       active ? "#49BCF9"              : "rgba(255,255,255,0.5)",
+        border:      "none",
       }}
     >{label}</motion.button>
   )
 
   const Section = ({ title, children }: { title: string; children: React.ReactNode }) => (
     <div>
-      <p className="text-[9px] font-bold tracking-widest mb-2" style={{ color: "rgba(255,255,255,0.25)" }}>{title}</p>
-      <div className="flex flex-wrap gap-1.5">{children}</div>
+      <p className="text-[9px] font-bold tracking-widest mb-2.5" style={{ color: "rgba(255,255,255,0.25)" }}>{title}</p>
+      {children}
     </div>
   )
 
-  const hasActive = Object.keys(DEFAULT_FILTERS).some(k => filters[k as keyof Filters] !== DEFAULT_FILTERS[k as keyof Filters])
+  const isDefault = (
+    filters.genre    === DEFAULT_FILTERS.genre    &&
+    filters.platform === DEFAULT_FILTERS.platform &&
+    filters.dateRange[0]  === DEFAULT_FILTERS.dateRange[0]  &&
+    filters.dateRange[1]  === DEFAULT_FILTERS.dateRange[1]  &&
+    filters.priceRange[0] === DEFAULT_FILTERS.priceRange[0] &&
+    filters.priceRange[1] === DEFAULT_FILTERS.priceRange[1]
+  )
 
   return (
     <motion.div
@@ -232,21 +359,21 @@ function FilterDropdown({ filters, onChange, onClose }: {
       className="absolute top-full left-0 mt-2 z-[200] flex flex-col gap-4 p-4"
       style={{
         width:                320,
-        background:           "rgba(30,38,51,0.70)",
-        backdropFilter:       "blur(12px)",
-        WebkitBackdropFilter: "blur(12px)",
+        background:           "rgba(30,38,51,0.80)",
+        backdropFilter:       "blur(10px)",
+        WebkitBackdropFilter: "blur(10px)",
         borderRadius:         12,
-        border:               "1px solid rgba(255,255,255,0.07)",
         boxShadow:            "0 16px 48px rgba(0,0,0,0.6)",
       }}
     >
+      {/* Header */}
       <div className="flex items-center justify-between">
         <span className="text-white text-[13px] font-bold">Filters</span>
         <div className="flex items-center gap-2">
-          {hasActive && (
+          {!isDefault && (
             <motion.button onClick={() => onChange(DEFAULT_FILTERS)}
               whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
-              className="text-[10px]" style={{ color: "#AE3BD6" }}>Clear all</motion.button>
+              className="text-[10px]" style={{ color: "#49BCF9" }}>Clear all</motion.button>
           )}
           <motion.button onClick={onClose}
             whileHover={{ scale: 1.1, rotate: 90 }} whileTap={{ scale: 0.9 }}
@@ -254,17 +381,43 @@ function FilterDropdown({ filters, onChange, onClose }: {
         </div>
       </div>
 
-      <Section title="DATE">
-        {FILTER_DATE.map(d => <Pill key={d} label={d} active={filters.date === d} onClick={() => set("date", d)} />)}
-      </Section>
-      <Section title="PRICE">
-        {FILTER_PRICE.map(p => <Pill key={p} label={p} active={filters.price === p} onClick={() => set("price", p)} />)}
-      </Section>
+      {/* STYLE */}
       <Section title="STYLE">
-        {FILTER_STYLE.map(g => <Pill key={g} label={g} active={filters.genre === g} onClick={() => set("genre", g)} />)}
+        <div className="flex flex-wrap gap-1.5">
+          {FILTER_STYLE.map(g => <Pill key={g} label={g} active={filters.genre === g} onClick={() => setGenre(g)} />)}
+        </div>
       </Section>
+
+      {/* PLATFORM */}
       <Section title="PLATFORM">
-        {FILTER_PLATFORM.map(p => <Pill key={p} label={p} active={filters.platform === p} onClick={() => set("platform", p)} />)}
+        <div className="flex flex-wrap gap-1.5">
+          {FILTER_PLATFORM.map(p => <Pill key={p} label={p} active={filters.platform === p} onClick={() => setPlatform(p)} />)}
+        </div>
+      </Section>
+
+      {/* Divider */}
+      <div style={{ height: 1, background: "rgba(255,255,255,0.06)" }} />
+
+      {/* DATE RANGE */}
+      <Section title="DATE">
+        <RangeSlider
+          min={1990} max={CURRENT_YEAR}
+          value={filters.dateRange}
+          onChange={setDate}
+          formatLabel={v => String(v)}
+          accentColor="#3452E5"
+        />
+      </Section>
+
+      {/* PRICE RANGE */}
+      <Section title="PRICE">
+        <RangeSlider
+          min={0} max={100}
+          value={filters.priceRange}
+          onChange={setPrice}
+          formatLabel={v => v === 0 ? "Free" : `$${v}`}
+          accentColor="#49BCF9"
+        />
       </Section>
     </motion.div>
   )
@@ -299,18 +452,18 @@ export default function HomePage() {
   const router           = useRouter()
   const { user, logout } = useAuth()
   const isLoggedIn       = !!user
-  const { counts: unreadCounts } = useUnreadCount()
+  const { counts: unreadCounts, refresh: refreshUnread } = useUnreadCount()
 
-  const [activeTab,    setActiveTab]    = useState<Tab>("Popular")
   const [activeNav,    setActiveNav]    = useState("Home")
   const [searchOpen,   setSearchOpen]   = useState(false)
   const [query,        setQuery]        = useState("")
   const [filterOpen,   setFilterOpen]   = useState(false)
   const [filters,      setFilters]      = useState<Filters>(DEFAULT_FILTERS)
+  const [notifOpen,    setNotifOpen]    = useState(false)
 
   // Data
   const [sections,     setSections]     = useState<Record<string, Game[]>>({})
-  const [prices,       setPrices]       = useState<Record<number, string>>({})
+  const [prices,       setPrices]       = useState<Record<number, CardPrice | null>>({})
   const [wishlistIds,  setWishlistIds]  = useState<Set<string>>(new Set())
   const [loading,      setLoading]      = useState(true)
 
@@ -351,23 +504,21 @@ export default function HomePage() {
     return () => document.removeEventListener("mousedown", h)
   }, [filterOpen])
 
-  // ── Price fetching — called directly with the game list (no closure issues) ─
+  // ── Price fetching — ITAD batch endpoint (price + discount %) ───────────────
   const fetchPricesFor = useCallback(async (games: Game[]) => {
     // Deduplicate by id
     const unique = [...new Map(games.map(g => [g.id, g])).values()]
-    // Batches of 5, 600 ms apart — 1 call per game, stays well under rate limits
-    for (let i = 0; i < unique.length; i += 5) {
-      const batch = unique.slice(i, i + 5)
-      const results = await Promise.all(
-        batch.map(g => fetchCheapestPrice(g.name).then(price => ({ id: g.id, price })))
+    // Batches of 20 — backend handles UUID resolution + ITAD overview internally
+    for (let i = 0; i < unique.length; i += 20) {
+      const batch = unique.slice(i, i + 20)
+      const result = await getCardPrices(
+        batch.map(g => ({ id: g.id, name: g.name, steamAppId: g.steamAppId }))
       )
-      setPrices(prev => {
-        const next = { ...prev }
-        // null = not in CheapShark DB → "unknown" so card shows "Unknown" not "Free"
-        results.forEach(({ id, price }) => { next[id] = price ?? "unknown" })
-        return next
-      })
-      if (i + 5 < unique.length) await new Promise(res => setTimeout(res, 600))
+      // Update page-level prices state (used by filters) AND prime the hook
+      // cache so cards mounted already — or mounted later — are served instantly.
+      setPrices(prev => ({ ...prev, ...result }))
+      primeCache(result)
+      if (i + 20 < unique.length) await new Promise(res => setTimeout(res, 300))
     }
   }, [])
 
@@ -430,18 +581,16 @@ export default function HomePage() {
 
       const [[popular, newGames, trended], [wishlist, forYou]] = await Promise.all([publicLoad, authLoad])
 
-      // Build Favorites from wishlist — then enrich with full RAWG data in background
-      const favGames: Game[] = (wishlist as WishlistItem[]).map(w => ({
+      // Build Favorites from wishlist.
+      // If a game's cover is missing (null DB entry from before cover storage was added),
+      // fetch the full RAWG record now — in parallel, only for the games that need it.
+      const rawFavs: Game[] = (wishlist as WishlistItem[]).map(w => ({
         id: Number(w.gameId), slug: w.gameSlug, name: w.gameName,
         cover: w.gameCover, rating: 0, genres: [], platforms: [], released: "", metacritic: null,
       }))
-
-      if (favGames.length > 0) {
-        Promise.allSettled(favGames.map(g => getGameById(String(g.id)))).then(results => {
-          const enriched = results.map((r, i) => r.status === "fulfilled" ? r.value : favGames[i])
-          setSections(prev => ({ ...prev, Favorites: enriched }))
-        })
-      }
+      const favGames: Game[] = rawFavs.length === 0 ? [] : await Promise.all(
+        rawFavs.map(g => g.cover ? Promise.resolve(g) : getGameById(String(g.id)).catch(() => g))
+      )
 
       setWishlistIds(new Set((wishlist as WishlistItem[]).map(w => w.gameId)))
 
@@ -481,19 +630,39 @@ export default function HomePage() {
 
   // ── Filtered sections ─────────────────────────────────────────────────────
   const filteredSections = useMemo(() => {
-    const def = Object.keys(DEFAULT_FILTERS).every(k => filters[k as keyof Filters] === DEFAULT_FILTERS[k as keyof Filters])
-    if (def) return sections
+    const isDefault = (
+      filters.genre    === DEFAULT_FILTERS.genre    &&
+      filters.platform === DEFAULT_FILTERS.platform &&
+      filters.dateRange[0]  === DEFAULT_FILTERS.dateRange[0]  &&
+      filters.dateRange[1]  === DEFAULT_FILTERS.dateRange[1]  &&
+      filters.priceRange[0] === DEFAULT_FILTERS.priceRange[0] &&
+      filters.priceRange[1] === DEFAULT_FILTERS.priceRange[1]
+    )
+    if (isDefault) return sections
     const out: Record<string, Game[]> = {}
     for (const [k, gs] of Object.entries(sections)) {
       let f = gs
-      if (filters.platform !== "All platforms") f = f.filter(g => matchesPlatform(g.platforms, filters.platform))
-      if (filters.genre    !== "All genres")    f = f.filter(g => g.genres.some(gen => gen.toLowerCase().includes(filters.genre.toLowerCase())))
-      if (filters.date     !== "All time") {
-        const cut = new Date(); cut.setFullYear(cut.getFullYear() - (filters.date === "Last year" ? 1 : 3))
-        f = f.filter(g => !g.released || new Date(g.released) >= cut)
+      if (filters.platform !== "All platforms")
+        f = f.filter(g => matchesPlatform(g.platforms, filters.platform))
+      if (filters.genre !== "All genres")
+        f = f.filter(g => g.genres.some(gen => gen.toLowerCase().includes(filters.genre.toLowerCase())))
+      // Date range
+      if (filters.dateRange[0] !== DEFAULT_FILTERS.dateRange[0] || filters.dateRange[1] !== DEFAULT_FILTERS.dateRange[1]) {
+        f = f.filter(g => {
+          if (!g.released) return true
+          const year = new Date(g.released).getFullYear()
+          return year >= filters.dateRange[0] && year <= filters.dateRange[1]
+        })
       }
-      if      (filters.price === "Free")       f = f.filter(g => { const p = prices[g.id]; return !p || parseFloat(p) === 0 })
-      else if (filters.price !== "Any price")  { const max = filters.price === "Under $20" ? 20 : 60; f = f.filter(g => { const p = prices[g.id]; return !p || parseFloat(p) <= max }) }
+      // Price range
+      if (filters.priceRange[0] !== DEFAULT_FILTERS.priceRange[0] || filters.priceRange[1] !== DEFAULT_FILTERS.priceRange[1]) {
+        f = f.filter(g => {
+          const p = prices[g.id]
+          if (!p) return true
+          if (p.isFree) return filters.priceRange[0] === 0
+          return p.price >= filters.priceRange[0] && p.price <= filters.priceRange[1]
+        })
+      }
       out[k] = f
     }
     return out
@@ -504,12 +673,6 @@ export default function HomePage() {
     const el = contentRef.current?.querySelector(`[data-section="${key}"]`) as HTMLElement | null
     if (el) contentRef.current!.scrollTo({ top: el.offsetTop - 16, behavior: "smooth" })
   }, [])
-
-  const handleTabClick = useCallback((tab: Tab) => {
-    if ((tab === "Favorites" || tab === "For you") && !isLoggedIn) { router.push("/login"); return }
-    setActiveTab(tab)
-    setTimeout(() => scrollToSection(tab), 50)
-  }, [isLoggedIn, router, scrollToSection])
 
   const handleNavClick = useCallback((label: string, href: string) => {
     if (!isLoggedIn && AUTH_NAV.has(label)) { router.push("/login"); return }
@@ -540,7 +703,12 @@ export default function HomePage() {
 
   const visibleSections   = ALL_SECTIONS.filter(s => !s.authOnly || isLoggedIn)
   const userInitial       = user?.name?.charAt(0)?.toUpperCase() ?? "?"
-  const activeFilterCount = Object.keys(DEFAULT_FILTERS).filter(k => filters[k as keyof Filters] !== DEFAULT_FILTERS[k as keyof Filters]).length
+  const activeFilterCount = [
+    filters.genre    !== DEFAULT_FILTERS.genre,
+    filters.platform !== DEFAULT_FILTERS.platform,
+    filters.dateRange[0]  !== DEFAULT_FILTERS.dateRange[0] || filters.dateRange[1]  !== DEFAULT_FILTERS.dateRange[1],
+    filters.priceRange[0] !== DEFAULT_FILTERS.priceRange[0] || filters.priceRange[1] !== DEFAULT_FILTERS.priceRange[1],
+  ].filter(Boolean).length
   const isSearching       = searchOpen && query.trim().length >= 2
 
   return (
@@ -582,6 +750,27 @@ export default function HomePage() {
 
           <div className="flex-1" />
 
+          {/* Admin mode switch — only for admins */}
+          {isLoggedIn && user?.role === "admin" && (
+            <div className="px-3 pb-2">
+              <motion.button
+                onClick={() => router.push("/admin")}
+                whileHover={{ x: 2 }} whileTap={{ scale: 0.97 }}
+                className="w-full flex items-center gap-3 px-3 py-2.5 text-[14px] font-medium"
+                style={{
+                  borderRadius: 10,
+                  color: "#6475D1",
+                  background: "rgba(100,117,209,0.13)",
+                  border: "1px solid rgba(100,117,209,0.25)",
+                  cursor: "pointer",
+                }}
+              >
+                <Shield size={15} />
+                <span className="flex-1 text-left">Switch to Admin</span>
+              </motion.button>
+            </div>
+          )}
+
           {isLoggedIn ? (
             <motion.button {...fadeUp(0.45)} onClick={logout}
               whileHover={{ x: 4, color: "#fff" }} whileTap={{ scale: 0.97 }}
@@ -608,27 +797,31 @@ export default function HomePage() {
             transition={{ duration: 0.5, ease: "easeOut", delay: 0.08 }}
             className="flex items-center gap-3 flex-shrink-0"
             style={{
-              height: 52, ...glassStyle, borderRadius: 12,
-              margin: "12px 80px 0",
+              height: 52, ...headerGlass, borderRadius: 12,
+              marginTop: 12,
+              marginInline: "auto",
+              width: `min(calc(100% - ${CONTENT_SIDE_PADDING * 2}px), ${CONTENT_MAX_WIDTH}px)`,
               position: "relative", zIndex: 100,   // ← above all content
             }}
           >
             {/* Filter */}
             <div className="relative flex-shrink-0 ml-4" ref={filterRef}>
               <motion.button onClick={() => setFilterOpen(v => !v)}
-                whileHover={{ scale: 1.08 }} whileTap={{ scale: 0.92 }}
-                className="flex items-center gap-1.5"
-                style={{ color: filterOpen || activeFilterCount > 0 ? "#AE3BD6" : "rgba(255,255,255,0.45)" }}>
-                <SlidersHorizontal size={16} />
+                whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
+                className="flex items-center gap-1.5 px-2.5 py-1.5"
+                style={{
+                  borderRadius: 8,
+                  color: filterOpen || activeFilterCount > 0 ? "#49BCF9" : "rgba(255,255,255,0.45)",
+                  background: filterOpen ? "rgba(52,82,229,0.15)" : "transparent",
+                }}>
+                <SlidersHorizontal size={14} />
+                <span className="text-[12px] font-medium">Filter</span>
                 {activeFilterCount > 0 && (
                   <span className="text-[9px] font-bold flex items-center justify-center"
-                    style={{ width: 15, height: 15, borderRadius: "50%", background: "#AE3BD6", color: "#fff" }}>
+                    style={{ width: 15, height: 15, borderRadius: "50%", background: "#3452E5", color: "#fff" }}>
                     {activeFilterCount}
                   </span>
                 )}
-                <motion.div animate={{ rotate: filterOpen ? 180 : 0 }} transition={{ duration: 0.2 }}>
-                  <ChevronDown size={12} style={{ color: "rgba(255,255,255,0.3)" }} />
-                </motion.div>
               </motion.button>
               <AnimatePresence>
                 {filterOpen && <FilterDropdown filters={filters} onChange={setFilters} onClose={() => setFilterOpen(false)} />}
@@ -642,9 +835,15 @@ export default function HomePage() {
                   if (searchOpen) closeSearch()
                   else setSearchOpen(true)
                 }}
-                whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}
-                style={{ color: searchOpen ? "#48BCF9" : "rgba(255,255,255,0.45)" }}>
-                <Search size={16} />
+                whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
+                className="flex items-center gap-1.5 px-2.5 py-1.5"
+                style={{
+                  borderRadius: 8,
+                  color: searchOpen ? "#49BCF9" : "rgba(255,255,255,0.45)",
+                  background: searchOpen ? "rgba(73,188,249,0.10)" : "transparent",
+                }}>
+                <Search size={14} />
+                {!searchOpen && <span className="text-[12px] font-medium">Search</span>}
               </motion.button>
               <AnimatePresence>
                 {searchOpen && (
@@ -673,50 +872,42 @@ export default function HomePage() {
               </AnimatePresence>
             </div>
 
-            {/* Tabs — h-full so underline is at header's true bottom edge */}
-            <div className="relative flex items-stretch gap-0.5 flex-1 h-full">
-              {TABS.map((tab, i) => {
-                const active = activeTab === tab
-                const locked = (tab === "Favorites" || tab === "For you") && !isLoggedIn
-                return (
-                  <motion.button key={tab}
-                    initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.18 + i * 0.05, duration: 0.35 }}
-                    onClick={() => handleTabClick(tab)}
-                    whileHover={{ color: locked ? "rgba(255,255,255,0.3)" : "#48BCF9", backgroundColor: "rgba(72,188,249,0.04)" }}
-                    whileTap={{ scale: 0.97 }}
-                    className="relative h-full px-3 text-[16px] font-semibold flex items-center gap-1.5"
-                    style={{ borderRadius: 10, color: locked ? "rgba(255,255,255,0.2)" : active ? "#48BCF9" : "rgba(255,255,255,0.4)" }}
-                  >
-                    {tab === "Favorites" && (
-                      <Star size={11} fill={active ? "#48BCF9" : "none"}
-                        stroke={active ? "#48BCF9" : locked ? "rgba(255,255,255,0.2)" : "rgba(255,255,255,0.4)"} />
-                    )}
-                    {tab}
-                    {active && !locked && (
-                      <motion.div layoutId="tab-underline" className="absolute bottom-0 left-2 right-2"
-                        style={{ height: 2, borderRadius: 9999 }}
-                        transition={{ type: "spring", stiffness: 380, damping: 22 }}>
-                        <div className="absolute inset-0 rounded-full" style={{ background: "#48BCF9" }} />
-                        <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none"
-                          style={{ width: "55%", height: 10, background: "#48BCF9", filter: "blur(8px)", opacity: 0.7 }} />
-                        <div className="absolute left-0 right-0 pointer-events-none"
-                          style={{ bottom: -1, height: 56, background: "linear-gradient(to top, rgba(72,188,249,0.13) 0%, rgba(72,188,249,0.04) 65%, transparent 100%)" }} />
-                      </motion.div>
-                    )}
-                  </motion.button>
-                )
-              })}
-              <div className="absolute bottom-0 left-0 right-0 pointer-events-none"
-                style={{ height: 1, background: "linear-gradient(to right, transparent, rgba(255,255,255,0.06), transparent)" }} />
+            {/* Logo — centered in header */}
+            <div className="flex-1 flex items-center justify-center pointer-events-none select-none">
+              <img src="/icons/logo.svg" alt="DisLow" style={{ height: 22, opacity: 0.9 }} />
             </div>
 
             {/* Bell + Avatar */}
             <div className="flex items-center gap-3 flex-shrink-0 mr-4">
-              <motion.div whileHover={{ scale: 1.15, rotate: 10 }} whileTap={{ scale: 0.9 }} className="relative cursor-pointer">
-                <Bell size={16} style={{ color: "rgba(255,255,255,0.45)" }} />
-                <div className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-[#FF6B4A]" />
-              </motion.div>
+              {/* Bell — opens a popover with the latest notifications.
+                  Sidebar Notifications nav still routes to the full /notifications page. */}
+              <div className="relative">
+                <motion.button
+                  onClick={() => {
+                    if (!isLoggedIn) { router.push("/login"); return }
+                    setNotifOpen(v => !v)
+                  }}
+                  whileHover={{ scale: 1.15, rotate: 10 }}
+                  whileTap={{ scale: 0.9 }}
+                  className="relative cursor-pointer flex items-center justify-center"
+                  style={{ background: "transparent", border: "none", padding: 4 }}
+                  aria-label="Notifications"
+                >
+                  <Bell size={16} style={{ color: notifOpen ? "#48BCF9" : "rgba(255,255,255,0.45)" }} />
+                  {isLoggedIn && unreadCounts.total > 0 && (
+                    <span
+                      className="absolute -top-0.5 -right-0.5"
+                      style={{ width: 8, height: 8, borderRadius: "50%", background: "#FF6B4A" }}
+                    />
+                  )}
+                </motion.button>
+                <NotificationPopover
+                  open={notifOpen && isLoggedIn}
+                  onClose={() => setNotifOpen(false)}
+                  onMutated={refreshUnread}
+                  anchor="right"
+                />
+              </div>
               {isLoggedIn ? (
                 <motion.div {...fadeUp(0.35)}
                   whileHover={{ scale: 1.08, boxShadow: "0 0 12px rgba(174,59,214,0.5)" }} whileTap={{ scale: 0.95 }}
@@ -738,7 +929,13 @@ export default function HomePage() {
 
           {/* ── CONTENT ── */}
           <div ref={contentRef} className="flex-1 overflow-y-auto py-5 space-y-20"
-            style={{ scrollbarWidth: "none", paddingLeft: 80, paddingRight: 80 }}>
+            style={{
+              scrollbarWidth: "none",
+              // Match the floating header — same maxWidth + auto margins so on
+              // ultrawide screens the cards stay centered instead of stretching.
+              width: `min(calc(100% - ${CONTENT_SIDE_PADDING * 2}px), ${CONTENT_MAX_WIDTH}px)`,
+              marginInline: "auto",
+            }}>
 
             {loading ? <LoadingSkeleton /> : isSearching ? (
               /* ── SEARCH RESULTS ── */
@@ -776,7 +973,7 @@ export default function HomePage() {
                       <motion.div key={game.id}
                         initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: i * 0.04, duration: 0.4, ease: "easeOut" }}>
-                        <GameCard game={game} price={prices[game.id] ?? null}
+                        <GameCard game={game}
                           isFavorited={wishlistIds.has(String(game.id))}
                           onToggleFavorite={e => handleToggleFavorite(e, game)} />
                       </motion.div>
@@ -795,7 +992,6 @@ export default function HomePage() {
                   <PopularCarousel
                     key={key}
                     games={games}
-                    prices={prices}
                     wishlistIds={wishlistIds}
                     onToggleFavorite={handleToggleFavorite}
                     onSeeAll={() => router.push("/section/popular")}
@@ -808,7 +1004,6 @@ export default function HomePage() {
                   <NewBentoGrid
                     key={key}
                     games={games}
-                    prices={prices}
                     wishlistIds={wishlistIds}
                     onToggleFavorite={handleToggleFavorite}
                     onSeeAll={() => router.push("/section/new")}
@@ -838,7 +1033,6 @@ export default function HomePage() {
                     <LazySection key={key} onVisible={() => triggerSection("Favorites")}>
                       <FavoritesShelf
                         games={games}
-                        prices={prices}
                         wishlistIds={wishlistIds}
                         onToggleFavorite={handleToggleFavorite}
                         onSeeAll={() => router.push("/section/favorites")}
@@ -860,7 +1054,6 @@ export default function HomePage() {
                   <LazySection key={key} onVisible={() => triggerSection("By Genre")}>
                     <ByGenre
                       enabled={triggered.has("By Genre")}
-                      prices={prices}
                       wishlistIds={wishlistIds}
                       onToggleFavorite={handleToggleFavorite}
                       delay={delay}
@@ -881,12 +1074,12 @@ export default function HomePage() {
                           onSeeAll={() => router.push(`/section/${toSlug(key)}`)}
                           delay={delay}
                         />
-                        <div className="flex overflow-x-auto pb-3" style={{ gap: 36, scrollbarWidth: "none" }}>
+                        <div className="flex overflow-x-auto pb-3" style={{ gap: 48, scrollbarWidth: "none" }}>
                           {games.map((game, i) => (
                             <motion.div key={game.id}
                               initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
                               transition={{ delay: delay + i * 0.035, duration: 0.45, ease: "easeOut" }}>
-                              <GameCard game={game} rank={i + 1} price={prices[game.id] ?? null}
+                              <GameCard game={game} rank={i + 1}
                                 isFavorited={wishlistIds.has(String(game.id))}
                                 onToggleFavorite={e => handleToggleFavorite(e, game)} />
                             </motion.div>
@@ -915,7 +1108,7 @@ export default function HomePage() {
                           <motion.div key={game.id}
                             initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
                             transition={{ delay: delay + i * 0.035, duration: 0.45, ease: "easeOut" }}>
-                            <GameCard game={game} rank={i + 1} price={prices[game.id] ?? null}
+                            <GameCard game={game} rank={i + 1}
                               isFavorited={wishlistIds.has(String(game.id))}
                               onToggleFavorite={e => handleToggleFavorite(e, game)} />
                           </motion.div>

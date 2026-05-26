@@ -17,9 +17,8 @@ const GENRES = [
 ]
 
 export default function ByGenre({
-  prices, wishlistIds, onToggleFavorite, delay = 0, enabled = false,
+  wishlistIds, onToggleFavorite, delay = 0, enabled = false,
 }: {
-  prices:           Record<number, string>
   wishlistIds:      Set<string>
   onToggleFavorite: (e: React.MouseEvent, game: Game) => void
   delay?:           number
@@ -106,7 +105,6 @@ export default function ByGenre({
                 <GameCard
                   game={game}
                   rank={i + 1}
-                  price={prices[game.id] ?? null}
                   isFavorited={wishlistIds.has(String(game.id))}
                   onToggleFavorite={e => onToggleFavorite(e, game)}
                 />

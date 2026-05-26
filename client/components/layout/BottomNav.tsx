@@ -5,10 +5,10 @@ import { usePathname } from "next/navigation"
 import { Home, Heart, Bell, Search } from "lucide-react"
 
 const tabs = [
-  { href: "/",         icon: Home,   label: "Home" },
-  { href: "/wishlist", icon: Heart,  label: "Favourites" },
-  { href: "/notifications", icon: Bell, label: "Notifications" },
-  { href: "/search",   icon: Search, label: "Search" },
+  { href: "/",              icon: Home,   label: "Home"          },
+  { href: "/wishlist",      icon: Heart,  label: "Favourites"    },
+  { href: "/notifications", icon: Bell,   label: "Notifications" },
+  { href: "/search",        icon: Search, label: "Search"        },
 ]
 
 export default function BottomNav() {

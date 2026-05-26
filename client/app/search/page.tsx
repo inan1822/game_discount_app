@@ -6,6 +6,8 @@ import Fuse from "fuse.js"
 import { searchGames } from "@/lib/api/games"
 import GameCard from "@/components/game/GameCard"
 import BottomNav from "@/components/layout/BottomNav"
+import AppSidebar from "@/components/layout/AppSidebar"
+import PageBackground from "@/components/ui/PageBackground"
 import type { Game } from "@/types/game"
 
 // Fuse.js options for re-ranking RAWG results by title relevance.
@@ -81,55 +83,135 @@ export default function SearchPage() {
   }
 
   return (
-    <div className="relative pb-24 min-h-screen">
-      <div className="blob-blue w-48 h-48 top-0 -right-16" />
+    <>
+      {/* ── Desktop layout (sidebar + content) ── */}
+      <main className="hidden md:block relative w-screen h-screen overflow-hidden" style={{ background: "#1E2532" }}>
+        <PageBackground />
+        <div className="relative flex h-full w-full" style={{ zIndex: 3 }}>
+          <AppSidebar />
+          <div
+            className="flex-1 min-w-0 overflow-y-auto"
+            style={{ scrollbarWidth: "none" }}
+          >
+            <div
+              className="py-10"
+              style={{
+                // Match home: cap on ultrawide, 96px side padding otherwise, centered.
+                width: "min(calc(100% - 192px), 1600px)",
+                marginInline: "auto",
+              }}
+            >
+              <h1 className="text-white text-2xl font-bold mb-6">Search Games</h1>
+              {/* Search input */}
+              <div
+                className="flex items-center gap-3 mb-8 px-4 py-3"
+                style={{
+                  background: "rgba(30,38,51,0.50)",
+                  border: "1px solid rgba(255,255,255,0.08)",
+                  borderRadius: 12,
+                  backdropFilter: "blur(10px)",
+                  WebkitBackdropFilter: "blur(10px)",
+                }}
+              >
+                <Search size={18} style={{ color: "#9fa0a1", flexShrink: 0 }} />
+                <input
+                  ref={inputRef}
+                  type="text"
+                  placeholder="Search games..."
+                  value={query}
+                  onChange={e => setQuery(e.target.value)}
+                  style={{
+                    flex: 1,
+                    background: "transparent",
+                    border: "none",
+                    outline: "none",
+                    color: "#fff",
+                    fontSize: 14,
+                  }}
+                  placeholder-color="#9fa0a1"
+                />
+                {query && (
+                  <button onClick={() => setQuery("")} style={{ background: "none", border: "none", cursor: "pointer", color: "#9fa0a1" }}>
+                    <X size={16} />
+                  </button>
+                )}
+              </div>
 
-      {/* Header */}
-      <header className="relative z-10 px-5 pt-12 pb-4">
-        <h1 className="text-xl font-bold text-white mb-4">Search Games</h1>
-        <div className="glass rounded-full px-4 py-3 flex items-center gap-3">
-          <Search size={18} className="text-[#9fa0a1] flex-shrink-0" />
-          <input
-            ref={inputRef}
-            type="text"
-            placeholder="Search games..."
-            value={query}
-            onChange={e => setQuery(e.target.value)}
-            className="flex-1 bg-transparent text-white placeholder-[#9fa0a1] outline-none text-sm"
-          />
-          {query && (
-            <button onClick={() => setQuery("")}>
-              <X size={16} className="text-[#9fa0a1] hover:text-white" />
-            </button>
-          )}
+              {loading ? (
+                <div className="grid grid-cols-3 gap-4">
+                  {[...Array(6)].map((_, i) => (
+                    <div key={i} className="rounded-[20px] bg-[#1c1e2a] animate-pulse" style={{ height: 280 }} />
+                  ))}
+                </div>
+              ) : searched && results.length === 0 ? (
+                <div className="text-center py-16" style={{ color: "#9fa0a1", fontSize: 14 }}>
+                  No games found for &ldquo;{query}&rdquo;
+                </div>
+              ) : results.length > 0 ? (
+                <div className="grid grid-cols-2 xl:grid-cols-3 gap-x-12 gap-y-10">
+                  {results.map(game => (
+                    <GameCard key={game.id} game={game} />
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-16" style={{ color: "#9fa0a1", fontSize: 14 }}>
+                  Type to search for games
+                </div>
+              )}
+            </div>
+          </div>
         </div>
-      </header>
-
-      <main className="relative z-10 px-5">
-        {loading ? (
-          <div className="grid grid-cols-2 gap-3">
-            {[...Array(6)].map((_, i) => (
-              <div key={i} className="rounded-[20px] bg-[#1c1e2a] animate-pulse" style={{ height: 250 }} />
-            ))}
-          </div>
-        ) : searched && results.length === 0 ? (
-          <div className="text-center py-16 text-[#9fa0a1] text-sm">
-            No games found for &quot;{query}&quot;
-          </div>
-        ) : results.length > 0 ? (
-          <div className="grid grid-cols-2 gap-3">
-            {results.map(game => (
-              <GameCard key={game.id} game={game} />
-            ))}
-          </div>
-        ) : (
-          <div className="text-center py-16 text-[#9fa0a1] text-sm">
-            Type to search for games
-          </div>
-        )}
       </main>
 
-      <BottomNav />
-    </div>
+      {/* ── Mobile layout (unchanged) ── */}
+      <div className="md:hidden relative pb-24 min-h-screen">
+        <div className="blob-blue w-48 h-48 top-0 -right-16" />
+
+        <header className="relative z-10 px-5 pt-12 pb-4">
+          <h1 className="text-xl font-bold text-white mb-4">Search Games</h1>
+          <div className="glass rounded-full px-4 py-3 flex items-center gap-3">
+            <Search size={18} className="text-[#9fa0a1] flex-shrink-0" />
+            <input
+              type="text"
+              placeholder="Search games..."
+              value={query}
+              onChange={e => setQuery(e.target.value)}
+              className="flex-1 bg-transparent text-white placeholder-[#9fa0a1] outline-none text-sm"
+            />
+            {query && (
+              <button onClick={() => setQuery("")}>
+                <X size={16} className="text-[#9fa0a1] hover:text-white" />
+              </button>
+            )}
+          </div>
+        </header>
+
+        <main className="relative z-10 px-5">
+          {loading ? (
+            <div className="grid grid-cols-2 gap-3">
+              {[...Array(6)].map((_, i) => (
+                <div key={i} className="rounded-[20px] bg-[#1c1e2a] animate-pulse" style={{ height: 250 }} />
+              ))}
+            </div>
+          ) : searched && results.length === 0 ? (
+            <div className="text-center py-16 text-[#9fa0a1] text-sm">
+              No games found for &quot;{query}&quot;
+            </div>
+          ) : results.length > 0 ? (
+            <div className="grid grid-cols-2 gap-3">
+              {results.map(game => (
+                <GameCard key={game.id} game={game} />
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-16 text-[#9fa0a1] text-sm">
+              Type to search for games
+            </div>
+          )}
+        </main>
+
+        <BottomNav />
+      </div>
+    </>
   )
 }

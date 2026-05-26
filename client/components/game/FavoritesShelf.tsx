@@ -3,22 +3,23 @@
 import { motion } from "framer-motion"
 import { useRouter } from "next/navigation"
 import type { Game } from "@/types/game"
-import { StarButton, formatPrice } from "./GameCard"
+import { StarButton, deriveRating, ratingColor } from "./GameCard"
 import { TiltCard } from "@/components/ui/TiltCard"
 import { SectionHeading } from "@/components/ui/SectionHeading"
+import { useCardPrice } from "@/hooks/useCardPrice"
 
 function FavCard({
-  game, rank, price, isFavorited, onToggleFavorite, index,
+  game, rank, isFavorited, onToggleFavorite, index,
 }: {
   game:             Game
   rank:             number
-  price:            string | undefined
   isFavorited:      boolean
   onToggleFavorite: (e: React.MouseEvent) => void
   index:            number
 }) {
-  const router       = useRouter()
-  const priceDisplay = formatPrice(price)
+  const router  = useRouter()
+  const price   = useCardPrice(game)
+  const rating  = deriveRating(game)
 
   return (
     <motion.div
@@ -38,7 +39,7 @@ function FavCard({
 
           {/* Cover */}
           {game.cover ? (
-            <img src={game.cover} alt={game.name} loading="lazy" className="absolute inset-0 w-full h-full object-cover" />
+            <img src={game.cover} alt={game.name} loading="eager" className="absolute inset-0 w-full h-full object-cover" />
           ) : (
             <div className="absolute inset-0" style={{ background: "linear-gradient(135deg,#1c2533,#22182e)" }} />
           )}
@@ -49,30 +50,42 @@ function FavCard({
           {/* Star */}
           <StarButton isFavorited={isFavorited} onToggle={onToggleFavorite} />
 
-          {/* Rank dot */}
-          <div className="absolute top-3 left-3 flex items-center justify-center font-bold text-[11px] text-white"
-            style={{ width: 24, height: 24, borderRadius: "50%", background: "rgba(174,59,214,0.90)", boxShadow: "0 2px 8px rgba(174,59,214,0.5)" }}>
-            {rank}
-          </div>
-
           {/* Info */}
           <div className="absolute bottom-0 left-0 right-0 px-4 py-3"
             style={{ background: "rgba(28,30,42,0.75)", backdropFilter: "blur(8px)", WebkitBackdropFilter: "blur(8px)" }}>
             <div className="flex items-center justify-between gap-2">
               <p className="text-white font-semibold text-[13px] leading-tight truncate flex-1">{game.name}</p>
-              {game.rating > 0 && (
-                <p className="text-[#AE3BD6] text-[11px] font-bold flex-shrink-0">★ {game.rating.toFixed(1)}</p>
+              {rating && (
+                <span className="text-[11px] font-bold flex-shrink-0 px-1.5 py-0.5"
+                  style={{
+                    background:    `${ratingColor(rating.pct)}22`,
+                    color:         ratingColor(rating.pct),
+                    borderRadius:  4,
+                    letterSpacing: "-0.01em",
+                  }}
+                  title={rating.source === "mc" ? "Metacritic score" : "User score"}>
+                  {rating.label}
+                </span>
               )}
             </div>
-            {priceDisplay && (
-              <span className="font-bold text-[13px]" style={{
-                color: priceDisplay === "Free"    ? "#48BCF9"
-                     : priceDisplay === "Unknown" ? "rgba(255,255,255,0.30)"
-                     : "#5BDE8A",
-              }}>
-                {priceDisplay}
+            <div className="flex items-center gap-1.5 mt-0.5">
+              {price && price.cut > 0 && (
+                <span className="font-bold text-[11px] px-1.5 py-0.5"
+                  style={{ background: "rgba(68,214,44,0.15)", color: "#44d62c", borderRadius: 4 }}>
+                  -{price.cut}%
+                </span>
+              )}
+              <span className="font-bold"
+                style={{
+                  color:    price === undefined ? "rgba(255,255,255,0.18)"
+                          : price === null      ? "rgba(255,255,255,0.30)"
+                          : price.isFree        ? "#48BCF9"
+                          : "#5BDE8A",
+                  fontSize: price != null && price !== undefined ? 13 : 11,
+                }}>
+                {price === undefined ? "···" : price === null ? "Unknown" : price.isFree ? "Free" : `$${price.price.toFixed(2)}`}
               </span>
-            )}
+            </div>
           </div>
         </div>
       </TiltCard>
@@ -81,10 +94,9 @@ function FavCard({
 }
 
 export default function FavoritesShelf({
-  games, prices, wishlistIds, onToggleFavorite, onSeeAll, delay = 0,
+  games, wishlistIds, onToggleFavorite, onSeeAll, delay = 0,
 }: {
   games:            Game[]
-  prices:           Record<number, string>
   wishlistIds:      Set<string>
   onToggleFavorite: (e: React.MouseEvent, game: Game) => void
   onSeeAll:         () => void
@@ -123,7 +135,6 @@ export default function FavoritesShelf({
               key={game.id}
               game={game}
               rank={i + 1}
-              price={prices[game.id]}
               isFavorited={wishlistIds.has(String(game.id))}
               onToggleFavorite={(e) => { e.stopPropagation(); onToggleFavorite(e, game) }}
               index={i}

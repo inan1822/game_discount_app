@@ -16,6 +16,19 @@ export function proxy(req: NextRequest) {
   // The httpOnly cookie name must match what auth.controller.ts sets
   const hasSession = !!req.cookies.get("dislow_token")?.value
 
+  // ── Admin area gate (optimistic). The real role check happens server-side
+  //    in app/admin/(protected)/layout.tsx via fetchAdminMe(). This proxy
+  //    just bounces unauthenticated traffic away before the layout renders.
+  if (pathname.startsWith("/admin")) {
+    if (!hasSession) {
+      const loginUrl = req.nextUrl.clone()
+      loginUrl.pathname = "/login"
+      loginUrl.searchParams.set("from", pathname)
+      return NextResponse.redirect(loginUrl)
+    }
+    return NextResponse.next()
+  }
+
   // 1. Logged-out user tries to access a protected page → send to login
   if (!hasSession && PROTECTED.some(p => pathname.startsWith(p))) {
     const loginUrl = req.nextUrl.clone()
