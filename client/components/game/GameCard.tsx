@@ -4,12 +4,14 @@ import { useRouter } from "next/navigation"
 import { motion } from "framer-motion"
 import type { Game } from "@/types/game"
 import { useCardPrice } from "@/hooks/useCardPrice"
+import { rawgImage } from "@/lib/rawgImage"
 
 interface GameCardProps {
   game:              Game
   rank?:             number
   isFavorited?:      boolean
   onToggleFavorite?: (e: React.MouseEvent) => void
+  imageSize?:        { w: number; h: number }
 }
 
 /** Normalise a RAWG platform name → short label */
@@ -58,6 +60,7 @@ export function StarButton({
   isFavorited: boolean
   onToggle:    (e: React.MouseEvent) => void
 }) {
+  const pts = "12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"
   return (
     <motion.button
       onClick={(e) => { e.stopPropagation(); onToggle(e) }}
@@ -67,25 +70,32 @@ export function StarButton({
       style={{
         top: 10, right: 10,
         width: 28, height: 28,
-        borderRadius: 8,
-        background: isFavorited
-          ? "rgba(72,188,249,0.18)"
-          : "rgba(0,0,0,0.35)",
-        backdropFilter:       "blur(4px)",
-        WebkitBackdropFilter: "blur(4px)",
-        border: isFavorited
-          ? "1px solid rgba(72,188,249,0.4)"
-          : "1px solid rgba(255,255,255,0.08)",
+        background: "transparent",
+        border: "none",
+        padding: 0,
       }}
       title={isFavorited ? "Remove from favorites" : "Add to favorites"}
     >
+      {/* Blurred glow copy — only visible when favorited */}
+      {isFavorited && (
+        <svg
+          width="18" height="18" viewBox="0 0 24 24"
+          fill="#49BCF9"
+          aria-hidden
+          style={{ position: "absolute", filter: "blur(6px)", opacity: 0.70, pointerEvents: "none" }}
+        >
+          <polygon points={pts} />
+        </svg>
+      )}
+      {/* Crisp star on top */}
       <svg
-        width="14" height="14" viewBox="0 0 24 24"
+        width="16" height="16" viewBox="0 0 24 24"
         fill={isFavorited ? "#48BCF9" : "none"}
-        stroke={isFavorited ? "#48BCF9" : "rgba(255,255,255,0.6)"}
+        stroke={isFavorited ? "#48BCF9" : "rgba(255,255,255,0.75)"}
         strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+        style={{ position: "relative" }}
       >
-        <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+        <polygon points={pts} />
       </svg>
     </motion.button>
   )
@@ -120,7 +130,10 @@ export default function GameCard({
   rank,
   isFavorited = false,
   onToggleFavorite,
+  imageSize,
 }: GameCardProps) {
+  const cardW = imageSize?.w ?? 280
+  const cardH = imageSize?.h ?? 380
   const router = useRouter()
   const price  = useCardPrice(game)
   const safePlatforms = Array.isArray(game.platforms)
@@ -134,7 +147,7 @@ export default function GameCard({
       whileHover={{ y: -4, transition: { duration: 0.2, ease: "easeOut" } }}
       whileTap={{ scale: 0.98 }}
       className="relative flex-shrink-0 cursor-pointer select-none group/card"
-      style={{ width: 280 }}
+      style={{ width: cardW }}
     >
           {onToggleFavorite && (
         <StarButton isFavorited={isFavorited} onToggle={onToggleFavorite} />
@@ -143,11 +156,11 @@ export default function GameCard({
       {/* Card body */}
       <div
         className="relative overflow-hidden"
-        style={{ height: 380, background: "#1C1E2A", borderRadius: 10 }}
+        style={{ height: cardH, background: "#1C1E2A", borderRadius: 10 }}
       >
         {game.cover ? (
           <img
-            src={game.cover}
+            src={rawgImage(game.cover)}
             alt={game.name}
             loading="lazy"
             className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover/card:scale-105"
@@ -178,13 +191,13 @@ export default function GameCard({
           }}
         >
           {/* Name */}
-          <p className="text-white text-[15px] font-bold leading-tight truncate">
-            {game.name}
+          <p className="text-white text-[18px] font-medium leading-tight truncate">
+            {game.name || "Unknown Game"}
           </p>
 
           {/* Genre */}
           {game.genres.length > 0 && (
-            <p className="text-[12px] mt-1 truncate" style={{ color: "rgba(255,255,255,0.45)" }}>
+            <p className="text-[13px] mt-1 truncate" style={{ color: "rgba(255,255,255,0.45)" }}>
               {game.genres.slice(0, 2).join(" · ")}
             </p>
           )}
@@ -196,7 +209,7 @@ export default function GameCard({
                 platforms.map(p => (
                   <span
                     key={p}
-                    className="text-[11px] font-semibold px-2 py-0.5"
+                    className="text-[13px] font-medium px-2 py-0.5"
                     style={{
                       background:   "rgba(255,255,255,0.09)",
                       color:        "rgba(255,255,255,0.60)",
@@ -208,7 +221,7 @@ export default function GameCard({
                 ))
               ) : (
                 <span
-                  className="text-[11px] font-semibold px-2 py-0.5"
+                  className="text-[13px] font-semibold px-2 py-0.5"
                   style={{
                     background:   "rgba(255,255,255,0.06)",
                     color:        "rgba(255,255,255,0.35)",
@@ -224,26 +237,32 @@ export default function GameCard({
             <div className="flex items-center gap-1.5 flex-shrink-0">
               {price && price.cut > 0 && (
                 <span
-                  className="font-bold text-[11px] px-1.5 py-0.5"
-                  style={{ background: "rgba(68,214,44,0.15)", color: "#44d62c", borderRadius: 4 }}
+                  className="font-medium text-[18px] px-2 py-0.5"
+                  style={{
+                    background: "rgba(68,214,44,0.08)",
+                    color: "#44d62c",
+                    borderRadius: 4,
+                    backdropFilter: "blur(8px)",
+                    WebkitBackdropFilter: "blur(8px)",
+                  }}
                 >
                   -{price.cut}%
                 </span>
               )}
               <span
-                className="font-bold"
+                className="font-medium"
                 style={{
                   color: price === undefined ? "rgba(255,255,255,0.18)"
                        : price === null      ? "rgba(255,255,255,0.30)"
                        : price.isFree        ? "#48BCF9"
                        : "#5BDE8A",
-                  fontSize: price != null && price !== undefined ? 14 : 11,
+                  fontSize: price != null && price !== undefined ? 18 : 13,
                 }}
               >
                 {price === undefined
                   ? "···"
                   : price === null
-                  ? "Unknown"
+                  ? "—"
                   : price.isFree
                   ? "Free"
                   : `$${price.price.toFixed(2)}`}

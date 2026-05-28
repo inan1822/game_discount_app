@@ -1,48 +1,34 @@
 "use client"
 
 import { useState, useEffect, useCallback, useRef, useMemo } from "react"
+import { createPortal } from "react-dom"
 import { useRouter } from "next/navigation"
 import { motion, AnimatePresence } from "framer-motion"
 import { useDebouncedCallback } from "use-debounce"
 import {
   SlidersHorizontal, Search, Bell,
-  Home, BellRing, Search as SearchIcon,
-  Users, User, Star, LogIn, X, ChevronDown, Receipt, Shield,
+  Star, X,
 } from "lucide-react"
 import { useAuth } from "@/context/AuthContext"
-import PageBackground from "@/components/ui/PageBackground"
 import GameCard from "@/components/game/GameCard"
 import PopularCarousel from "@/components/game/PopularCarousel"
 import NewBentoGrid from "@/components/game/NewBentoGrid"
 import FavoritesShelf from "@/components/game/FavoritesShelf"
-import DealOfTheDay from "@/components/game/DealOfTheDay"
-import ByGenre from "@/components/game/ByGenre"
 import { SectionHeading } from "@/components/ui/SectionHeading"
+import ScrollableRow from "@/components/ui/ScrollableRow"
 import {
   getPopularGames, getNewGames, getTrendedGames, getForYouGames, searchGames, getGameById,
-  getFreeToPlayGames, getHiddenGemsGames, getDealOfDay, getCardPrices,
-  type DealOfDay as DealOfDayType,
+  getFreeToPlayGames, getHiddenGemsGames, getCardPrices,
+  getDisLowGames,
 } from "@/lib/api/games"
 import { primeCache } from "@/hooks/useCardPrice"
+import { DualRangeSlider } from "@/components/ui/DualRangeSlider"
 import { getWishlist, addToWishlist, removeFromWishlist } from "@/lib/api/wishlist"
 import { useUnreadCount } from "@/hooks/useUnreadCount"
-import NotificationDot from "@/components/ui/NotificationDot"
 import NotificationPopover from "@/components/notifications/NotificationPopover"
 import type { Game, WishlistItem, CardPrice } from "@/types/game"
 
 // ─── Constants ────────────────────────────────────────────────────────────────
-// "Favorites" lives in the sidebar now (under Notifications); "For you" was removed.
-const AUTH_NAV = new Set(["Notifications", "Favorites", "Friends", "Profile", "Purchases"])
-
-const NAV = [
-  { icon: Home,        label: "Home",          href: "/"               },
-  { icon: BellRing,    label: "Notifications", href: "/notifications"  },
-  { icon: Star,        label: "Favorites",     href: "/wishlist"       },
-  { icon: SearchIcon,  label: "Search",        href: "/search"         },
-  { icon: Receipt,     label: "Purchases",     href: "/account/orders" },
-  { icon: Users,       label: "Friends",       href: "/friends"        },
-  { icon: User,        label: "Profile",       href: "/profile"        },
-] as const
 
 const ALL_SECTIONS = [
   { label: "Popular",      key: "Popular",      authOnly: false },
@@ -50,10 +36,9 @@ const ALL_SECTIONS = [
   { label: "Favorites",    key: "Favorites",    authOnly: true  },
   { label: "For you",      key: "For you",      authOnly: true  },
   { label: "Trended",      key: "Trended",      authOnly: false },
-  { label: "Deal of Day",  key: "Deal of Day",  authOnly: false },
   { label: "Free to Play", key: "Free to Play", authOnly: false },
   { label: "Hidden Gems",  key: "Hidden Gems",  authOnly: false },
-  { label: "By Genre",     key: "By Genre",     authOnly: false },
+  { label: "DisLow games", key: "DisLow games", authOnly: false },
 ] as const
 
 // ─── Filters ─────────────────────────────────────────────────────────────────
@@ -75,14 +60,8 @@ const DEFAULT_FILTERS: Filters = {
 }
 
 // ─── Styles / helpers ─────────────────────────────────────────────────────────
-const glassStyle = {
-  background: "rgba(30, 38, 51, 0.70)",
-  backdropFilter: "blur(6px)",
-  WebkitBackdropFilter: "blur(6px)",
-} as const
-
 // Header glass — lighter opacity (50%) so the floating bar reads as glass,
-// not as a solid strip. Sidebar keeps glassStyle (70%) for legibility.
+// not as a solid strip.
 const headerGlass = {
   background: "rgba(30, 38, 51, 0.50)",
   backdropFilter: "blur(10px)",
@@ -114,206 +93,13 @@ function matchesPlatform(platforms: string[], target: string) {
   })
 }
 
-// ─── Nav Glow Item ────────────────────────────────────────────────────────────
-function NavGlowItem({
-  icon: Icon,
-  label,
-  active,
-  locked,
-  delay,
-  dot,
-  onClick,
-}: {
-  icon:    React.ElementType
-  label:   string
-  active:  boolean
-  locked:  boolean
-  delay:   number
-  dot?:    React.ReactNode
-  onClick: () => void
-}) {
-  const ref                       = useRef<HTMLButtonElement>(null)
-  const [pos,     setPos]         = useState({ x: 0, y: 0 })
-  const [hovered, setHovered]     = useState(false)
-
-  return (
-    <motion.button
-      ref={ref}
-      onClick={onClick}
-      initial={{ opacity: 0, x: -8 }}
-      animate={{ opacity: 1, x: 0 }}
-      transition={{ delay, duration: 0.35 }}
-      onMouseMove={e => {
-        const r = ref.current!.getBoundingClientRect()
-        setPos({ x: e.clientX - r.left, y: e.clientY - r.top })
-      }}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-      whileTap={{ scale: 0.97 }}
-      className="w-full flex items-center gap-3 px-3 py-2.5 mb-0.5 text-[16px] font-medium relative overflow-hidden"
-      style={{
-        borderRadius: 10,
-        color: active
-          ? "#48BCF9"
-          : locked
-          ? "rgba(255,255,255,0.25)"
-          : hovered
-          ? "#48BCF9"
-          : "rgba(255,255,255,0.45)",
-        background: active ? "rgba(52,82,229,0.13)" : "transparent",
-        border: "none",
-        cursor: "pointer",
-        transition: "color 0.25s",
-      }}
-    >
-      {/* Active left indicator */}
-      {active && (
-        <motion.div
-          layoutId="nav-indicator"
-          className="absolute left-0 top-1/2 -translate-y-1/2"
-          style={{ width: 3, height: 20, background: "#48BCF9", borderRadius: "0 4px 4px 0" }}
-        />
-      )}
-
-      {/* Cursor-tracking glow */}
-      <div
-        style={{
-          position:     "absolute",
-          left:         pos.x,
-          top:          pos.y,
-          width:        140,
-          height:       140,
-          borderRadius: "50%",
-          transform:    "translate(-50%, -50%)",
-          background:   "radial-gradient(circle, #48BCF9 10%, transparent 70%)",
-          opacity:      hovered && !active ? 0.14 : 0,
-          transition:   "opacity 0.3s",
-          pointerEvents: "none",
-          zIndex:       0,
-        }}
-      />
-
-      <Icon size={15} style={{ position: "relative", zIndex: 1 }} />
-      <span style={{ position: "relative", zIndex: 1, flex: 1, textAlign: "left" }}>{label}</span>
-      {locked && (
-        <span
-          className="text-[8px] px-1 py-0.5 rounded"
-          style={{ background: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.2)", position: "relative", zIndex: 1 }}
-        >
-          Login
-        </span>
-      )}
-      {dot && <span style={{ position: "relative", zIndex: 1 }}>{dot}</span>}
-    </motion.button>
-  )
-}
-
-// ─── Range Slider ─────────────────────────────────────────────────────────────
-function RangeSlider({
-  min, max, value, onChange, formatLabel,
-  accentColor = "#3452E5",
-}: {
-  min: number; max: number
-  value: [number, number]
-  onChange: (v: [number, number]) => void
-  formatLabel: (v: number) => string
-  accentColor?: string
-}) {
-  const trackRef = useRef<HTMLDivElement>(null)
-  const [dragging, setDragging] = useState<"min" | "max" | null>(null)
-
-  const pct = (v: number) => ((v - min) / (max - min)) * 100
-
-  const getValueFromX = (clientX: number) => {
-    const rect = trackRef.current?.getBoundingClientRect()
-    if (!rect) return min
-    const ratio = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width))
-    return Math.round(min + ratio * (max - min))
-  }
-
-  const handleTrackClick = (e: React.MouseEvent) => {
-    const v = getValueFromX(e.clientX)
-    const dMin = Math.abs(v - value[0])
-    const dMax = Math.abs(v - value[1])
-    if (dMin <= dMax) onChange([Math.min(v, value[1]), value[1]])
-    else              onChange([value[0], Math.max(v, value[0])])
-  }
-
-  useEffect(() => {
-    if (!dragging) return
-    const move = (e: MouseEvent | TouchEvent) => {
-      const clientX = "touches" in e ? e.touches[0].clientX : e.clientX
-      const v = getValueFromX(clientX)
-      if (dragging === "min") onChange([Math.min(v, value[1] - 1), value[1]])
-      else                    onChange([value[0], Math.max(v, value[0] + 1)])
-    }
-    const up = () => setDragging(null)
-    window.addEventListener("mousemove", move)
-    window.addEventListener("mouseup", up)
-    window.addEventListener("touchmove", move)
-    window.addEventListener("touchend", up)
-    return () => {
-      window.removeEventListener("mousemove", move)
-      window.removeEventListener("mouseup", up)
-      window.removeEventListener("touchmove", move)
-      window.removeEventListener("touchend", up)
-    }
-  }, [dragging, value, onChange])
-
-  const minPct = pct(value[0])
-  const maxPct = pct(value[1])
-
-  return (
-    <div className="flex flex-col gap-2">
-      {/* Labels */}
-      <div className="flex justify-between text-[11px] font-semibold" style={{ color: accentColor }}>
-        <span>{formatLabel(value[0])}</span>
-        <span>{formatLabel(value[1])}</span>
-      </div>
-      {/* Track */}
-      <div
-        ref={trackRef}
-        onClick={handleTrackClick}
-        className="relative h-1 rounded-full cursor-pointer select-none"
-        style={{ background: "rgba(255,255,255,0.10)" }}
-      >
-        {/* Filled range */}
-        <div className="absolute top-0 bottom-0 rounded-full pointer-events-none"
-          style={{ left: `${minPct}%`, right: `${100 - maxPct}%`, background: accentColor, opacity: 0.85 }} />
-        {/* Min thumb */}
-        <div
-          onMouseDown={e => { e.preventDefault(); setDragging("min") }}
-          onTouchStart={e => { e.preventDefault(); setDragging("min") }}
-          className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-4 h-4 rounded-full cursor-grab active:cursor-grabbing"
-          style={{
-            left: `${minPct}%`,
-            background: "#fff",
-            boxShadow: `0 0 0 2px ${accentColor}`,
-            zIndex: 2,
-          }}
-        />
-        {/* Max thumb */}
-        <div
-          onMouseDown={e => { e.preventDefault(); setDragging("max") }}
-          onTouchStart={e => { e.preventDefault(); setDragging("max") }}
-          className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-4 h-4 rounded-full cursor-grab active:cursor-grabbing"
-          style={{
-            left: `${maxPct}%`,
-            background: "#fff",
-            boxShadow: `0 0 0 2px ${accentColor}`,
-            zIndex: 2,
-          }}
-        />
-      </div>
-    </div>
-  )
-}
-
 // ─── Filter Dropdown ──────────────────────────────────────────────────────────
-function FilterDropdown({ filters, onChange, onClose }: {
-  filters:  Filters
-  onChange: (f: Filters) => void
-  onClose:  () => void
+function FilterDropdown({ filters, onChange, onClose, pos, popupRef }: {
+  filters:   Filters
+  onChange:  (f: Filters) => void
+  onClose:   () => void
+  pos:       { top: number; left: number }
+  popupRef:  React.RefObject<HTMLDivElement>
 }) {
   const setGenre    = (v: string)           => onChange({ ...filters, genre: v })
   const setPlatform = (v: string)           => onChange({ ...filters, platform: v })
@@ -356,14 +142,20 @@ function FilterDropdown({ filters, onChange, onClose }: {
       animate={{ opacity: 1, y: 0,  scale: 1    }}
       exit={{    opacity: 0, y: -8, scale: 0.97 }}
       transition={{ duration: 0.18 }}
-      className="absolute top-full left-0 mt-2 z-[200] flex flex-col gap-4 p-4"
+      ref={popupRef}
+      className="flex flex-col gap-4 p-4"
       style={{
+        position:             "fixed",
+        top:                  pos.top,
+        left:                 pos.left,
+        zIndex:               9999,
         width:                320,
-        background:           "rgba(30,38,51,0.80)",
-        backdropFilter:       "blur(10px)",
-        WebkitBackdropFilter: "blur(10px)",
-        borderRadius:         12,
+        background:           "rgba(38,44,53,0.70)",
+        backdropFilter:       "blur(4px)",
+        WebkitBackdropFilter: "blur(4px)",
+        borderRadius:         10,
         boxShadow:            "0 16px 48px rgba(0,0,0,0.6)",
+        overflow:             "hidden",
       }}
     >
       {/* Header */}
@@ -382,43 +174,39 @@ function FilterDropdown({ filters, onChange, onClose }: {
       </div>
 
       {/* STYLE */}
-      <Section title="STYLE">
+      <div>
+        <p className="text-[9px] font-bold tracking-widest mb-2.5" style={{ color: "rgba(255,255,255,0.25)" }}>STYLE</p>
         <div className="flex flex-wrap gap-1.5">
           {FILTER_STYLE.map(g => <Pill key={g} label={g} active={filters.genre === g} onClick={() => setGenre(g)} />)}
         </div>
-      </Section>
+      </div>
 
       {/* PLATFORM */}
-      <Section title="PLATFORM">
+      <div>
+        <p className="text-[9px] font-bold tracking-widest mb-2.5" style={{ color: "rgba(255,255,255,0.25)" }}>PLATFORM</p>
         <div className="flex flex-wrap gap-1.5">
           {FILTER_PLATFORM.map(p => <Pill key={p} label={p} active={filters.platform === p} onClick={() => setPlatform(p)} />)}
         </div>
-      </Section>
+      </div>
 
       {/* Divider */}
       <div style={{ height: 1, background: "rgba(255,255,255,0.06)" }} />
 
       {/* DATE RANGE */}
-      <Section title="DATE">
-        <RangeSlider
-          min={1990} max={CURRENT_YEAR}
-          value={filters.dateRange}
-          onChange={setDate}
-          formatLabel={v => String(v)}
-          accentColor="#3452E5"
-        />
-      </Section>
+      <div>
+        <p className="text-[9px] font-bold tracking-widest mb-2.5" style={{ color: "rgba(255,255,255,0.25)" }}>DATE</p>
+        <DualRangeSlider min={1990} max={CURRENT_YEAR} step={1}
+          value={filters.dateRange} onValueChange={setDate}
+          formatValue={v => String(v)} accentColor="#49BCF9" />
+      </div>
 
       {/* PRICE RANGE */}
-      <Section title="PRICE">
-        <RangeSlider
-          min={0} max={100}
-          value={filters.priceRange}
-          onChange={setPrice}
-          formatLabel={v => v === 0 ? "Free" : `$${v}`}
-          accentColor="#49BCF9"
-        />
-      </Section>
+      <div>
+        <p className="text-[9px] font-bold tracking-widest mb-2.5" style={{ color: "rgba(255,255,255,0.25)" }}>PRICE</p>
+        <DualRangeSlider min={0} max={100} step={1}
+          value={filters.priceRange} onValueChange={setPrice}
+          formatValue={v => v === 0 ? "Free" : `$${v}`} accentColor="#49BCF9" />
+      </div>
     </motion.div>
   )
 }
@@ -450,11 +238,10 @@ function LazySection({ onVisible, children }: { onVisible: () => void; children:
 // ─── Page ─────────────────────────────────────────────────────────────────────
 export default function HomePage() {
   const router           = useRouter()
-  const { user, logout } = useAuth()
+  const { user } = useAuth()
   const isLoggedIn       = !!user
   const { counts: unreadCounts, refresh: refreshUnread } = useUnreadCount()
 
-  const [activeNav,    setActiveNav]    = useState("Home")
   const [searchOpen,   setSearchOpen]   = useState(false)
   const [query,        setQuery]        = useState("")
   const [filterOpen,   setFilterOpen]   = useState(false)
@@ -466,9 +253,6 @@ export default function HomePage() {
   const [prices,       setPrices]       = useState<Record<number, CardPrice | null>>({})
   const [wishlistIds,  setWishlistIds]  = useState<Set<string>>(new Set())
   const [loading,      setLoading]      = useState(true)
-
-  // New sections data
-  const [dealOfDay,      setDealOfDay]      = useState<DealOfDayType | null>(null)
 
   // Lazy-loading: tracks which sections have been triggered by IntersectionObserver
   const [triggered,    setTriggered]    = useState<Set<string>>(new Set())
@@ -488,17 +272,23 @@ export default function HomePage() {
     trended: Math.floor(Math.random() * 4) + 1,
   }))
 
-  const contentRef = useRef<HTMLDivElement>(null)
-  const filterRef  = useRef<HTMLDivElement>(null)
+  const contentRef   = useRef<HTMLDivElement>(null)
+  const filterRef    = useRef<HTMLDivElement>(null)
+  const filterPopRef = useRef<HTMLDivElement>(null)
+  const [filterPos, setFilterPos] = useState<{ top: number; left: number }>({ top: 0, left: 0 })
 
   // Keep sectionsRef in sync so lazy callbacks always see fresh data
   useEffect(() => { sectionsRef.current = sections }, [sections])
 
-  // Close filter on outside click
+  // Close filter on outside click — check both the button ref and the portal popup ref
   useEffect(() => {
     if (!filterOpen) return
     const h = (e: MouseEvent) => {
-      if (filterRef.current && !filterRef.current.contains(e.target as Node)) setFilterOpen(false)
+      const t = e.target as Node
+      if (
+        filterRef.current    && !filterRef.current.contains(t) &&
+        filterPopRef.current && !filterPopRef.current.contains(t)
+      ) setFilterOpen(false)
     }
     document.addEventListener("mousedown", h)
     return () => document.removeEventListener("mousedown", h)
@@ -553,12 +343,11 @@ export default function HomePage() {
         }).catch(() => {})
         break
 
-      case "Deal of Day":
-        getDealOfDay().then(d => { if (d) setDealOfDay(d) }).catch(() => {})
-        break
-
-      // By Genre fetches its own data internally once enabled=true
-      case "By Genre":
+      case "DisLow games":
+        getDisLowGames().then(gs => {
+          setSections(prev => ({ ...prev, "DisLow games": gs }))
+          fetchPricesFor(gs)
+        }).catch(() => {})
         break
     }
   }, [fetchPricesFor])
@@ -668,17 +457,6 @@ export default function HomePage() {
     return out
   }, [sections, filters, prices])
 
-  // ── Scroll to section ─────────────────────────────────────────────────────
-  const scrollToSection = useCallback((key: string) => {
-    const el = contentRef.current?.querySelector(`[data-section="${key}"]`) as HTMLElement | null
-    if (el) contentRef.current!.scrollTo({ top: el.offsetTop - 16, behavior: "smooth" })
-  }, [])
-
-  const handleNavClick = useCallback((label: string, href: string) => {
-    if (!isLoggedIn && AUTH_NAV.has(label)) { router.push("/login"); return }
-    setActiveNav(label); router.push(href)
-  }, [isLoggedIn, router])
-
   const closeSearch = useCallback(() => {
     setSearchOpen(false); setQuery(""); setSearchResults([])
   }, [])
@@ -712,84 +490,8 @@ export default function HomePage() {
   const isSearching       = searchOpen && query.trim().length >= 2
 
   return (
-    <main className="relative w-screen h-screen overflow-hidden" style={{ background: "#1E2532" }}>
-      <PageBackground />
-
-      <div className="relative flex h-full" style={{ zIndex: 3 }}>
-
-        {/* ══════════ SIDEBAR ══════════ */}
-        <motion.aside
-          initial={{ opacity: 0, x: -24 }} animate={{ opacity: 1, x: 0 }}
-          transition={{ duration: 0.55, ease: "easeOut" }}
-          className="flex flex-col flex-shrink-0 h-full"
-          style={{ width: 240, ...glassStyle, borderRight: "1px solid rgba(255,255,255,0.05)" }}
-        >
-          <motion.div {...fadeUp(0.05)} className="flex items-center gap-3 px-5 pt-6 pb-5">
-            <img src="/icons/logo.svg" alt="" style={{ width: 30, height: 30 }} />
-            <span className="text-white font-bold text-[17px] tracking-wide">DisLow</span>
-          </motion.div>
-
-          <div className="px-3 mb-1">
-            <p className="text-[9px] font-bold tracking-[0.12em] px-3 mb-2" style={{ color: "rgba(255,255,255,0.25)" }}>MENU</p>
-            {NAV.map(({ icon: Icon, label, href }, i) => (
-              <NavGlowItem
-                key={label}
-                icon={Icon}
-                label={label}
-                active={activeNav === label}
-                locked={!isLoggedIn && AUTH_NAV.has(label)}
-                delay={0.1 + i * 0.05}
-                dot={label === "Notifications" && isLoggedIn
-                  ? <NotificationDot events={unreadCounts.events} discounts={unreadCounts.discounts} />
-                  : undefined
-                }
-                onClick={() => handleNavClick(label, href)}
-              />
-            ))}
-          </div>
-
-          <div className="flex-1" />
-
-          {/* Admin mode switch — only for admins */}
-          {isLoggedIn && user?.role === "admin" && (
-            <div className="px-3 pb-2">
-              <motion.button
-                onClick={() => router.push("/admin")}
-                whileHover={{ x: 2 }} whileTap={{ scale: 0.97 }}
-                className="w-full flex items-center gap-3 px-3 py-2.5 text-[14px] font-medium"
-                style={{
-                  borderRadius: 10,
-                  color: "#6475D1",
-                  background: "rgba(100,117,209,0.13)",
-                  border: "1px solid rgba(100,117,209,0.25)",
-                  cursor: "pointer",
-                }}
-              >
-                <Shield size={15} />
-                <span className="flex-1 text-left">Switch to Admin</span>
-              </motion.button>
-            </div>
-          )}
-
-          {isLoggedIn ? (
-            <motion.button {...fadeUp(0.45)} onClick={logout}
-              whileHover={{ x: 4, color: "#fff" }} whileTap={{ scale: 0.97 }}
-              className="flex items-center gap-3 px-8 py-5 text-[16px] font-medium"
-              style={{ color: "rgba(255,255,255,0.35)", borderTop: "1px solid rgba(255,255,255,0.05)" }}>
-              <div className="w-2.5 h-2.5 rounded-full bg-[#FF6B4A]" />log out
-            </motion.button>
-          ) : (
-            <motion.button {...fadeUp(0.45)} onClick={() => router.push("/login")}
-              whileHover={{ x: 4 }} whileTap={{ scale: 0.97 }}
-              className="flex items-center gap-3 px-8 py-5 text-[16px] font-semibold"
-              style={{ color: "#48BCF9", borderTop: "1px solid rgba(255,255,255,0.05)" }}>
-              <LogIn size={15} />Log in
-            </motion.button>
-          )}
-        </motion.aside>
-
-        {/* ══════════ RIGHT PANEL ══════════ */}
-        <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
+    // Shell (sidebar + background) is provided by (app)/layout.tsx
+    <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
 
           {/* HEADER — z-index: 100 so filter dropdown renders above game cards */}
           <motion.header
@@ -805,8 +507,15 @@ export default function HomePage() {
             }}
           >
             {/* Filter */}
-            <div className="relative flex-shrink-0 ml-4" ref={filterRef}>
-              <motion.button onClick={() => setFilterOpen(v => !v)}
+            <div className="relative flex-shrink-0 ml-6" ref={filterRef}>
+              <motion.button
+                onClick={() => {
+                  if (filterRef.current) {
+                    const r = filterRef.current.getBoundingClientRect()
+                    setFilterPos({ top: r.bottom + 22, left: r.left })
+                  }
+                  setFilterOpen(v => !v)
+                }}
                 whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
                 className="flex items-center gap-1.5 px-2.5 py-1.5"
                 style={{
@@ -814,8 +523,8 @@ export default function HomePage() {
                   color: filterOpen || activeFilterCount > 0 ? "#49BCF9" : "rgba(255,255,255,0.45)",
                   background: filterOpen ? "rgba(52,82,229,0.15)" : "transparent",
                 }}>
-                <SlidersHorizontal size={14} />
-                <span className="text-[12px] font-medium">Filter</span>
+                <SlidersHorizontal size={16} />
+                <span className={`text-[18px] ${filterOpen || activeFilterCount > 0 ? "font-bold" : "font-medium"}`}>Filter</span>
                 {activeFilterCount > 0 && (
                   <span className="text-[9px] font-bold flex items-center justify-center"
                     style={{ width: 15, height: 15, borderRadius: "50%", background: "#3452E5", color: "#fff" }}>
@@ -823,9 +532,12 @@ export default function HomePage() {
                   </span>
                 )}
               </motion.button>
-              <AnimatePresence>
-                {filterOpen && <FilterDropdown filters={filters} onChange={setFilters} onClose={() => setFilterOpen(false)} />}
-              </AnimatePresence>
+              {filterOpen && createPortal(
+                <AnimatePresence>
+                  <FilterDropdown filters={filters} onChange={setFilters} onClose={() => setFilterOpen(false)} pos={filterPos} popupRef={filterPopRef} />
+                </AnimatePresence>,
+                document.body
+              )}
             </div>
 
             {/* Search */}
@@ -842,8 +554,8 @@ export default function HomePage() {
                   color: searchOpen ? "#49BCF9" : "rgba(255,255,255,0.45)",
                   background: searchOpen ? "rgba(73,188,249,0.10)" : "transparent",
                 }}>
-                <Search size={14} />
-                {!searchOpen && <span className="text-[12px] font-medium">Search</span>}
+                <Search size={16} />
+                {!searchOpen && <span className={`text-[18px] ${searchOpen ? "font-bold" : "font-medium"}`}>Search</span>}
               </motion.button>
               <AnimatePresence>
                 {searchOpen && (
@@ -854,7 +566,7 @@ export default function HomePage() {
                     onChange={e => setQuery(e.target.value)}
                     onKeyDown={e => { if (e.key === "Escape") closeSearch() }}
                     placeholder="Search games…"
-                    className="bg-transparent text-white text-sm outline-none border-b overflow-hidden"
+                    className="bg-transparent text-white text-[18px] outline-none border-b overflow-hidden"
                     style={{ borderColor: "rgba(255,255,255,0.2)" }}
                   />
                 )}
@@ -872,13 +584,11 @@ export default function HomePage() {
               </AnimatePresence>
             </div>
 
-            {/* Logo — centered in header */}
-            <div className="flex-1 flex items-center justify-center pointer-events-none select-none">
-              <img src="/icons/logo.svg" alt="DisLow" style={{ height: 22, opacity: 0.9 }} />
-            </div>
+            {/* Spacer */}
+            <div className="flex-1" />
 
             {/* Bell + Avatar */}
-            <div className="flex items-center gap-3 flex-shrink-0 mr-4">
+            <div className="flex items-center gap-3 flex-shrink-0 mr-6">
               {/* Bell — opens a popover with the latest notifications.
                   Sidebar Notifications nav still routes to the full /notifications page. */}
               <div className="relative">
@@ -918,10 +628,15 @@ export default function HomePage() {
                 </motion.div>
               ) : (
                 <motion.button {...fadeUp(0.35)} onClick={() => router.push("/login")}
-                  whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.97 }}
-                  className="text-[12px] font-semibold px-3 py-1"
-                  style={{ borderRadius: 8, background: "rgba(52,82,229,0.15)", color: "#48BCF9", border: "1px solid rgba(72,188,249,0.2)" }}>
-                  Login
+                  whileHover={{ scale: 1.12 }} whileTap={{ scale: 0.95 }}
+                  className="flex items-center justify-center"
+                  style={{ background: "transparent", border: "none", padding: 4, color: "#49BCF9", cursor: "pointer" }}
+                  aria-label="Log in"
+                  title="Log in"
+                >
+                  <svg width="18" height="22" viewBox="0 0 15 19" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M12 0H6C5.20435 0 4.44129 0.316071 3.87868 0.87868C3.31607 1.44129 3 2.20435 3 3V7H4V3C4 2.46957 4.21071 1.96086 4.58579 1.58579C4.96086 1.21071 5.46957 1 6 1H12C12.5304 1 13.0391 1.21071 13.4142 1.58579C13.7893 1.96086 14 2.46957 14 3V16C14 16.5304 13.7893 17.0391 13.4142 17.4142C13.0391 17.7893 12.5304 18 12 18H6C5.46957 18 4.96086 17.7893 4.58579 17.4142C4.21071 17.0391 4 16.5304 4 16V12H3V16C3 16.7956 3.31607 17.5587 3.87868 18.1213C4.44129 18.6839 5.20435 19 6 19H12C12.7956 19 13.5587 18.6839 14.1213 18.1213C14.6839 17.5587 15 16.7956 15 16V3C15 2.20435 14.6839 1.44129 14.1213 0.87868C13.5587 0.316071 12.7956 0 12 0ZM0 9H10.25L7 5.75L7.66 5L12.16 9.5L7.66 14L7 13.25L10.25 10H0V9Z" />
+                  </svg>
                 </motion.button>
               )}
             </div>
@@ -931,10 +646,13 @@ export default function HomePage() {
           <div ref={contentRef} className="flex-1 overflow-y-auto py-5 space-y-20"
             style={{
               scrollbarWidth: "none",
-              // Match the floating header — same maxWidth + auto margins so on
-              // ultrawide screens the cards stay centered instead of stretching.
-              width: `min(calc(100% - ${CONTENT_SIDE_PADDING * 2}px), ${CONTENT_MAX_WIDTH}px)`,
+              // Use paddingInline instead of shrinking width so the element
+              // stays full-column-width — prevents glow / text clipping on
+              // smaller windows where width-192px collapsed to near zero.
+              paddingInline: CONTENT_SIDE_PADDING,
+              maxWidth: CONTENT_MAX_WIDTH,
               marginInline: "auto",
+              boxSizing: "border-box",
             }}>
 
             {loading ? <LoadingSkeleton /> : isSearching ? (
@@ -1042,28 +760,9 @@ export default function HomePage() {
                   )
                 }
 
-                // ── Deal of Day — lazy data, always render sentinel ──────────
-                if (key === "Deal of Day") return (
-                  <LazySection key={key} onVisible={() => triggerSection("Deal of Day")}>
-                    {dealOfDay ? <DealOfTheDay deal={dealOfDay} delay={delay} /> : null}
-                  </LazySection>
-                )
-
-                // ── By Genre — lazy, self-loading via enabled prop ───────────
-                if (key === "By Genre") return (
-                  <LazySection key={key} onVisible={() => triggerSection("By Genre")}>
-                    <ByGenre
-                      enabled={triggered.has("By Genre")}
-                      wishlistIds={wishlistIds}
-                      onToggleFavorite={handleToggleFavorite}
-                      delay={delay}
-                    />
-                  </LazySection>
-                )
-
-                // ── Lazy data sections (Free to Play, Hidden Gems) ───────────
+                // ── Lazy data sections (Free to Play, Hidden Gems, DisLow games) ──
                 // Always render sentinel so observer can fire even before data arrives
-                if (key === "Free to Play" || key === "Hidden Gems") return (
+                if (key === "Free to Play" || key === "Hidden Gems" || key === "DisLow games") return (
                   <LazySection key={key} onVisible={() => triggerSection(key)}>
                     {games.length > 0 && (
                       <motion.section data-section={key}
@@ -1074,17 +773,18 @@ export default function HomePage() {
                           onSeeAll={() => router.push(`/section/${toSlug(key)}`)}
                           delay={delay}
                         />
-                        <div className="flex overflow-x-auto pb-3" style={{ gap: 48, scrollbarWidth: "none" }}>
+                        <ScrollableRow gap={48}>
                           {games.map((game, i) => (
                             <motion.div key={game.id}
                               initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
                               transition={{ delay: delay + i * 0.035, duration: 0.45, ease: "easeOut" }}>
                               <GameCard game={game} rank={i + 1}
                                 isFavorited={wishlistIds.has(String(game.id))}
-                                onToggleFavorite={e => handleToggleFavorite(e, game)} />
+                                onToggleFavorite={e => handleToggleFavorite(e, game)}
+                                imageSize={{ w: 346, h: 374 }} />
                             </motion.div>
                           ))}
-                        </div>
+                        </ScrollableRow>
                       </motion.section>
                     )}
                   </LazySection>
@@ -1103,17 +803,18 @@ export default function HomePage() {
                         onSeeAll={() => router.push(`/section/${toSlug(key)}`)}
                         delay={delay}
                       />
-                      <div className="flex overflow-x-auto pb-3" style={{ gap: 36, scrollbarWidth: "none" }}>
+                      <ScrollableRow gap={36}>
                         {games.map((game, i) => (
                           <motion.div key={game.id}
                             initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
                             transition={{ delay: delay + i * 0.035, duration: 0.45, ease: "easeOut" }}>
                             <GameCard game={game} rank={i + 1}
                               isFavorited={wishlistIds.has(String(game.id))}
-                              onToggleFavorite={e => handleToggleFavorite(e, game)} />
+                              onToggleFavorite={e => handleToggleFavorite(e, game)}
+                              imageSize={key === "Trended" || key === "For you" ? { w: 346, h: 374 } : undefined} />
                           </motion.div>
                         ))}
-                      </div>
+                      </ScrollableRow>
                     </motion.section>
                   </LazySection>
                 )
@@ -1122,8 +823,6 @@ export default function HomePage() {
             <div style={{ height: 32 }} />
           </div>
         </div>
-      </div>
-    </main>
   )
 }
 

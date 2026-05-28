@@ -74,6 +74,7 @@ export interface Product {
   category:     ProductCategory
   price:        number
   isActive:     boolean
+  isFeatured:   boolean
   totalKeys:    number
   availableKeys: number
   createdAt:    string

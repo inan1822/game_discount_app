@@ -14,6 +14,7 @@ export interface IProduct extends Document {
   category: ProductCategory
   price: number
   isActive: boolean
+  isFeatured: boolean
   totalKeys: number
   availableKeys: number
   createdAt: Date
@@ -38,6 +39,7 @@ const ProductSchema = new Schema<IProduct>({
   },
   price:         { type: Number, required: true, min: 0 },
   isActive:      { type: Boolean, default: true },
+  isFeatured:    { type: Boolean, default: false, index: true },
   totalKeys:     { type: Number, default: 0 },
   availableKeys: { type: Number, default: 0 },
 }, { timestamps: true })

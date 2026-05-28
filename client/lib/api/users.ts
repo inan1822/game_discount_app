@@ -4,6 +4,7 @@ import type {
   FollowRequestUser,
   UserSearchResult,
   FriendProfile,
+  FriendWithGame,
 } from "@/types/user"
 
 export interface MyStats {
@@ -110,6 +111,11 @@ export async function declineRequest(requesterId: string): Promise<void> {
 export async function searchUsers(q: string, signal?: AbortSignal): Promise<UserSearchResult[]> {
   const { data } = await api.get("/users/search", { params: { q }, signal })
   return data.data as UserSearchResult[]
+}
+
+export async function listFriendsWithGame(gameId: string): Promise<FriendWithGame[]> {
+  const { data } = await api.get(`/wishlist/friends/${gameId}`)
+  return data.data as FriendWithGame[]
 }
 
 export async function getFriendProfile(userId: string): Promise<FriendProfile> {

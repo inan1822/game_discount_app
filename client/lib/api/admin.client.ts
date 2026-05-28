@@ -44,6 +44,7 @@ type ProductPayload = {
   name: string; description?: string; imageUrl?: string
   rawgGameId?: string | null; rawgGameName?: string | null
   platform: string; category: string; price: number; isActive?: boolean
+  isFeatured?: boolean
 }
 
 export async function createProduct(payload: ProductPayload): Promise<Product> {

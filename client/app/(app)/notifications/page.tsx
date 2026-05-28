@@ -5,8 +5,6 @@ import { useRouter } from "next/navigation"
 import { BellRing, CheckCheck } from "lucide-react"
 import { useAuth } from "@/context/AuthContext"
 import { useUnreadCount } from "@/hooks/useUnreadCount"
-import PageBackground from "@/components/ui/PageBackground"
-import AppSidebar from "@/components/layout/AppSidebar"
 import {
   getNotifications, markRead, markAllRead, deleteNotification,
 } from "@/lib/api/notifications"
@@ -100,21 +98,15 @@ export default function NotificationsPage() {
 
   if (isLoading || !user) {
     return (
-      <main className="w-screen h-screen flex items-center justify-center" style={{ background: "#1E2532" }}>
+      <div className="flex-1 flex items-center justify-center">
         <div className="text-white/40 text-sm">Loading…</div>
-      </main>
+      </div>
     )
   }
 
   return (
-    <main className="relative w-screen h-screen overflow-hidden" style={{ background: "#1E2532" }}>
-      <PageBackground />
-
-      <div className="relative flex h-full" style={{ zIndex: 3 }}>
-        <AppSidebar />
-
-        {/* ══════════ CONTENT ══════════ */}
-        <div className="flex-1 min-w-0 overflow-y-auto" style={{ scrollbarWidth: "none" }}>
+    // Shell (sidebar + background) provided by (app)/layout.tsx
+    <div className="flex-1 min-w-0 overflow-y-auto" style={{ scrollbarWidth: "none" }}>
           <div className="max-w-2xl mx-auto px-8 py-10">
 
             {/* Header */}
@@ -196,8 +188,6 @@ export default function NotificationsPage() {
             )}
           </div>
         </div>
-      </div>
-    </main>
   )
 }
 

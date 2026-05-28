@@ -4,8 +4,6 @@ import { Suspense, useEffect, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { motion } from "framer-motion"
 import { useAuth } from "@/context/AuthContext"
-import PageBackground from "@/components/ui/PageBackground"
-import AppSidebar from "@/components/layout/AppSidebar"
 import FollowingPanel from "@/components/friends/FollowingPanel"
 import FollowersPanel from "@/components/friends/FollowersPanel"
 import RequestsPanel  from "@/components/friends/RequestsPanel"
@@ -52,14 +50,8 @@ function FriendsContent() {
   if (isLoading || !isLoggedIn) return null
 
   return (
-    <main className="relative w-screen h-screen overflow-hidden" style={{ background: "#1E2532" }}>
-      <PageBackground />
-
-      <div className="relative flex h-full" style={{ zIndex: 3 }}>
-        <AppSidebar />
-
-        {/* ══════════ RIGHT PANEL ══════════ */}
-        <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
+    // Shell (sidebar + background) provided by (app)/layout.tsx
+    <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
           <div className="flex-1 overflow-y-auto" style={{ paddingLeft: 20, paddingRight: 80, paddingTop: 24, scrollbarWidth: "none" }}>
             <motion.h1
               initial={{ opacity: 0, y: -8 }}
@@ -128,8 +120,6 @@ function FriendsContent() {
             </div>
           </div>
         </div>
-      </div>
-    </main>
   )
 }
 

@@ -84,31 +84,17 @@ export const getHiddenGemsGames = async (): Promise<Game[]> => {
   return data.data ?? []
 }
 
-/** Deal of the Day */
-export interface DealOfDay {
-  title:       string
-  cover:       string | null
-  salePrice:   string
-  normalPrice: string
-  savings:     number
-  storeName:   string
-  storeIcon:   string
-  dealLink:    string
-  gameId:      number | null
-}
-export const getDealOfDay = async (): Promise<DealOfDay | null> => {
+/**
+ * DisLow games — admin-curated featured Products surfaced as Game cards on home.
+ * Backed by GET /store/featured (no auth).
+ */
+export const getDisLowGames = async (): Promise<Game[]> => {
   try {
-    const { data } = await api.get("/games/deal-of-day")
-    return data.data ?? null
+    const { data } = await api.get("/store/featured")
+    return data.data ?? []
   } catch {
-    return null
+    return []
   }
-}
-
-/** By Genre */
-export const getByGenreGames = async (genre: string, page = 1): Promise<Game[]> => {
-  const { data } = await api.get("/games/by-genre", { params: { genre, page } })
-  return data.data ?? []
 }
 
 /**

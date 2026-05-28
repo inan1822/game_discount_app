@@ -32,7 +32,16 @@
       "Bash(dir \"C:\\\\FULLSTACK\\\\lessons\\\\AI Figma\\\\gaming-app\\\\client\" /b)",
       "Bash(node -e \"const s = require\\('fs'\\).readFileSync\\('src/featchers/games/games.service.ts','utf8'\\).split\\('\\\\n'\\).slice\\(1406,1410\\).join\\('\\\\n'\\); console.log\\(JSON.stringify\\(s\\)\\)\")",
       "Bash(node -e \"const fs=require\\('fs'\\);const p='src/featchers/games/games.service.ts';let s=fs.readFileSync\\(p,'utf8'\\);s=s.replace\\(/\\\\.normalize\\\\\\(\\\\\"NFD\\\\\"\\\\\\)\\\\.replace\\\\\\(\\\\/\\\\[[^\\\\]]+\\\\]\\\\/g, \\\\\"\\\\\"\\\\\\)/, '.normalize\\(\\\\\"NFD\\\\\"\\).replace\\(/[\\\\\\\\u0300-\\\\\\\\u036f]/g, \\\\\"\\\\\"\\)'\\);fs.writeFileSync\\(p,s\\);console.log\\('done'\\);\")",
-      "Bash(node -e \"const s = require\\('fs'\\).readFileSync\\('src/featchers/games/games.service.ts','utf8'\\); console.log\\(s.split\\('\\\\n'\\)[1408]\\)\")"
+      "Bash(node -e \"const s = require\\('fs'\\).readFileSync\\('src/featchers/games/games.service.ts','utf8'\\); console.log\\(s.split\\('\\\\n'\\)[1408]\\)\")",
+      "mcp__Claude_in_Chrome__javascript_tool",
+      "mcp__Claude_in_Chrome__computer",
+      "Bash(netstat -ano)",
+      "Bash(findstr :5000)",
+      "Bash(taskkill /PID 40916 /F)",
+      "PowerShell(Stop-Process -Id 40916 -Force)",
+      "WebFetch(domain:21st.dev)",
+      "Bash(git mv *)",
+      "PowerShell(Get-Process node -ErrorAction SilentlyContinue)"
     ]
   }
 }

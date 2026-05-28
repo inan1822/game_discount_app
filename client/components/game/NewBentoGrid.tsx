@@ -89,7 +89,7 @@ function BigCard({ game, rank, isFavorited, onToggleFavorite }: CardProps) {
                           : "#5BDE8A",
                   fontSize: price != null && price !== undefined ? 16 : 12,
                 }}>
-                {price === undefined ? "···" : price === null ? "Unknown" : price.isFree ? "Free" : `$${price.price.toFixed(2)}`}
+                {price === undefined ? "···" : price === null ? "—" : price.isFree ? "Free" : `$${price.price.toFixed(2)}`}
               </span>
             </div>
           </div>
@@ -152,7 +152,7 @@ function MedCard({ game, rank, isFavorited, onToggleFavorite }: CardProps) {
                           : "#5BDE8A",
                   fontSize: price != null && price !== undefined ? 13 : 10,
                 }}>
-                {price === undefined ? "···" : price === null ? "Unknown" : price.isFree ? "Free" : `$${price.price.toFixed(2)}`}
+                {price === undefined ? "···" : price === null ? "—" : price.isFree ? "Free" : `$${price.price.toFixed(2)}`}
               </span>
             </div>
           </div>
@@ -205,7 +205,7 @@ function SmallCard({ game, rank, isFavorited, onToggleFavorite }: CardProps) {
                         : "#5BDE8A",
                 fontSize: price != null && price !== undefined ? 12 : 9,
               }}>
-              {price === undefined ? "···" : price === null ? "Unknown" : price.isFree ? "Free" : `$${price.price.toFixed(2)}`}
+              {price === undefined ? "···" : price === null ? "—" : price.isFree ? "Free" : `$${price.price.toFixed(2)}`}
             </span>
           </div>
         </div>

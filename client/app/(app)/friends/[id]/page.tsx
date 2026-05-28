@@ -3,32 +3,13 @@
 import { useCallback, useEffect, useState, use } from "react"
 import { useRouter } from "next/navigation"
 import { motion } from "framer-motion"
-import {
-  Home, BellRing, Search as SearchIcon, Users, User, ArrowLeft, Lock, LogIn,
-} from "lucide-react"
+import { ArrowLeft, Lock } from "lucide-react"
 import { toast } from "react-toastify"
 import { useAuth } from "@/context/AuthContext"
-import PageBackground from "@/components/ui/PageBackground"
-import NotificationDot from "@/components/ui/NotificationDot"
-import { useUnreadCount } from "@/hooks/useUnreadCount"
 import Avatar from "@/components/friends/Avatar"
 import { ActionButton } from "@/components/friends/FriendRow"
 import { getFriendProfile, follow, unfollow, acceptRequest } from "@/lib/api/users"
 import type { FriendProfile, Relationship } from "@/types/user"
-
-const NAV = [
-  { icon: Home,        label: "Home",          href: "/"              },
-  { icon: BellRing,    label: "Notifications", href: "/notifications" },
-  { icon: SearchIcon,  label: "Search",        href: "/search"        },
-  { icon: Users,       label: "Friends",       href: "/friends"       },
-  { icon: User,        label: "Profile",       href: "/profile"       },
-] as const
-
-const glassStyle = {
-  background: "rgba(30, 38, 51, 0.70)",
-  backdropFilter: "blur(6px)",
-  WebkitBackdropFilter: "blur(6px)",
-} as const
 
 function ActionRow({
   relationship, isPrivate, onPrimary,
@@ -65,8 +46,7 @@ function ActionRow({
 export default function FriendProfilePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
   const router = useRouter()
-  const { user: me, logout, isLoading } = useAuth()
-  const { counts } = useUnreadCount()
+  const { user: me, isLoading } = useAuth()
   const isLoggedIn = !!me
 
   const [profile,  setProfile]  = useState<FriendProfile | null>(null)
@@ -131,7 +111,7 @@ export default function FriendProfilePage({ params }: { params: Promise<{ id: st
 
   if (notFound) {
     return (
-      <main className="relative w-screen h-screen flex items-center justify-center" style={{ background: "#1E2532" }}>
+      <div className="flex-1 flex items-center justify-center">
         <div className="text-center">
           <p className="text-white text-[18px] font-semibold mb-2">User not found</p>
           <button
@@ -142,7 +122,7 @@ export default function FriendProfilePage({ params }: { params: Promise<{ id: st
             Back to friends
           </button>
         </div>
-      </main>
+      </div>
     )
   }
 
@@ -152,73 +132,8 @@ export default function FriendProfilePage({ params }: { params: Promise<{ id: st
   const isFollowing = profile.relationship === "following" || profile.relationship === "friends"
 
   return (
-    <main className="relative w-screen h-screen overflow-hidden" style={{ background: "#1E2532" }}>
-      <PageBackground />
-
-      <div className="relative flex h-full" style={{ zIndex: 3 }}>
-        {/* SIDEBAR */}
-        <aside
-          className="flex flex-col flex-shrink-0 h-full"
-          style={{ width: 240, ...glassStyle, borderRight: "1px solid rgba(255,255,255,0.05)" }}
-        >
-          <div className="flex items-center gap-3 px-5 pt-6 pb-5">
-            <img src="/icons/logo.svg" alt="" style={{ width: 30, height: 30 }} />
-            <span className="text-white font-bold text-[17px] tracking-wide">DisLow</span>
-          </div>
-          <div className="px-3 mb-1">
-            <p className="text-[9px] font-bold tracking-[0.12em] px-3 mb-2" style={{ color: "rgba(255,255,255,0.25)" }}>MENU</p>
-            {NAV.map(({ icon: Icon, label, href }) => {
-              const active = label === "Friends"
-              return (
-                <button
-                  key={label}
-                  onClick={() => router.push(href)}
-                  className="w-full flex items-center gap-3 px-3 py-2.5 mb-0.5 text-[16px] font-medium relative"
-                  style={{
-                    borderRadius: 10,
-                    color: active ? "#48BCF9" : "rgba(255,255,255,0.45)",
-                    background: active ? "rgba(52,82,229,0.13)" : "transparent",
-                    border: "none",
-                    cursor: "pointer",
-                  }}
-                >
-                  {active && (
-                    <div
-                      className="absolute left-0 top-1/2 -translate-y-1/2"
-                      style={{ width: 3, height: 20, background: "#48BCF9", borderRadius: "0 4px 4px 0" }}
-                    />
-                  )}
-                  <Icon size={15} />
-                  <span className="flex-1 text-left">{label}</span>
-                  {label === "Notifications" && (
-                    <NotificationDot events={counts.events} discounts={counts.discounts} />
-                  )}
-                </button>
-              )
-            })}
-          </div>
-          <div className="flex-1" />
-          {isLoggedIn ? (
-            <button
-              onClick={logout}
-              className="flex items-center gap-3 px-8 py-5 text-[16px] font-medium"
-              style={{ color: "rgba(255,255,255,0.35)", borderTop: "1px solid rgba(255,255,255,0.05)" }}
-            >
-              <div className="w-2.5 h-2.5 rounded-full bg-[#FF6B4A]" />log out
-            </button>
-          ) : (
-            <button
-              onClick={() => router.push("/login")}
-              className="flex items-center gap-3 px-8 py-5 text-[16px] font-semibold"
-              style={{ color: "#48BCF9", borderTop: "1px solid rgba(255,255,255,0.05)" }}
-            >
-              <LogIn size={15} />Log in
-            </button>
-          )}
-        </aside>
-
-        {/* RIGHT */}
-        <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
+    // Shell (sidebar + background) provided by (app)/layout.tsx
+    <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
           <div className="flex-1 overflow-y-auto" style={{ paddingLeft: 20, paddingRight: 80, paddingTop: 20, scrollbarWidth: "none" }}>
 
             {/* Back button — glassmorphism per design rules */}
@@ -364,7 +279,5 @@ export default function FriendProfilePage({ params }: { params: Promise<{ id: st
             )}
           </div>
         </div>
-      </div>
-    </main>
   )
 }

@@ -6,8 +6,6 @@ import Fuse from "fuse.js"
 import { searchGames } from "@/lib/api/games"
 import GameCard from "@/components/game/GameCard"
 import BottomNav from "@/components/layout/BottomNav"
-import AppSidebar from "@/components/layout/AppSidebar"
-import PageBackground from "@/components/ui/PageBackground"
 import type { Game } from "@/types/game"
 
 // Fuse.js options for re-ranking RAWG results by title relevance.
@@ -84,15 +82,9 @@ export default function SearchPage() {
 
   return (
     <>
-      {/* ── Desktop layout (sidebar + content) ── */}
-      <main className="hidden md:block relative w-screen h-screen overflow-hidden" style={{ background: "#1E2532" }}>
-        <PageBackground />
-        <div className="relative flex h-full w-full" style={{ zIndex: 3 }}>
-          <AppSidebar />
-          <div
-            className="flex-1 min-w-0 overflow-y-auto"
-            style={{ scrollbarWidth: "none" }}
-          >
+      {/* ── Desktop layout — shell from (app)/layout.tsx ── */}
+      <div className="hidden md:block flex-1 min-w-0 overflow-y-auto" style={{ scrollbarWidth: "none" }}>
+        <div className="contents">
             <div
               className="py-10"
               style={{
@@ -161,7 +153,6 @@ export default function SearchPage() {
             </div>
           </div>
         </div>
-      </main>
 
       {/* ── Mobile layout (unchanged) ── */}
       <div className="md:hidden relative pb-24 min-h-screen">

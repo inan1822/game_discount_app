@@ -7,7 +7,7 @@ import {
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select"
-import { deleteProduct } from "@/lib/api/admin.client"
+import { deleteProduct, updateProduct } from "@/lib/api/admin.client"
 import type { Product, ProductsPage } from "@/types/admin"
 import { Plus, Search, Edit, Key, Trash2, ChevronLeft, ChevronRight } from "lucide-react"
 import { toast } from "react-toastify"
@@ -100,6 +100,18 @@ export function ProductsTable({ initialData }: { initialData: ProductsPage }) {
     startTransition(() => router.push(`${pathname}?${params}`))
   }
 
+  async function handleToggleFeatured(product: Product) {
+    const next = !product.isFeatured
+    setProducts(prev => prev.map(p => p._id === product._id ? { ...p, isFeatured: next } : p))
+    try {
+      await updateProduct(product._id, { isFeatured: next } as never)
+      toast.success(next ? "Marked as DisLow game" : "Removed from DisLow games")
+    } catch {
+      setProducts(prev => prev.map(p => p._id === product._id ? { ...p, isFeatured: !next } : p))
+      toast.error("Failed to update featured flag")
+    }
+  }
+
   async function handleDelete(product: Product) {
     if (!confirm(`Delete "${product.name}"? This cannot be undone if no keys have been sold.`)) return
     try {
@@ -187,7 +199,7 @@ export function ProductsTable({ initialData }: { initialData: ProductsPage }) {
         <Table>
           <TableHeader>
             <TableRow style={{ borderColor: "rgba(188,188,201,0.10)" }}>
-              {["", "Name", "Category", "Platform", "Price", "Stock", "Active", "Actions"].map(h => (
+              {["", "Name", "Category", "Platform", "Price", "Stock", "Active", "Featured", "Actions"].map(h => (
                 <TableHead key={h} style={{ color: "#9fa0a1", fontSize: 12, fontWeight: 600 }}>{h}</TableHead>
               ))}
             </TableRow>
@@ -195,7 +207,7 @@ export function ProductsTable({ initialData }: { initialData: ProductsPage }) {
           <TableBody>
             {products.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={8} style={{ textAlign: "center", color: "#9fa0a1", padding: "40px 0" }}>
+                <TableCell colSpan={9} style={{ textAlign: "center", color: "#9fa0a1", padding: "40px 0" }}>
                   No products yet. <Link href="/admin/products/new" style={{ color: "#6475D1" }}>Create one →</Link>
                 </TableCell>
               </TableRow>
@@ -232,6 +244,21 @@ export function ProductsTable({ initialData }: { initialData: ProductsPage }) {
                     }}>
                       {p.isActive ? "Active" : "Inactive"}
                     </span>
+                  </TableCell>
+                  <TableCell>
+                    <button
+                      onClick={() => handleToggleFeatured(p)}
+                      title={p.isFeatured ? "Remove from DisLow games" : "Add to DisLow games"}
+                      style={{
+                        fontSize: 11, fontWeight: 600, borderRadius: 999, padding: "3px 10px",
+                        background: p.isFeatured ? "rgba(174,59,214,0.18)" : "rgba(188,188,201,0.08)",
+                        color:      p.isFeatured ? "#AE3BD6"               : "#9fa0a1",
+                        border: "1px solid " + (p.isFeatured ? "rgba(174,59,214,0.35)" : "rgba(188,188,201,0.15)"),
+                        cursor: "pointer",
+                      }}
+                    >
+                      {p.isFeatured ? "Featured" : "Off"}
+                    </button>
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-2">

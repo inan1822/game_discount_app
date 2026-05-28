@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useCallback } from "react"
 import { useRouter } from "next/navigation"
-import PageBackground from "@/components/ui/PageBackground"
 import { fetchMyOrders } from "@/lib/api/shop"
 import { fetchMyTickets, fetchOrderKey } from "@/lib/api/support"
 import { useAuth } from "@/context/AuthContext"
@@ -15,7 +14,6 @@ import {
   ShoppingBag, ChevronLeft, ChevronRight, Key, Copy, Check,
   MessageCircle, Receipt, Ticket as TicketIcon, Eye, EyeOff,
 } from "lucide-react"
-import AppSidebar from "@/components/layout/AppSidebar"
 
 const currency = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" })
 
@@ -325,12 +323,10 @@ export default function MyOrdersPage() {
   }
 
   return (
-    <div className="relative min-h-screen overflow-hidden" style={{ background: "#1E2532", color: "#fff" }}>
-      <PageBackground />
-      <div className="relative flex h-screen" style={{ zIndex: 3 }}>
-        <AppSidebar />
-      <div className="flex-1 min-w-0 overflow-y-auto px-4 py-10" style={{ scrollbarWidth: "none" }}>
-      <div className="max-w-3xl mx-auto">
+    // Shell (sidebar + background) provided by (app)/layout.tsx
+    <>
+      <div className="flex-1 min-w-0 overflow-y-auto px-4 py-10" style={{ scrollbarWidth: "none", color: "#fff" }}>
+        <div className="max-w-3xl mx-auto">
 
         {/* Header */}
         <header style={{ marginBottom: 28 }}>
@@ -523,9 +519,8 @@ export default function MyOrdersPage() {
             )}
           </>
         )}
-      </div>
+        </div>
 
-      </div>
       </div>
 
       {/* Support drawer */}
@@ -536,6 +531,6 @@ export default function MyOrdersPage() {
         productName={selectedOrder?.items[0]?.productName ?? ""}
         ticket={selectedTicket}
       />
-    </div>
+    </>
   )
 }

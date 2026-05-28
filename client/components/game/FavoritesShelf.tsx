@@ -6,6 +6,7 @@ import type { Game } from "@/types/game"
 import { StarButton, deriveRating, ratingColor } from "./GameCard"
 import { TiltCard } from "@/components/ui/TiltCard"
 import { SectionHeading } from "@/components/ui/SectionHeading"
+import ScrollableRow from "@/components/ui/ScrollableRow"
 import { useCardPrice } from "@/hooks/useCardPrice"
 
 function FavCard({
@@ -83,7 +84,7 @@ function FavCard({
                           : "#5BDE8A",
                   fontSize: price != null && price !== undefined ? 13 : 11,
                 }}>
-                {price === undefined ? "···" : price === null ? "Unknown" : price.isFree ? "Free" : `$${price.price.toFixed(2)}`}
+                {price === undefined ? "···" : price === null ? "—" : price.isFree ? "Free" : `$${price.price.toFixed(2)}`}
               </span>
             </div>
           </div>
@@ -116,32 +117,20 @@ export default function FavoritesShelf({
         title="Favorites"
         onSeeAll={onSeeAll}
         delay={delay}
-        right={
-          <span className="text-[11px] font-bold px-2 py-0.5 mb-2" style={{
-            background: "rgba(174,59,214,0.18)", color: "#AE3BD6",
-            borderRadius: 6, border: "1px solid rgba(174,59,214,0.30)",
-          }}>
-            {games.length} saved
-          </span>
-        }
       />
 
-      {/* Outer div handles horizontal scroll only */}
-      <div style={{ overflowX: "auto", overflowY: "visible", scrollbarWidth: "none" }}>
-        {/* Inner flex is overflow:visible so scale hover isn't clipped */}
-        <div className="flex" style={{ gap: 36, paddingTop: 20, paddingBottom: 20, paddingLeft: 4, paddingRight: 4 }}>
-          {games.map((game, i) => (
-            <FavCard
-              key={game.id}
-              game={game}
-              rank={i + 1}
-              isFavorited={wishlistIds.has(String(game.id))}
-              onToggleFavorite={(e) => { e.stopPropagation(); onToggleFavorite(e, game) }}
-              index={i}
-            />
-          ))}
-        </div>
-      </div>
+      <ScrollableRow gap={36} paddingTop={20} paddingBottom={20} paddingLeft={4} paddingRight={4}>
+        {games.map((game, i) => (
+          <FavCard
+            key={game.id}
+            game={game}
+            rank={i + 1}
+            isFavorited={wishlistIds.has(String(game.id))}
+            onToggleFavorite={(e) => { e.stopPropagation(); onToggleFavorite(e, game) }}
+            index={i}
+          />
+        ))}
+      </ScrollableRow>
     </motion.section>
   )
 }

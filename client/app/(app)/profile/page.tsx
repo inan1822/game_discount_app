@@ -9,8 +9,6 @@ import {
   LogOut,
 } from "lucide-react"
 import { useAuth } from "@/context/AuthContext"
-import PageBackground from "@/components/ui/PageBackground"
-import AppSidebar from "@/components/layout/AppSidebar"
 import StatsRow from "@/components/profile/StatsRow"
 import AvatarPicker from "@/components/profile/AvatarPicker"
 import PreferenceToggle from "@/components/profile/PreferenceToggle"
@@ -116,20 +114,18 @@ export default function ProfilePage() {
 
   if (isLoading || !user) {
     return (
-      <main className="w-screen h-screen flex items-center justify-center" style={{ background: "#1E2532" }}>
+      <div className="flex-1 flex items-center justify-center">
         <div className="text-white/40 text-sm">Loading…</div>
-      </main>
+      </div>
     )
   }
 
   const userInitial = user.name?.charAt(0)?.toUpperCase() ?? "?"
 
   return (
-    <main className="relative w-screen h-screen overflow-hidden" style={{ background: "#1E2532" }}>
-      <PageBackground />
-
-      <div className="relative flex h-full" style={{ zIndex: 3 }}>
-        <AppSidebar />
+    // Shell (sidebar + background) provided by (app)/layout.tsx
+    <>
+      <div className="contents">
 
         {/* ══════════ AVATAR PICKER MODAL ══════════ */}
         {pickerOpen && (
@@ -344,6 +340,6 @@ export default function ProfilePage() {
           </div>
         </div>
       </div>
-    </main>
+    </>
   )
 }

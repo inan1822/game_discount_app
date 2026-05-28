@@ -1,8 +1,19 @@
+import mongoose from "mongoose"
 import WishlistModel from "./Wishlist.model.js"
 import PriceWatch from "../pricewatch/PriceWatch.model.js"
 import EventWatch from "../pricewatch/EventWatch.model.js"
 import { AppError } from "../../shared/utils/AppError.js"
+import userModel from "../users/User.model.js"
 import axios from "axios"
+
+const ONLINE_WINDOW_MS = 2 * 60 * 1000
+
+export interface FriendWithGame {
+    _id: string
+    displayName: string
+    avatarUrl: string | null
+    isOnline: boolean
+}
 
 export const getWishlistService = async (userId: string) => {
     const items = await WishlistModel
@@ -47,6 +58,37 @@ export const removeFromWishlistService = async (userId: string, gameId: string) 
 export const isInWishlistService = async (userId: string, gameId: string): Promise<boolean> => {
     const item = await WishlistModel.findOne({ userId, gameId })
     return !!item
+}
+
+export const listFriendsWithGameService = async (
+    meId: string,
+    gameId: string,
+): Promise<FriendWithGame[]> => {
+    const me = await userModel.findById(meId).select("following").lean()
+    if (!me || !me.following?.length) return []
+
+    const followingOids = me.following.map(id => new mongoose.Types.ObjectId(id.toString()))
+
+    const rows = await WishlistModel
+        .find({ userId: { $in: followingOids }, gameId })
+        .select("userId")
+        .lean()
+
+    if (rows.length === 0) return []
+
+    const users = await userModel
+        .find({ _id: { $in: rows.map(r => r.userId) } })
+        .select("_id name avatar lastSeenAt")
+        .lean()
+
+    return users.map(u => ({
+        _id:         u._id.toString(),
+        displayName: u.name,
+        avatarUrl:   u.avatar ?? null,
+        isOnline:    u.lastSeenAt
+            ? Date.now() - new Date(u.lastSeenAt).getTime() < ONLINE_WINDOW_MS
+            : false,
+    }))
 }
 
 // ─── Internal helpers ─────────────────────────────────────────────────────────

@@ -177,15 +177,17 @@ Every frosted-glass element follows one of two recipes:
 ```
 ┌──────────────────────────────────────────────────────────────┐
 │ AppSidebar (240px fixed) │  20px gap  │  Content area       │
-│                          │            │  max-w varies        │
-│                          │            │  20px right padding  │
+│                          │            │  max-w: 1600px       │
+│                          │            │  96px side padding   │
 └──────────────────────────────────────────────────────────────┘
 ```
 
 - Sidebar: 240px, full height, glassmorphism (40% opacity)
 - Content NEVER touches the sidebar — always 20px gap (`paddingLeft: 20`)
-- Right edge: always 20px padding (`paddingRight: 20` or `px-8`)
-- Content `max-width` varies by page (see per-page rules below)
+- Content max-width: **1600px** — caps layout on ultrawide screens, centered with `marginInline: "auto"`
+- Side padding: **96px** (`paddingInline: 96`) on the content wrapper — never use a narrower value
+- Floating header width formula: `min(calc(100% - 192px), 1600px)` — matches the content column exactly
+- Content `max-width` is 1600px on ALL main app pages unless a page has an explicit override
 
 ### Mobile Layout (< 768px)
 - Fixed bottom navigation bar (4 tabs)
@@ -570,7 +572,26 @@ Primary font: `CoconPro` (commercial). Fallback: `'Nunito'` from Google Fonts.
 | caption | 16px | 350 | Labels, captions |
 | bold | 32px | 700 | CTAs, emphasis |
 
-In practice on the web, pages use `text-xl` / `text-2xl` / `text-sm` Tailwind classes. Always prefer `Nunito` if CoconPro is not available.
+**Actual web sizes used in the app** (use these — not the Figma pt values above):
+
+| Element | Size | Weight |
+|---|---|---|
+| Section heading (`SectionHeading`) | `26px` | bold |
+| "See all" link | `15px` | regular |
+| Header bar labels (Filter / Search) | `18px` | medium |
+| Header bar input text | `18px` | regular |
+| **Game detail tab buttons (Events / Discounts)** | `18px` | semibold (active: bold) |
+| Store name (deal rows) | `15px` | semibold |
+| Visit Store button | `15px` | semibold |
+| Search results title | `15px` | bold |
+| Body / description text | `13px` | regular |
+| Empty state / meta text | `13px` | regular |
+| Filter dropdown header | `13px` | bold |
+| Filter pill labels | `11px` | medium |
+| Deal metadata hints | `11px` | regular |
+| Filter section labels (STYLE / PLATFORM / DATE) | `9px` | bold, `tracking-widest`, uppercase |
+
+Always prefer `Nunito` if CoconPro is not available.
 
 ---
 

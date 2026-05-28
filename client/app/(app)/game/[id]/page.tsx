@@ -4,37 +4,37 @@ import { useState, useEffect, useRef, useCallback } from "react"
 import { useParams, useRouter } from "next/navigation"
 import { motion, AnimatePresence } from "framer-motion"
 import {
-  ArrowLeft, Heart, Home, BellRing, Search as SearchIcon,
-  Users, User, LogIn, ExternalLink, Tag, Zap, Calendar, Monitor, ShoppingCart, Receipt,
+  ArrowLeft, Heart, ExternalLink, Tag, Zap, Calendar, Monitor, ShoppingCart, Gift,
 } from "lucide-react"
 import { getGameById, getGameDeals, getGameDlcDeals, getGameGiveaways, getGameEvents } from "@/lib/api/games"
 import { addToWishlist, removeFromWishlist, getWishlist } from "@/lib/api/wishlist"
 import { fetchStoreProductsByGame } from "@/lib/api/shop"
+import { listFriendsWithGame } from "@/lib/api/users"
 import { useAuth } from "@/context/AuthContext"
-import PageBackground from "@/components/ui/PageBackground"
 import type { Game, PriceResult, GiveawayItem, GameEvent } from "@/types/game"
 import type { Product } from "@/types/admin"
-
-// ─── Constants ────────────────────────────────────────────────────────────────
-
-const AUTH_NAV = new Set(["Notifications", "Friends", "Profile", "Purchases"])
-
-const NAV = [
-  { icon: Home,        label: "Home",          href: "/"               },
-  { icon: BellRing,    label: "Notifications", href: "/notifications"  },
-  { icon: SearchIcon,  label: "Search",        href: "/search"         },
-  { icon: Receipt,     label: "Purchases",     href: "/account/orders" },
-  { icon: Users,       label: "Friends",       href: "/friends"        },
-  { icon: User,        label: "Profile",       href: "/profile"        },
-] as const
+import type { FriendWithGame } from "@/types/user"
+import { GlowCard } from "@/components/ui/spotlight-card"
+import { StarButton } from "@/components/game/GameCard"
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
-const glassStyle = {
+// Sidebar / drawer glass — navigation surfaces (40% opacity)
+const sidebarGlass = {
   background:           "rgba(30, 38, 51, 0.40)",
   backdropFilter:       "blur(8px)",
   WebkitBackdropFilter: "blur(8px)",
 } as const
+
+// Glass Panel — content cards, modals, tab bars (70% opacity)
+const panelGlass = {
+  background:           "rgba(28, 30, 42, 0.70)",
+  backdropFilter:       "blur(8px)",
+  WebkitBackdropFilter: "blur(8px)",
+} as const
+
+const CONTENT_MAX_WIDTH    = 1600
+const CONTENT_SIDE_PADDING = 96
 
 const fadeUp = (delay = 0) => ({
   initial:    { opacity: 0, y: 16 },
@@ -42,143 +42,6 @@ const fadeUp = (delay = 0) => ({
   transition: { duration: 0.45, ease: "easeOut", delay },
 })
 
-// ─── NavGlowItem ──────────────────────────────────────────────────────────────
-
-function NavGlowItem({
-  icon: Icon, label, active, locked, delay, onClick,
-}: {
-  icon:    React.ElementType
-  label:   string
-  active:  boolean
-  locked:  boolean
-  delay:   number
-  onClick: () => void
-}) {
-  const ref                   = useRef<HTMLButtonElement>(null)
-  const [pos, setPos]         = useState({ x: 0, y: 0 })
-  const [hovered, setHovered] = useState(false)
-
-  return (
-    <motion.button
-      ref={ref}
-      onClick={onClick}
-      initial={{ opacity: 0, x: -8 }}
-      animate={{ opacity: 1, x: 0 }}
-      transition={{ delay, duration: 0.35 }}
-      onMouseMove={e => {
-        const r = ref.current?.getBoundingClientRect()
-        if (!r) return
-        setPos({ x: e.clientX - r.left, y: e.clientY - r.top })
-      }}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-      whileTap={{ scale: 0.97 }}
-      className="w-full flex items-center gap-3 px-3 py-2.5 mb-0.5 text-sm font-medium relative overflow-hidden"
-      style={{
-        borderRadius: 10,
-        color:   active  ? "#48BCF9"
-               : locked  ? "rgba(255,255,255,0.25)"
-               : hovered ? "#48BCF9"
-               : "rgba(255,255,255,0.45)",
-        background: active ? "rgba(52,82,229,0.13)" : "transparent",
-        border: "none",
-        cursor: "pointer",
-        transition: "color 0.25s",
-      }}
-    >
-      {active && (
-        <motion.div
-          layoutId="nav-indicator-detail"
-          className="absolute left-0 top-1/2 -translate-y-1/2"
-          style={{ width: 3, height: 20, background: "#48BCF9", borderRadius: "0 4px 4px 0" }}
-        />
-      )}
-      <div
-        style={{
-          position:     "absolute",
-          left:         pos.x,
-          top:          pos.y,
-          width:        140,
-          height:       140,
-          borderRadius: "50%",
-          transform:    "translate(-50%, -50%)",
-          background:   "radial-gradient(circle, #48BCF9 10%, transparent 70%)",
-          opacity:      hovered && !active ? 0.14 : 0,
-          transition:   "opacity 0.3s",
-          pointerEvents: "none",
-          zIndex:       0,
-        }}
-      />
-      <Icon size={15} style={{ position: "relative", zIndex: 1 }} />
-      <span style={{ position: "relative", zIndex: 1 }}>{label}</span>
-      {locked && (
-        <span
-          className="ml-auto text-[8px] px-1 py-0.5 rounded"
-          style={{ background: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.2)", position: "relative", zIndex: 1 }}
-        >
-          Login
-        </span>
-      )}
-    </motion.button>
-  )
-}
-
-// ─── Sidebar ──────────────────────────────────────────────────────────────────
-
-function Sidebar({ activeNav, onNav, isLoggedIn, onLogout }: {
-  activeNav:  string
-  onNav:      (label: string, href: string) => void
-  isLoggedIn: boolean
-  onLogout:   () => void
-}) {
-  const router = useRouter()
-  return (
-    <motion.aside
-      initial={{ opacity: 0, x: -24 }} animate={{ opacity: 1, x: 0 }}
-      transition={{ duration: 0.55, ease: "easeOut" }}
-      className="flex flex-col flex-shrink-0 h-full"
-      style={{ width: 240, ...glassStyle, borderRight: "1px solid rgba(255,255,255,0.05)" }}
-    >
-      <motion.div {...fadeUp(0.05)} className="flex items-center gap-3 px-5 pt-6 pb-5">
-        <img src="/icons/logo.svg" alt="" style={{ width: 30, height: 30 }} />
-        <span className="text-white font-bold text-[17px] tracking-wide">DisLow</span>
-      </motion.div>
-
-      <div className="px-3 mb-1">
-        <p className="text-[9px] font-bold tracking-[0.12em] px-3 mb-2" style={{ color: "rgba(255,255,255,0.25)" }}>MENU</p>
-        {NAV.map(({ icon, label, href }, i) => (
-          <NavGlowItem
-            key={label}
-            icon={icon}
-            label={label}
-            active={activeNav === label}
-            locked={!isLoggedIn && AUTH_NAV.has(label)}
-            delay={0.1 + i * 0.05}
-            onClick={() => onNav(label, href)}
-          />
-        ))}
-      </div>
-
-      <div className="flex-1" />
-
-      {isLoggedIn ? (
-        <motion.button {...fadeUp(0.45)} onClick={onLogout}
-          whileHover={{ x: 4 }} whileTap={{ scale: 0.97 }}
-          className="flex items-center gap-3 px-8 py-5 text-sm font-medium"
-          style={{ color: "rgba(255,255,255,0.35)", borderTop: "1px solid rgba(255,255,255,0.05)" }}>
-          <div className="w-2.5 h-2.5 rounded-full bg-[#FF6B4A]" />log out
-        </motion.button>
-      ) : (
-        <motion.button {...fadeUp(0.45)} onClick={() => router.push("/login")}
-          whileHover={{ x: 4 }} whileTap={{ scale: 0.97 }}
-          className="flex items-center gap-3 px-8 py-5 text-sm font-semibold"
-          style={{ color: "#48BCF9", borderTop: "1px solid rgba(255,255,255,0.05)" }}>
-          <LogIn size={15} />Log in
-        </motion.button>
-      )}
-    </motion.aside>
-  )
-}
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -236,7 +99,7 @@ function SteamEventCard({ event }: { event: GameEvent }) {
             background: isUpdate
               ? "rgba(72,188,249,0.12)"
               : "rgba(174,59,214,0.12)",
-            color: isUpdate ? "#48BCF9" : "#CF6EF5",
+            color: isUpdate ? "#48BCF9" : "#AE3BD6",
           }}
         >
           {event.feedLabel.toUpperCase()}
@@ -249,7 +112,7 @@ function SteamEventCard({ event }: { event: GameEvent }) {
 
       {/* Title */}
       <div className="px-4 pb-2">
-        <p className="text-white font-semibold text-[13px] leading-snug line-clamp-2 group-hover:text-[#CF6EF5] transition-colors">
+        <p className="text-white font-semibold text-[13px] leading-snug line-clamp-2 group-hover:text-[#AE3BD6] transition-colors">
           {event.title}
         </p>
       </div>
@@ -257,7 +120,7 @@ function SteamEventCard({ event }: { event: GameEvent }) {
       {/* Summary excerpt */}
       {event.summary && (
         <div className="px-4 pb-3">
-          <p className="text-[11px] leading-relaxed line-clamp-3" style={{ color: "rgba(255,255,255,0.38)" }}>
+          <p className="text-[13px] leading-relaxed line-clamp-3" style={{ color: "rgba(255,255,255,0.38)" }}>
             {event.summary}
           </p>
         </div>
@@ -271,7 +134,7 @@ function SteamEventCard({ event }: { event: GameEvent }) {
         <span className="text-[10px]" style={{ color: "rgba(255,255,255,0.3)" }}>
           {event.author || "Steam"}
         </span>
-        <span className="text-[10px] flex items-center gap-1" style={{ color: "rgba(174,59,214,0.7)" }}>
+        <span className="text-[10px] flex items-center gap-1" style={{ color: "rgba(174,59,214,0.8)" }}>
           Read more <ExternalLink size={9} />
         </span>
       </div>
@@ -296,7 +159,7 @@ function GiveawayRow({ giveaway }: { giveaway: GiveawayItem }) {
       className="flex items-center justify-between rounded-[14px] px-4 py-3 group"
       style={{
         background:           "rgba(28,42,35,0.75)",
-        border:               "1px solid rgba(91,222,138,0.18)",
+        border:               "1px solid rgba(68,214,44,0.18)",
         backdropFilter:       "blur(8px)",
         WebkitBackdropFilter: "blur(8px)",
       }}
@@ -307,8 +170,8 @@ function GiveawayRow({ giveaway }: { giveaway: GiveawayItem }) {
           className="flex items-center justify-center flex-shrink-0 text-base"
           style={{
             width: 36, height: 36, borderRadius: 10,
-            background: "rgba(91,222,138,0.12)",
-            border:     "1px solid rgba(91,222,138,0.2)",
+            background: "rgba(68,214,44,0.12)",
+            border:     "1px solid rgba(68,214,44,0.2)",
           }}
         >
           🎁
@@ -337,11 +200,11 @@ function GiveawayRow({ giveaway }: { giveaway: GiveawayItem }) {
         )}
         <span
           className="text-[11px] font-bold px-2 py-0.5 rounded-full"
-          style={{ background: "rgba(91,222,138,0.18)", color: "#5BDE8A" }}
+          style={{ background: "rgba(68,214,44,0.15)", color: "#44d62c" }}
         >
           FREE
         </span>
-        <ExternalLink size={11} className="text-[#5BDE8A] opacity-60 group-hover:opacity-100 transition-opacity" />
+        <ExternalLink size={11} className="opacity-60 group-hover:opacity-100 transition-opacity" style={{ color: "#44d62c" }} />
       </div>
     </motion.a>
   )
@@ -416,10 +279,10 @@ function DiscountRow({ deal, isCheapest }: { deal: PriceResult; isCheapest: bool
       className="flex items-center gap-3 rounded-[14px] px-4 py-3 group"
       style={{
         background:           isCheapest
-          ? "rgba(100,117,209,0.10)"
+          ? "rgba(68,214,44,0.08)"
           : "rgba(28,30,42,0.70)",
         border:               isCheapest
-          ? "1px solid rgba(100,117,209,0.28)"
+          ? "1px solid rgba(68,214,44,0.25)"
           : "1px solid rgba(255,255,255,0.05)",
         backdropFilter:       "blur(8px)",
         WebkitBackdropFilter: "blur(8px)",
@@ -443,11 +306,11 @@ function DiscountRow({ deal, isCheapest }: { deal: PriceResult; isCheapest: bool
       {/* Store name + "Best Deal" badge */}
       <div className="flex flex-col min-w-0 flex-1">
         <div className="flex items-center gap-2">
-          <span className="text-white text-sm font-semibold truncate">{deal.storeName}</span>
+          <span className="text-white text-[15px] font-semibold truncate">{deal.storeName}</span>
           {isCheapest && (
             <span
               className="text-[9px] font-bold px-1.5 py-0.5 rounded-full flex-shrink-0"
-              style={{ background: "rgba(100,117,209,0.25)", color: "#8899E8" }}
+              style={{ background: "rgba(68,214,44,0.15)", color: "#44d62c" }}
             >
               BEST DEAL
             </span>
@@ -456,7 +319,7 @@ function DiscountRow({ deal, isCheapest }: { deal: PriceResult; isCheapest: bool
         {/* DLC name — shown only on rows returned from /games/dlc-deals */}
         {deal.dlcName && (
           <span
-            className="text-[10px] truncate"
+            className="text-[11px] truncate"
             style={{ color: "rgba(255,255,255,0.45)" }}
           >
             DLC · {deal.dlcName}
@@ -466,40 +329,40 @@ function DiscountRow({ deal, isCheapest }: { deal: PriceResult; isCheapest: bool
         {(deal.storeID === "cdkeys-psn"  || deal.storeID === "eneba-psn"   ||
           deal.storeID === "g2a-psn"     || deal.storeID === "kinguin-psn" ||
           deal.storeID === "g2a-ps") && (
-          <span className="text-[10px]" style={{ color: "rgba(255,255,255,0.3)" }}>
+          <span className="text-[11px]" style={{ color: "rgba(255,255,255,0.3)" }}>
             PSN wallet vouchers · add funds, buy from PS Store
           </span>
         )}
         {deal.storeID === "ps-search" && (
-          <span className="text-[10px]" style={{ color: "rgba(255,255,255,0.3)" }}>
+          <span className="text-[11px]" style={{ color: "rgba(255,255,255,0.3)" }}>
             Search directly on PlayStation Store
           </span>
         )}
         {/* Real G2A platform deals — price range, multiple sellers */}
         {(deal.storeID === "g2a-pc" || deal.storeID === "g2a-xbox" || deal.storeID === "g2a-switch") && (
-          <span className="text-[10px]" style={{ color: "rgba(255,255,255,0.3)" }}>
+          <span className="text-[11px]" style={{ color: "rgba(255,255,255,0.3)" }}>
             Third-party marketplace · multiple sellers, prices vary by region
           </span>
         )}
         {/* Synthetic key-market search entries (Xbox / Nintendo) */}
         {deal.storeID === "kinguin-xbox" && (
-          <span className="text-[10px]" style={{ color: "rgba(255,255,255,0.3)" }}>
+          <span className="text-[11px]" style={{ color: "rgba(255,255,255,0.3)" }}>
             Xbox game keys · activate on Xbox / Microsoft Store
           </span>
         )}
         {deal.storeID === "kinguin-switch" && (
-          <span className="text-[10px]" style={{ color: "rgba(255,255,255,0.3)" }}>
+          <span className="text-[11px]" style={{ color: "rgba(255,255,255,0.3)" }}>
             Nintendo Switch game keys · add funds or activate directly
           </span>
         )}
         {/* PC store search fallbacks */}
         {(deal.storeID === "steam-search" || deal.storeID === "gog-search" || deal.storeID === "epic-search") && (
-          <span className="text-[10px]" style={{ color: "rgba(255,255,255,0.3)" }}>
+          <span className="text-[11px]" style={{ color: "rgba(255,255,255,0.3)" }}>
             Search directly on this store
           </span>
         )}
         {(deal.storeID === "g2a-pc-search" || deal.storeID === "kinguin-pc-search") && (
-          <span className="text-[10px]" style={{ color: "rgba(255,255,255,0.3)" }}>
+          <span className="text-[11px]" style={{ color: "rgba(255,255,255,0.3)" }}>
             PC game keys · compare offers before buying
           </span>
         )}
@@ -509,7 +372,7 @@ function DiscountRow({ deal, isCheapest }: { deal: PriceResult; isCheapest: bool
           !deal.storeID.startsWith("g2a-")    &&
           !deal.storeID.startsWith("kinguin-") &&
           deal.storeID !== "ps-search"         && (
-          <span className="text-[10px]" style={{ color: "rgba(255,255,255,0.3)" }}>
+          <span className="text-[11px]" style={{ color: "rgba(255,255,255,0.3)" }}>
             Regular: ${deal.normalPrice}
           </span>
         )}
@@ -520,7 +383,7 @@ function DiscountRow({ deal, isCheapest }: { deal: PriceResult; isCheapest: bool
         {hasSaving && (
           <span
             className="text-[10px] font-bold px-1.5 py-0.5 rounded-full"
-            style={{ background: "rgba(91,222,138,0.15)", color: "#5BDE8A" }}
+            style={{ background: "rgba(68,214,44,0.15)", color: "#44d62c" }}
           >
             -{Math.round(deal.savings)}%
           </span>
@@ -537,7 +400,7 @@ function DiscountRow({ deal, isCheapest }: { deal: PriceResult; isCheapest: bool
         <ExternalLink
           size={13}
           className="transition-colors"
-          style={{ color: isCheapest ? "#8899E8" : "rgba(255,255,255,0.3)" }}
+          style={{ color: isCheapest ? "#44d62c" : "rgba(255,255,255,0.3)" }}
         />
       </div>
     </motion.a>
@@ -616,7 +479,7 @@ function ConsoleButtons({ platforms, selected, onSelect, dlcOnly, onToggleDlc, d
           title={dlcAvailable
             ? (dlcOnly ? "Showing DLC discounts — click to switch back" : "Show only DLC discounts")
             : "DLC discounts require a Steam-listed game"}
-          className="flex items-center gap-2 rounded-full px-3 py-1 text-[9px] font-bold tracking-widest flex-shrink-0"
+          className="flex items-center gap-2 rounded-full px-3 py-1 text-[9px] font-bold tracking-widest flex-shrink-0 relative z-20"
           style={{
             background: dlcOnly
               ? "rgba(100,117,209,0.18)"
@@ -678,7 +541,7 @@ function ConsoleButtons({ platforms, selected, onSelect, dlcOnly, onToggleDlc, d
                   {b.icon}
                 </div>
               )}
-              <span className="text-white text-sm font-semibold flex-1 truncate">
+              <span className="text-white text-[16px] font-semibold flex-1 truncate">
                 {b.label}
               </span>
               {isSelected && (
@@ -1048,6 +911,7 @@ export default function GameDetailPage() {
   const [dlcOnly,         setDlcOnly]         = useState(false)
   const [dlcDeals,        setDlcDeals]        = useState<PriceResult[] | null>(null)
   const [loadingDlcDeals, setLoadingDlcDeals] = useState(false)
+  const [friendsWithGame, setFriendsWithGame] = useState<FriendWithGame[]>([])
 
   // When the game loads, if the current platform tab isn't supported (e.g. PC
   // default selected but game is PS-only), switch to the first available one.
@@ -1148,6 +1012,14 @@ export default function GameDetailPage() {
       .catch(() => console.warn("[Wishlist] Failed to load wishlist"))
   }, [isLoggedIn, id])
 
+  // Fetch which friends (people I follow) have this game in their favorites
+  useEffect(() => {
+    if (!isLoggedIn || !id) return
+    listFriendsWithGame(id)
+      .then(setFriendsWithGame)
+      .catch(() => setFriendsWithGame([]))
+  }, [isLoggedIn, id])
+
   const handleToggleWishlist = async () => {
     if (!isLoggedIn) { router.push("/login"); return }
     if (!game || wishlistBusy) return
@@ -1165,11 +1037,6 @@ export default function GameDetailPage() {
     } finally {
       setWishlistBusy(false)
     }
-  }
-
-  const handleNav = (label: string, href: string) => {
-    if (!isLoggedIn && AUTH_NAV.has(label)) { router.push("/login"); return }
-    router.push(href)
   }
 
   // Console platforms — if the game is on PS/Xbox/Switch we render the console
@@ -1211,52 +1078,26 @@ export default function GameDetailPage() {
   if (!game) return null
 
   return (
-    <main className="relative w-screen h-screen overflow-hidden" style={{ background: "#12131A" }}>
-      <PageBackground />
-
-      <div className="relative flex h-full" style={{ zIndex: 3 }}>
-
-        {/* ══ SIDEBAR ══ */}
-        <Sidebar
-          activeNav="Home"
-          onNav={handleNav}
-          isLoggedIn={isLoggedIn}
-          onLogout={logout}
-        />
-
-        {/* ══ MAIN CONTENT ══ */}
-        <div className="flex flex-1 min-w-0 h-full overflow-hidden gap-5 px-6 py-5">
+    // Shell (sidebar + background) provided by (app)/layout.tsx
+    <div
+      className="flex flex-1 min-w-0 h-full gap-10 py-5"
+      style={{
+        paddingInline: CONTENT_SIDE_PADDING,
+        maxWidth:      CONTENT_MAX_WIDTH,
+        marginInline:  "auto",
+        boxSizing:     "border-box",
+      }}
+    >
 
           {/* ── LEFT PANEL ── */}
           <motion.div
             {...fadeUp(0.08)}
             className="flex flex-col flex-shrink-0 overflow-y-auto"
-            style={{ width: 460, scrollbarWidth: "none" }}
+            style={{ width: 594, scrollbarWidth: "none" }}
           >
-            {/* Back button */}
-            <motion.button
-              onClick={() => router.back()}
-              whileHover={{ x: -3 }} whileTap={{ scale: 0.95 }}
-              className="flex items-center gap-2 mb-3 text-sm font-medium"
-              style={{ color: "rgba(255,255,255,0.55)", alignSelf: "flex-start" }}
-            >
-              <div
-                className="flex items-center justify-center"
-                style={{
-                  width: 36, height: 36, borderRadius: 10,
-                  background:           "rgba(42,45,50,0.60)",
-                  backdropFilter:       "blur(6px)",
-                  WebkitBackdropFilter: "blur(6px)",
-                  border:               "1px solid rgba(255,255,255,0.07)",
-                }}
-              >
-                <ArrowLeft size={15} className="text-white" />
-              </div>
-              <span>Back</span>
-            </motion.button>
 
             {/* Cover card */}
-            <div className="relative rounded-[10px] overflow-hidden mb-4 flex-shrink-0" style={{ height: 280 }}>
+            <div className="relative rounded-[10px] overflow-hidden mb-4 flex-shrink-0 w-full" style={{ width: 594, height: 334.13 }}>
               {game.cover ? (
                 <img src={game.cover} alt={game.name} className="w-full h-full object-cover" />
               ) : (
@@ -1267,101 +1108,72 @@ export default function GameDetailPage() {
                 style={{ background: "linear-gradient(to top, rgba(18,19,26,0.92) 0%, rgba(18,19,26,0.3) 50%, transparent 100%)" }}
               />
 
-              {/* Top-right: external link + favorite */}
-              <div className="absolute top-3 right-3 flex gap-2">
-                {cheapestDeal && (
-                  <a
-                    href={cheapestDeal.dealLink}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    aria-label={`Best price on ${cheapestDeal.storeName}`}
-                    className="flex items-center justify-center"
-                    style={{ width: 36, height: 36, borderRadius: "50%", background: "rgba(0,0,0,0.5)" }}
-                  >
-                    <ExternalLink size={14} className="text-[#B3BADE]" />
-                  </a>
-                )}
-                <motion.button
-                  onClick={handleToggleWishlist}
-                  whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}
-                  aria-label={inWishlist ? "Remove from wishlist" : "Add to wishlist"}
-                  className="flex items-center justify-center"
-                  style={{
-                    width: 36, height: 36, borderRadius: "50%",
-                    background: "rgba(0,0,0,0.5)",
-                    opacity: wishlistBusy ? 0.5 : 1,
-                  }}
-                >
-                  <Heart
-                    size={14}
-                    className={inWishlist ? "fill-current" : ""}
-                    style={{ color: inWishlist ? "#AE3BD6" : "#B3BADE" }}
-                  />
-                </motion.button>
+              {/* Top-right: star favorite — z-30 to stay above events/discount hot area */}
+              <div className="absolute top-3 right-3 z-30" style={{ opacity: wishlistBusy ? 0.5 : 1 }}>
+                <StarButton
+                  isFavorited={inWishlist}
+                  onToggle={handleToggleWishlist}
+                />
               </div>
 
               {/* Bottom: title + badges */}
               <div className="absolute bottom-0 left-0 right-0 px-4 pb-4">
-                <h1 className="text-white font-bold text-xl leading-tight mb-1">{game.name}</h1>
+                <h1 className="text-white font-bold text-[26px] leading-tight mb-1">{game.name}</h1>
                 <div className="flex items-center gap-3 flex-wrap">
                   {game.rating > 0 && (
-                    <span className="text-[12px] font-bold" style={{ color: "#AE3BD6" }}>★ {game.rating.toFixed(1)}</span>
-                  )}
-                  {game.metacritic && (
-                    <span className="text-[10px] px-2 py-0.5 rounded font-bold" style={{ background: "#44d62c", color: "#000" }}>
-                      MC {game.metacritic}
-                    </span>
+                    <span className="text-[13px] font-bold" style={{ color: "#6475D1" }}>★ {game.rating.toFixed(1)}</span>
                   )}
                   {game.released && (
-                    <span className="text-[11px]" style={{ color: "rgba(255,255,255,0.45)" }}>{game.released.slice(0, 4)}</span>
+                    <span className="text-[13px]" style={{ color: "rgba(255,255,255,0.45)" }}>{game.released.slice(0, 4)}</span>
                   )}
                 </div>
               </div>
             </div>
 
-            {/* Platform pills */}
-            {game.platforms.length > 0 && (
-              <div className="flex flex-wrap gap-2 mb-4">
-                {[...new Set(game.platforms.map(shortPlatform))].slice(0, 5).map(p => (
-                  <span
-                    key={p}
-                    className="text-[11px] font-semibold px-3 py-1.5"
-                    style={{ background: "#2A2D32", color: "#B3BADE", borderRadius: 6 }}
-                  >
-                    {p}
-                  </span>
-                ))}
+
+
+            {/* Friends who added this game to their favorites */}
+            {isLoggedIn && friendsWithGame.length > 0 && (
+              <div className="flex items-center gap-3 mb-4">
+                <div className="flex -space-x-2">
+                  {friendsWithGame.slice(0, 5).map(f => (
+                    <a
+                      key={f._id}
+                      href={`/friends/${f._id}`}
+                      title={f.displayName}
+                      className="w-9 h-9 rounded-full flex items-center justify-center text-[12px] font-bold text-white border-2 flex-shrink-0 overflow-hidden"
+                      style={{ borderColor: "#12131A" }}
+                    >
+                      {f.avatarUrl ? (
+                        <img
+                          src={f.avatarUrl}
+                          alt={f.displayName}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <div
+                          className="w-full h-full flex items-center justify-center"
+                          style={{ background: "#6475D1" }}
+                        >
+                          {f.displayName.charAt(0).toUpperCase()}
+                        </div>
+                      )}
+                    </a>
+                  ))}
+                  {friendsWithGame.length > 5 && (
+                    <div
+                      className="w-9 h-9 rounded-full flex items-center justify-center text-[11px] font-bold text-white border-2 flex-shrink-0"
+                      style={{ background: "#2a2d32", borderColor: "#12131A", color: "#9FA0A1" }}
+                    >
+                      +{friendsWithGame.length - 5}
+                    </div>
+                  )}
+                </div>
+                <span className="text-[13px]" style={{ color: "#9FA0A1" }}>
+                  {friendsWithGame.length} friend{friendsWithGame.length !== 1 ? "s" : ""} added to favorites
+                </span>
               </div>
             )}
-
-            {/* Platform dot-separated list */}
-            {game.platforms.length > 0 && (
-              <p className="text-[11px] mb-4 leading-relaxed" style={{ color: "#9FA0A1" }}>
-                {game.platforms.join(" · ")}
-              </p>
-            )}
-
-            {/* Friend circles — placeholder */}
-            <div className="flex items-center gap-3 mb-4">
-              <div className="flex -space-x-2">
-                {[
-                  { letter: "A", color: "#6475D1" },
-                  { letter: "M", color: "#AE3BD6" },
-                  { letter: "J", color: "#44D62C" },
-                  { letter: "S", color: "#2AB7E6" },
-                  { letter: "K", color: "#E67C2A" },
-                ].map(({ letter, color }) => (
-                  <div
-                    key={letter}
-                    className="w-9 h-9 rounded-full flex items-center justify-center text-[12px] font-bold text-white border-2"
-                    style={{ background: color, borderColor: "#12131A" }}
-                  >
-                    {letter}
-                  </div>
-                ))}
-              </div>
-              <span className="text-[12px]" style={{ color: "#9FA0A1" }}>5 friends playing</span>
-            </div>
 
             {/* Buy button — links to the cheapest store page for THIS game */}
             {cheapestDeal && (
@@ -1371,7 +1183,7 @@ export default function GameDetailPage() {
                 rel="noopener noreferrer"
                 whileHover={{ scale: 1.01 }}
                 whileTap={{ scale: 0.98 }}
-                className="flex items-center justify-center gap-2 rounded-[12px] py-3 mb-5 text-white font-semibold text-sm"
+                className="flex items-center justify-center gap-2 rounded-[12px] py-3 mb-5 text-white font-semibold text-[15px]"
                 style={{
                   background: "#6475D1",
                   boxShadow:  "0 4px 16px rgba(100,117,209,0.35)",
@@ -1405,46 +1217,76 @@ export default function GameDetailPage() {
             {game.description && (
               <div>
                 <p className="text-[10px] font-bold tracking-[0.1em] mb-2" style={{ color: "rgba(255,255,255,0.25)" }}>ABOUT</p>
-                <p className="text-[12px] leading-relaxed" style={{ color: "#9FA0A1" }}>
+                <p className="text-[13px] leading-relaxed" style={{ color: "#9FA0A1" }}>
                   {game.description.slice(0, 400)}{game.description.length > 400 ? "…" : ""}
                 </p>
               </div>
             )}
+
+            {/* Back button — bottom of left panel */}
+            <motion.button
+              onClick={() => router.back()}
+              whileHover={{ x: -3 }}
+              whileTap={{ scale: 0.95 }}
+              className="mt-6 self-start"
+              style={{ background: "none", border: "none", padding: 0, cursor: "pointer" }}
+            >
+              <img src="/icons/back-button.svg" alt="Back" style={{ height: 36 }} />
+            </motion.button>
           </motion.div>
 
           {/* ── RIGHT PANEL ── */}
           <motion.div
             {...fadeUp(0.15)}
-            className="flex flex-col flex-1 min-w-0 overflow-hidden"
+            className="flex flex-col flex-1 min-w-0 overflow-visible pr-6 pt-[4px]"
           >
             {/* Tab switcher */}
-            <div
-              className="flex flex-shrink-0 mb-5 p-1 gap-1"
+            <GlowCard
+              customSize
+              glowColor={tab === "Events" ? "purple" : "green"}
+              pinned={tab === "Events" ? { xp: 0.05, yp: 0.95 } : { xp: 0.95, yp: 0.95 }}
+              className="!rounded-[12px] !p-1 !aspect-auto !backdrop-blur-none !shadow-none mb-5 flex gap-1 self-start"
               style={{
-                ...glassStyle,
-                borderRadius: 12,
-                border:       "1px solid rgba(255,255,255,0.06)",
-                alignSelf:    "flex-start",
-              }}
+                width:        "min(746px, 100%)",
+                background:   "rgba(28, 30, 42, 0.40)",
+                backdropFilter: "blur(8px)",
+                WebkitBackdropFilter: "blur(8px)",
+                ["--bg-spot-opacity" as any]:     "0.18",
+                ["--border-spot-opacity" as any]: "0.9",
+                ["--border-light-opacity" as any]:"0.5",
+                ["--size" as any]: "350",
+                ["--saturation" as any]: "80",
+                ["--lightness" as any]:  "55",
+                /* left=A521D3(287) → right=44D62C(112): spread = 112-287 = -175 */
+                ["--base" as any]:   "287",
+                ["--spread" as any]: "-175",
+              } as React.CSSProperties}
             >
-              {(["Events", "Discounts"] as const).map(t => (
+              {(["Events", "Discounts"] as const).map(t => {
+                const isEvents  = t === "Events"
+                const isActive  = tab === t
+                const activeBg  = "transparent"
+                const activeCol = isEvents ? "#AE3BD6"                : "#44d62c"
+                return (
                 <motion.button
                   key={t}
                   onClick={() => setTab(t)}
                   whileTap={{ scale: 0.96 }}
-                  className="px-5 py-1.5 text-sm font-semibold"
+                  className="flex-1 px-8 py-[6px] text-[18px] relative z-10 after:absolute after:inset-[-60px] after:content-['']"
                   style={{
                     borderRadius: 9,
-                    background:   tab === t ? "rgba(174,59,214,0.22)" : "transparent",
-                    color:        tab === t ? "#CF6EF5"               : "rgba(255,255,255,0.4)",
-                    border:       tab === t ? "1px solid rgba(174,59,214,0.35)" : "1px solid transparent",
-                    transition:   "all 0.2s",
+                    background:   isActive ? activeBg  : "transparent",
+                    color:        isActive ? activeCol : "rgba(255,255,255,0.4)",
+                    fontWeight:   isActive ? 700 : 500,
+                    border:       "1px solid transparent",
+                    boxShadow:    "none",
+                    transition:   "all 0.25s",
                   }}
                 >
                   {t}
                 </motion.button>
-              ))}
-            </div>
+              )})}
+            </GlowCard>
 
             {/* Tab content */}
             <div className="flex-1 overflow-y-auto pr-1" style={{ scrollbarWidth: "none" }}>
@@ -1610,10 +1452,11 @@ export default function GameDetailPage() {
                         {giveaways.length > 0 && (
                           <>
                             <p
-                              className="text-[9px] font-bold tracking-widest mb-3"
-                              style={{ color: "#5BDE8A" }}
+                              className="text-[9px] font-bold tracking-widest mb-3 flex items-center gap-1.5"
+                              style={{ color: "#44d62c" }}
                             >
-                              🎁 FREE GIVEAWAYS
+                              <Gift size={10} />
+                              FREE GIVEAWAYS
                             </p>
                             <div className="flex flex-col gap-2">
                               {giveaways.map(gv => (
@@ -1631,8 +1474,6 @@ export default function GameDetailPage() {
           </motion.div>
 
         </div>
-      </div>
-    </main>
   )
 }
 
@@ -1768,21 +1609,18 @@ function DisLowKeyRow({ product, onBuy }: { product: Product; onBuy: () => void 
 
 function PageSkeleton() {
   return (
-    <main className="relative w-screen h-screen overflow-hidden flex" style={{ background: "#12131A" }}>
-      <div className="w-60 h-full bg-[#1a1d28] animate-pulse" />
-      <div className="flex flex-1 gap-5 px-6 py-5">
-        <div className="w-[460px] flex flex-col gap-4">
-          <div className="h-8 w-20 rounded bg-[#1c1e2a] animate-pulse" />
-          <div className="h-48 rounded-[16px] bg-[#1c1e2a] animate-pulse" />
-          <div className="h-24 rounded bg-[#1c1e2a] animate-pulse" />
-        </div>
-        <div className="flex-1 flex flex-col gap-3">
-          <div className="h-10 w-48 rounded-[12px] bg-[#1c1e2a] animate-pulse" />
-          <div className="flex flex-col gap-3">
-            {[...Array(4)].map((_, i) => <div key={i} className="h-36 rounded-[16px] bg-[#1c1e2a] animate-pulse" />)}
-          </div>
+    <div className="flex flex-1 gap-5 px-6 py-5">
+      <div className="w-[460px] flex flex-col gap-4">
+        <div className="h-8 w-20 rounded bg-[#1c1e2a] animate-pulse" />
+        <div className="h-48 rounded-[16px] bg-[#1c1e2a] animate-pulse" />
+        <div className="h-24 rounded bg-[#1c1e2a] animate-pulse" />
+      </div>
+      <div className="flex-1 flex flex-col gap-3">
+        <div className="h-10 w-48 rounded-[12px] bg-[#1c1e2a] animate-pulse" />
+        <div className="flex flex-col gap-3">
+          {[...Array(4)].map((_, i) => <div key={i} className="h-36 rounded-[16px] bg-[#1c1e2a] animate-pulse" />)}
         </div>
       </div>
-    </main>
+    </div>
   )
 }

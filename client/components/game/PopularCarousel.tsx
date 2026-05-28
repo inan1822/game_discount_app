@@ -9,7 +9,6 @@ import {
 } from "framer-motion"
 import { useRef, useLayoutEffect, useState, useEffect, useCallback } from "react"
 import { useRouter } from "next/navigation"
-import { ChevronRight, ChevronLeft } from "lucide-react"
 import type { Game } from "@/types/game"
 import { StarButton } from "./GameCard"
 import { useCardPrice } from "@/hooks/useCardPrice"
@@ -205,7 +204,7 @@ function TileInfo({ game, price, platforms }: {
             {price === undefined
               ? "···"
               : price === null
-              ? "Unknown"
+              ? "—"
               : price.isFree
               ? "Free"
               : `$${price.price.toFixed(2)}`}
@@ -218,30 +217,67 @@ function TileInfo({ game, price, platforms }: {
 
 // ─── Nav button ───────────────────────────────────────────────────────────────
 
+// Arrow path from Figma asset (arrow_next.svg / arrow_next_hoverd.svg)
+const ARROW_PATH = "M61.0672 54.9335L53.572 47.4407C53.4323 47.301 53.2663 47.1902 53.0837 47.1145C52.9011 47.0389 52.7054 47 52.5077 47C52.1085 47 51.7257 47.1585 51.4434 47.4407C51.3036 47.5804 51.1928 47.7463 51.1171 47.9289C51.0415 48.1114 51.0026 48.3071 51.0026 48.5047C51.0026 48.9038 51.1611 49.2865 51.4434 49.5687L57.8893 55.9974L51.4434 62.4262C51.3029 62.5655 51.1914 62.7313 51.1153 62.9139C51.0392 63.0965 51 63.2924 51 63.4902C51 63.688 51.0392 63.8839 51.1153 64.0665C51.1914 64.2491 51.3029 64.4149 51.4434 64.5542C51.5828 64.6946 51.7486 64.8061 51.9312 64.8822C52.1139 64.9583 52.3098 64.9974 52.5077 64.9974C52.7056 64.9974 52.9015 64.9583 53.0842 64.8822C53.2669 64.8061 53.4327 64.6946 53.572 64.5542L61.0672 57.0614C61.2077 56.9221 61.3192 56.7564 61.3953 56.5738C61.4714 56.3911 61.5106 56.1953 61.5106 55.9974C61.5106 55.7996 61.4714 55.6037 61.3953 55.4211C61.3192 55.2385 61.2077 55.0728 61.0672 54.9335Z"
+
 function NavBtn({ dir, onClick }: { dir: "prev" | "next"; onClick: () => void }) {
-  const Icon = dir === "next" ? ChevronRight : ChevronLeft
+  const [hovered, setHovered] = useState(false)
+  const filterId = `navbtn-glow-${dir}`
+
   return (
     <motion.button
       onClick={onClick}
+      onHoverStart={() => setHovered(true)}
+      onHoverEnd={() => setHovered(false)}
       initial={{ opacity: 0, scale: 0.8 }}
       animate={{ opacity: 1, scale: 1 }}
       exit={{ opacity: 0, scale: 0.8 }}
-      whileHover={{ scale: 1.12 }}
       whileTap={{ scale: 0.90 }}
-      className="absolute top-1/2 -translate-y-1/2 z-20 flex items-center justify-center"
+      className="absolute top-1/2 -translate-y-1/2 z-20"
       style={{
-        [dir === "next" ? "right" : "left"]: 10,
-        width:                38,
-        height:               38,
-        borderRadius:         "50%",
-        background:           "rgba(174,59,214,0.28)",
-        border:               "1px solid rgba(174,59,214,0.50)",
-        backdropFilter:       "blur(8px)",
-        WebkitBackdropFilter: "blur(8px)",
-        boxShadow:            "0 4px 16px rgba(174,59,214,0.2)",
+        
+        [dir === "next" ? "right" : "left"]: -8,
+        background: "none",
+        border: "none",
+        padding: 0,
+        cursor: "pointer",
       }}
     >
-      <Icon size={17} className="text-white" />
+      <svg
+        width="180" height="180" viewBox="0 0 112 112" fill="none"
+        xmlns="http://www.w3.org/2000/svg"
+        style={{
+          transform: dir === "prev" ? "scaleX(-1)" : undefined,
+          transition: "filter 0.2s",
+          filter: hovered ? "drop-shadow(0 0 8px #3396E6)" : "none",
+        }}
+      >
+        <defs>
+          <filter id={filterId} x="-150%" y="-150%" width="400%" height="400%">
+            <feGaussianBlur stdDeviation="20" />
+          </filter>
+        </defs>
+
+        {/* Blurred glow circle — intensifies on hover */}
+        <motion.circle
+          cx="56" cy="56" r="16"
+          fill="#3594E2"
+          filter={`url(#${filterId})`}
+          animate={{ opacity: hovered ? 1 : 0.65 }}
+          transition={{ duration: 0.2 }}
+        />
+
+        {/* Arrow — stroke only by default, fills on hover */}
+        <motion.path
+          d={ARROW_PATH}
+          animate={{
+            fill:         hovered ? "#3396E6" : "transparent",
+            stroke:       "#3396E6",
+            strokeOpacity: hovered ? 0 : 0.85,
+          }}
+          transition={{ duration: 0.18 }}
+        />
+      </svg>
     </motion.button>
   )
 }
@@ -329,21 +365,22 @@ export default function PopularCarousel({
     >
       <SectionHeading title="Popular" onSeeAll={onSeeAll} delay={delay} />
 
-      {/* Carousel wrapper — overflow:hidden clips any cards beyond the 2 side ones.
-          mask-image fades the section's own pixels to transparent at the left and
-          right edges (not an overlay — the content itself is masked). */}
-      <div
-        className="relative overflow-hidden"
-        style={{
-          paddingTop: 8,
-          maskImage:        "linear-gradient(to right, transparent 0%, #000 8%, #000 92%, transparent 100%)",
-          WebkitMaskImage:  "linear-gradient(to right, transparent 0%, #000 8%, #000 92%, transparent 100%)",
-        }}
-      >
+      {/* Outer wrapper — position:relative anchor for the nav buttons so they
+          sit OUTSIDE the masked div and are never faded by maskImage. */}
+      <div className="relative" style={{ paddingTop: 8 }}>
 
-        {/* Prev / Next buttons */}
+        {/* Prev / Next — outside the masked div so mask never clips them */}
         {currentIndex > 0 && <NavBtn dir="prev" onClick={() => scrollTo(currentIndex - 1)} />}
         {currentIndex < games.length - 1 && <NavBtn dir="next" onClick={() => scrollTo(currentIndex + 1)} />}
+
+        {/* Masked carousel — overflow:hidden + edge fade, does NOT contain nav btns */}
+        <div
+          className="overflow-hidden"
+          style={{
+            maskImage:        "linear-gradient(to right, transparent 0%, #000 8%, #000 92%, transparent 100%)",
+            WebkitMaskImage:  "linear-gradient(to right, transparent 0%, #000 8%, #000 92%, transparent 100%)",
+          }}
+        >
 
         {/* Scroll track */}
         <div
@@ -380,14 +417,15 @@ export default function PopularCarousel({
               onClick={() => scrollTo(i)}
               animate={{
                 width:      i === currentIndex ? 20 : 6,
-                background: i === currentIndex ? "#AE3BD6" : "rgba(255,255,255,0.18)",
+                background: i === currentIndex ? "#3452E5" : "rgba(255,255,255,0.18)",
               }}
               transition={{ duration: 0.22 }}
               style={{ height: 6, borderRadius: 3, flexShrink: 0 }}
             />
           ))}
         </div>
-      </div>
+        </div> {/* end masked carousel */}
+      </div>   {/* end outer wrapper */}
     </motion.section>
   )
 }

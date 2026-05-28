@@ -3,12 +3,8 @@
 import { useState, useEffect, useRef, useCallback } from "react"
 import { useRouter, useParams } from "next/navigation"
 import { motion } from "framer-motion"
-import {
-  ArrowLeft, Home, BellRing, Search as SearchIcon,
-  Users, User, LogIn, Bell,
-} from "lucide-react"
+import { ArrowLeft, Bell } from "lucide-react"
 import { useAuth } from "@/context/AuthContext"
-import PageBackground from "@/components/ui/PageBackground"
 import GameCard from "@/components/game/GameCard"
 import { getPopularGames, getNewGames, getTrendedGames, getForYouGames, getCardPrices } from "@/lib/api/games"
 import { getWishlist, addToWishlist, removeFromWishlist } from "@/lib/api/wishlist"
@@ -24,15 +20,6 @@ const SLUG_META: Record<string, { label: string; paginated: boolean }> = {
 }
 
 const AUTH_SECTIONS = new Set(["favorites", "for-you"])
-const AUTH_NAV      = new Set(["Notifications", "Friends", "Profile"])
-
-const NAV = [
-  { icon: Home,        label: "Home",          href: "/"              },
-  { icon: BellRing,    label: "Notifications",  href: "/notifications" },
-  { icon: SearchIcon,  label: "Search",         href: "/search"        },
-  { icon: Users,       label: "Friends",        href: "/friends"       },
-  { icon: User,        label: "Profile",        href: "/profile"       },
-] as const
 
 const glassStyle = {
   background:           "rgba(30, 38, 51, 0.70)",
@@ -51,7 +38,7 @@ const fadeUp = (delay = 0, y = 20) => ({
 export default function SectionPage() {
   const router           = useRouter()
   const params           = useParams()
-  const { user, logout } = useAuth()
+  const { user } = useAuth()
   const isLoggedIn       = !!user
 
   const slug      = (params?.key as string) ?? ""
@@ -59,7 +46,6 @@ export default function SectionPage() {
   const label     = meta?.label ?? slug
   const paginated = meta?.paginated ?? true
 
-  const [activeNav,   setActiveNav]   = useState("Home")
   const [games,       setGames]       = useState<Game[]>([])
   const [prices,      setPrices]      = useState<Record<number, CardPrice | null>>({})
   const [wishlistIds, setWishlistIds] = useState<Set<string>>(new Set())
@@ -188,76 +174,11 @@ export default function SectionPage() {
     }
   }, [isLoggedIn, wishlistIds, router, slug])
 
-  const handleNavClick = (navLabel: string, href: string) => {
-    if (!isLoggedIn && AUTH_NAV.has(navLabel)) { router.push("/login"); return }
-    setActiveNav(navLabel); router.push(href)
-  }
-
   const userInitial = user?.name?.charAt(0)?.toUpperCase() ?? "?"
 
   return (
-    <main className="relative w-screen h-screen overflow-hidden" style={{ background: "#1E2532" }}>
-      <PageBackground />
-
-      <div className="relative flex h-full" style={{ zIndex: 3 }}>
-
-        {/* ══════════ SIDEBAR ══════════ */}
-        <motion.aside
-          initial={{ opacity: 0, x: -24 }} animate={{ opacity: 1, x: 0 }}
-          transition={{ duration: 0.55, ease: "easeOut" }}
-          className="flex flex-col flex-shrink-0 h-full"
-          style={{ width: 192, ...glassStyle, borderRight: "1px solid rgba(255,255,255,0.05)" }}
-        >
-          <motion.div {...fadeUp(0.05)} className="flex items-center gap-3 px-5 pt-6 pb-5">
-            <img src="/icons/logo.svg" alt="" style={{ width: 30, height: 30 }} />
-            <span className="text-white font-bold text-[17px] tracking-wide">DisLow</span>
-          </motion.div>
-
-          <div className="px-3 mb-1">
-            <p className="text-[9px] font-bold tracking-[0.12em] px-3 mb-2"
-              style={{ color: "rgba(255,255,255,0.25)" }}>MENU</p>
-            {NAV.map(({ icon: Icon, label: navLabel, href }, i) => {
-              const active = activeNav === navLabel
-              const locked = !isLoggedIn && AUTH_NAV.has(navLabel)
-              return (
-                <motion.button key={navLabel} {...fadeUp(0.1 + i * 0.05, 8)}
-                  onClick={() => handleNavClick(navLabel, href)}
-                  whileHover={{ x: 3, backgroundColor: active ? "rgba(52,82,229,0.18)" : "rgba(255,255,255,0.04)" }}
-                  whileTap={{ scale: 0.97 }}
-                  className="w-full flex items-center gap-3 px-3 py-2.5 mb-0.5 text-sm font-medium relative overflow-hidden"
-                  style={{ borderRadius: 10, color: active ? "#48BCF9" : locked ? "rgba(255,255,255,0.25)" : "rgba(255,255,255,0.45)", background: active ? "rgba(52,82,229,0.13)" : "transparent" }}
-                >
-                  {active && <motion.div layoutId="nav-indicator" className="absolute left-0 top-1/2 -translate-y-1/2"
-                    style={{ width: 3, height: 20, background: "#48BCF9", borderRadius: "0 4px 4px 0" }} />}
-                  <Icon size={15} /><span>{navLabel}</span>
-                  {locked && <span className="ml-auto text-[8px] px-1 py-0.5 rounded"
-                    style={{ background: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.2)" }}>Login</span>}
-                </motion.button>
-              )
-            })}
-          </div>
-
-          <div className="flex-1" />
-
-          {isLoggedIn ? (
-            <motion.button {...fadeUp(0.45)} onClick={logout}
-              whileHover={{ x: 4, color: "#fff" }} whileTap={{ scale: 0.97 }}
-              className="flex items-center gap-3 px-8 py-5 text-sm font-medium"
-              style={{ color: "rgba(255,255,255,0.35)", borderTop: "1px solid rgba(255,255,255,0.05)" }}>
-              <div className="w-2.5 h-2.5 rounded-full bg-[#FF6B4A]" />log out
-            </motion.button>
-          ) : (
-            <motion.button {...fadeUp(0.45)} onClick={() => router.push("/login")}
-              whileHover={{ x: 4 }} whileTap={{ scale: 0.97 }}
-              className="flex items-center gap-3 px-8 py-5 text-sm font-semibold"
-              style={{ color: "#48BCF9", borderTop: "1px solid rgba(255,255,255,0.05)" }}>
-              <LogIn size={15} />Log in
-            </motion.button>
-          )}
-        </motion.aside>
-
-        {/* ══════════ MAIN ══════════ */}
-        <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
+    // Shell (sidebar + background) provided by (app)/layout.tsx
+    <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
 
           {/* HEADER */}
           <motion.header
@@ -382,7 +303,5 @@ export default function SectionPage() {
             )}
           </div>
         </div>
-      </div>
-    </main>
   )
 }

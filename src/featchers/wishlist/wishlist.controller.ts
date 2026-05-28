@@ -4,7 +4,8 @@ import {
     getWishlistService,
     addToWishlistService,
     removeFromWishlistService,
-    isInWishlistService
+    isInWishlistService,
+    listFriendsWithGameService,
 } from "./wishlist.service.js"
 
 export const getWishlist = async (req: Request, res: Response): Promise<void> => {
@@ -42,6 +43,16 @@ export const checkWishlist = async (req: Request, res: Response): Promise<void> 
     try {
         const inWishlist = await isInWishlistService(req.user!.id, String(req.params.gameId))
         res.status(200).json({ status: "200", message: "OK", data: { inWishlist } })
+    } catch (error) {
+        const { status, message } = getErrorInfo(error)
+        res.status(status).json({ status: String(status), message, data: null })
+    }
+}
+
+export const getFriendsWithGame = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const friends = await listFriendsWithGameService(req.user!.id, String(req.params.gameId))
+        res.status(200).json({ status: "200", message: "OK", data: friends })
     } catch (error) {
         const { status, message } = getErrorInfo(error)
         res.status(status).json({ status: String(status), message, data: null })

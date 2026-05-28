@@ -4,8 +4,6 @@ import { useRouter } from "next/navigation"
 import { ArrowLeft, Heart } from "lucide-react"
 import { useWishlist } from "@/context/WishlistContext"
 import BottomNav from "@/components/layout/BottomNav"
-import AppSidebar from "@/components/layout/AppSidebar"
-import PageBackground from "@/components/ui/PageBackground"
 
 // No manual auth check needed — middleware.ts redirects guests to /login
 // before this component ever renders.
@@ -68,20 +66,14 @@ export default function WishlistPage() {
 
   return (
     <>
-      {/* ── Desktop layout ── */}
-      <div className="hidden md:flex relative w-screen h-screen overflow-hidden" style={{ background: "#1E2532" }}>
-        <PageBackground />
-        <div className="relative flex h-full w-full" style={{ zIndex: 3 }}>
-          <AppSidebar />
-          <div className="flex-1 min-w-0 overflow-y-auto" style={{ scrollbarWidth: "none" }}>
-            <div className="max-w-2xl mx-auto px-8 py-10">
-              <div className="flex items-center gap-4 mb-8">
-                <h1 className="text-white text-2xl font-bold">Favourites</h1>
-                <span className="ml-auto text-sm" style={{ color: "#9fa0a1" }}>{items.length} games</span>
-              </div>
-              {gameList}
-            </div>
+      {/* ── Desktop layout — shell provided by (app)/layout.tsx ── */}
+      <div className="hidden md:block flex-1 min-w-0 overflow-y-auto" style={{ scrollbarWidth: "none" }}>
+        <div className="max-w-2xl mx-auto px-8 py-10">
+          <div className="flex items-center gap-4 mb-8">
+            <h1 className="text-white text-2xl font-bold">Favourites</h1>
+            <span className="ml-auto text-sm" style={{ color: "#9fa0a1" }}>{items.length} games</span>
           </div>
+          {gameList}
         </div>
       </div>
 

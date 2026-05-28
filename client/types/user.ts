@@ -69,6 +69,13 @@ export interface FriendProfileFavorite {
   gameSlug: string
 }
 
+export interface FriendWithGame {
+  _id: string
+  displayName: string
+  avatarUrl: string | null
+  isOnline: boolean
+}
+
 export interface FriendProfile {
   _id: string
   displayName: string

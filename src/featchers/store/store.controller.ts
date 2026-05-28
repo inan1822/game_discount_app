@@ -50,6 +50,36 @@ export const getProductsByGame = async (req: Request, res: Response, next: NextF
   }
 }
 
+// ── GET /api/v1/store/featured ─────────────────────────────────────────────
+// Public — admin-curated "DisLow games" section on the home page.
+// Returns active + featured Products, projected into the frontend `Game` shape
+// so the existing GameCard component can render them with zero adaptation.
+export const listFeatured = async (_req: Request, res: Response, next: NextFunction) => {
+  try {
+    const products = await Product.find({ isActive: true, isFeatured: true })
+      .sort({ updatedAt: -1 })
+      .limit(20)
+      .lean()
+
+    const games = products.map(p => ({
+      id:         parseInt(String(p._id).slice(-8), 16),  // stable numeric id derived from ObjectId
+      slug:       String(p._id),
+      name:       p.name,
+      cover:      p.imageUrl || null,
+      rating:     0,
+      genres:     [p.category],
+      platforms:  [p.platform],
+      released:   "",
+      metacritic: null,
+      description: p.description,
+    }))
+
+    return res.status(200).json({ status: "200", message: "ok", data: games })
+  } catch (err) {
+    next(err)
+  }
+}
+
 // ── GET /api/v1/store/products/:id ─────────────────────────────────────────
 export const getStoreProduct = async (req: Request, res: Response, next: NextFunction) => {
   try {

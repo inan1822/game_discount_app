@@ -45,7 +45,7 @@ export const listProducts = async (req: Request, res: Response, next: NextFuncti
 // ── POST /api/v1/admin/products ─────────────────────────────────────────────
 export const createProduct = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { name, description, imageUrl, rawgGameId, rawgGameName, platform, category, price, isActive } = req.body
+    const { name, description, imageUrl, rawgGameId, rawgGameName, platform, category, price, isActive, isFeatured } = req.body
 
     if (!name || !platform || !category || price == null) {
       return res.status(400).json({ status: "400", message: "name, platform, category and price are required", data: null })
@@ -56,8 +56,9 @@ export const createProduct = async (req: Request, res: Response, next: NextFunct
       rawgGameId:   rawgGameId   ?? null,
       rawgGameName: rawgGameName ?? null,
       platform, category,
-      price:    Number(price),
-      isActive: isActive !== false,
+      price:      Number(price),
+      isActive:   isActive !== false,
+      isFeatured: isFeatured === true,
     })
 
     return res.status(201).json({ status: "201", message: "Product created", data: product })
@@ -92,11 +93,17 @@ export const getProduct = async (req: Request, res: Response, next: NextFunction
 // ── PUT /api/v1/admin/products/:id ─────────────────────────────────────────
 export const updateProduct = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { name, description, imageUrl, rawgGameId, rawgGameName, platform, category, price, isActive } = req.body
+    const { name, description, imageUrl, rawgGameId, rawgGameName, platform, category, price, isActive, isFeatured } = req.body
+
+    const update: Record<string, unknown> = {
+      name, description, imageUrl, rawgGameId, rawgGameName, platform, category, isActive,
+    }
+    if (price !== undefined)      update.price      = Number(price)
+    if (isFeatured !== undefined) update.isFeatured = !!isFeatured
 
     const product = await Product.findByIdAndUpdate(
       req.params.id,
-      { name, description, imageUrl, rawgGameId, rawgGameName, platform, category, price: Number(price), isActive },
+      update,
       { new: true, runValidators: true }
     ).lean()
 

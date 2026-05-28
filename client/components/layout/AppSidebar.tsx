@@ -2,11 +2,16 @@
 
 /**
  * AppSidebar — shared desktop sidebar used by ALL main app pages.
- * Drop-in replacement for the copy-pasted <aside> that lived in each page.
- * Owns: nav items, active detection, notification dot, logout/login.
+ * Mounted ONCE inside (main)/layout.tsx so it persists across route changes,
+ * letting the limelight indicator visibly slide between items on navigation.
+ *
+ * Limelight pattern adapted from EaseMize "limelight-nav" (21st.dev).
+ * Original is horizontal — bar on top, cone hangs down (narrow at top, wide
+ * at bottom). Here it's rotated 90° for a vertical sidebar: bar on the left
+ * edge, cone fans right (narrow at the bar, wide as it spreads).
  */
 
-import { useRef, useState } from "react"
+import { useLayoutEffect, useRef, useState } from "react"
 import { useRouter, usePathname } from "next/navigation"
 import { motion } from "framer-motion"
 import {
@@ -31,76 +36,92 @@ const NAV = [
 
 const AUTH_ITEMS = new Set(["Notifications", "Favorites", "Friends", "Profile", "Purchases"])
 
-// ── NavItem ───────────────────────────────────────────────────────────────────
+// ── NavItem (stateless — parent owns the active indicator) ────────────────────
 
 function NavItem({
-  icon: Icon, label, active, locked, dot, onClick,
+  icon: Icon, label, active, locked, dot, onClick, itemRef,
 }: {
-  icon:    React.ElementType
-  label:   string
-  active:  boolean
-  locked:  boolean
-  dot?:    React.ReactNode
-  onClick: () => void
+  icon:     React.ElementType
+  label:    string
+  active:   boolean
+  locked:   boolean
+  dot?:     React.ReactNode
+  onClick:  () => void
+  itemRef?: (el: HTMLButtonElement | null) => void
 }) {
-  const ref                   = useRef<HTMLButtonElement>(null)
-  const [pos,     setPos]     = useState({ x: 0, y: 0 })
-  const [hovered, setHovered] = useState(false)
-
+  // Hover effects only fire on idle (non-active, non-locked) items. On the
+  // active item the limelight already provides the visual emphasis, and on
+  // locked items we want them to feel inert.
+  const interactive = !active && !locked
   return (
     <motion.button
-      ref={ref}
+      ref={itemRef}
       onClick={onClick}
       whileTap={{ scale: 0.97 }}
-      onMouseMove={e => {
-        const r = ref.current!.getBoundingClientRect()
-        setPos({ x: e.clientX - r.left, y: e.clientY - r.top })
-      }}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-      className="w-full flex items-center gap-3 px-3 py-2.5 mb-0.5 text-[16px] font-medium relative overflow-hidden"
+      whileHover={interactive ? { x: 4 } : undefined}
+      transition={{ type: "spring", stiffness: 380, damping: 28 }}
+      className={`group w-full flex items-center gap-3 px-6 py-2.5 mb-0.5 text-[18px] ${active ? "font-bold" : "font-medium"} relative`}
       style={{
         borderRadius: 10,
-        color: active
-          ? "#48BCF9"
-          : locked
-          ? "rgba(255,255,255,0.25)"
-          : hovered
-          ? "#48BCF9"
-          : "rgba(255,255,255,0.45)",
-        background: active ? "rgba(52,82,229,0.13)" : "transparent",
-        border: "none",
-        cursor: "pointer",
-        transition: "color 0.2s",
+        color:      active ? "#49BCF9" : locked ? "rgba(255,255,255,0.20)" : "rgba(255,255,255,0.45)",
+        background: "transparent",
+        border:     "none",
+        cursor:     locked ? "not-allowed" : "pointer",
+        transition: "color 0.25s, opacity 0.25s, background 0.25s",
+        opacity:    active ? 1 : locked ? 0.45 : 0.65,
       }}
     >
-      {/* Active left bar */}
-      {active && (
-        <motion.div
-          layoutId="app-sidebar-indicator"
-          className="absolute left-0 top-1/2 -translate-y-1/2"
-          style={{ width: 3, height: 20, background: "#48BCF9", borderRadius: "0 4px 4px 0" }}
+      {/* Hover background — a faint blue wash sliding in from the left.
+          Skipped on active (limelight already provides emphasis) + locked. */}
+      {interactive && (
+        <span
+          aria-hidden
+          className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none"
+          style={{
+            borderRadius: 10,
+            background: "linear-gradient(to right, rgba(73,188,249,0.12) 0%, rgba(73,188,249,0.03) 15%, transparent 30%)",
+            zIndex: 0,
+          }}
         />
       )}
 
-      {/* Cursor glow */}
-      <div style={{
-        position:     "absolute",
-        left:         pos.x,
-        top:          pos.y,
-        width:        120,
-        height:       120,
-        borderRadius: "50%",
-        transform:    "translate(-50%, -50%)",
-        background:   "radial-gradient(circle, #48BCF9 10%, transparent 70%)",
-        opacity:      hovered && !active ? 0.13 : 0,
-        transition:   "opacity 0.2s",
-        pointerEvents:"none",
-      }} />
+      {/* Hover mini-accent on the left edge — a dim preview of the
+          limelight bar that appears when the item is hovered. */}
+      {interactive && (
+        <span
+          aria-hidden
+          className="absolute left-0 top-1/2 w-[3px] h-0 opacity-0 group-hover:h-[18px]
+           group-hover:opacity-70 transition-all duration-300 -translate-y-1/2 pointer-events-none"
 
-      <Icon size={15} />
-      <span className="flex-1 text-left">{label}</span>
-      {dot}
+          style={{
+            background: "linear-gradient(to bottom, transparent, #49BCF9, transparent)",
+            filter: "blur(2px)",
+            borderRadius: "0 2px 2px 0",
+            zIndex: 1,
+          }}
+        />
+      )}
+
+      <Icon
+        size={15}
+        style={{ position: "relative", zIndex: 2, transition: "color 0.25s, filter 0.25s" }}
+        className={interactive ? "group-hover:text-[#9FDFFF] group-hover:drop-shadow-[0_0_4px_rgba(73,188,249,0.5)]" : ""}
+      />
+      <span
+        className={`flex-1 text-left ${interactive ? "group-hover:text-[#D4ECFF]" : ""}`}
+        style={{ position: "relative", zIndex: 2, transition: "color 0.25s" }}
+      >
+        {label}
+      </span>
+      {locked && (
+        <span
+          className="text-[8px] px-1 py-0.5 rounded"
+          style={{ background: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.2)", position: "relative", zIndex: 2 }}
+        >
+          Login
+        </span>
+      )}
+      {dot && <span style={{ position: "relative", zIndex: 2 }}>{dot}</span>}
     </motion.button>
   )
 }
@@ -126,20 +147,47 @@ export default function AppSidebar() {
       router.push("/login")
       return
     }
+    // Skip navigation if we're already on this route — prevents the
+    // "Home button refreshes the sidebar" feedback the user reported.
+    if (isActive(href)) return
     router.push(href)
   }
 
+  // ── Limelight (shared sliding indicator) ────────────────────────────────────
+  const navItemRefs                         = useRef<(HTMLButtonElement | null)[]>([])
+  const limelightRef                        = useRef<HTMLDivElement>(null)
+  const [limelightReady, setLimelightReady] = useState(false)
+
+  useLayoutEffect(() => {
+    const activeIdx = NAV.findIndex(n => isActive(n.href))
+    if (activeIdx < 0) return
+    const itemEl    = navItemRefs.current[activeIdx]
+    const limelight = limelightRef.current
+    if (!itemEl || !limelight) return
+
+    const barH   = 36
+    const newTop = itemEl.offsetTop + itemEl.offsetHeight / 2 - barH / 2
+    limelight.style.top     = `${newTop}px`
+    limelight.style.opacity = "1"
+
+    if (!limelightReady) {
+      // Defer one frame so the first position lands with NO transition
+      requestAnimationFrame(() => setLimelightReady(true))
+    }
+  }, [pathname, limelightReady])
+
+
+ 
   return (
-    <motion.aside
-      initial={{ opacity: 0, x: -24 }}
-      animate={{ opacity: 1, x: 0 }}
-      transition={{ duration: 0.45, ease: "easeOut" }}
+    <aside
       className="flex flex-col flex-shrink-0 h-full"
       style={{
         width: 240,
-        background:           "rgba(30, 38, 51, 0.70)",
-        backdropFilter:       "blur(8px)",
-        WebkitBackdropFilter: "blur(8px)",
+        // Gradient-only background, no solid color, with blur underneath.
+        background:
+          "linear-gradient(180deg, rgba(52,82,229,0.10) 0%, rgba(30,38,51,0.55) 40%, rgba(174,59,214,0.08) 100%)",
+        backdropFilter:       "blur(12px)",
+        WebkitBackdropFilter: "blur(12px)",
         borderRight:          "1px solid rgba(255,255,255,0.05)",
       }}
     >
@@ -150,26 +198,75 @@ export default function AppSidebar() {
       </div>
 
       {/* Nav */}
-      <div className="px-3 mb-1">
-        <p className="text-[9px] font-bold tracking-[0.12em] px-3 mb-2"
+      <div className="mb-1">
+        <p className="text-[9px] font-bold tracking-[0.12em] px-6 mb-2"
           style={{ color: "rgba(255,255,255,0.25)" }}>
           MENU
         </p>
-        {NAV.map(({ icon: Icon, label, href }, i) => (
-          <NavItem
-            key={label}
-            icon={Icon}
-            label={label}
-            active={isActive(href)}
-            locked={!isLoggedIn && AUTH_ITEMS.has(label)}
-            dot={
-              label === "Notifications" && isLoggedIn
-                ? <NotificationDot events={counts.events} discounts={counts.discounts} />
-                : undefined
-            }
-            onClick={() => handleClick(label, href)}
-          />
-        ))}
+
+        {/* Limelight container — position:relative so the sliding indicator's
+            offsetTop math is correct (offsetParent = this div). */}
+        <div style={{ position: "relative" }}>
+
+          {/* The single shared limelight indicator.
+              The BAR has no solid fill — only a vertical gradient. The CONE
+              fans rightward and gets wider with distance (narrow at the bar,
+              wide as it spreads), then is blurred 3px for softness.       */}
+          <div
+            ref={limelightRef}
+            aria-hidden
+            style={{
+              position:   "absolute",
+              left:       0,
+              top:        -999,
+              width:      3,
+              height:     36,
+              opacity:    0,
+              background: "linear-gradient(to bottom, transparent 0%, #6DCBFF 25%, #49BCF9 50%, #49BCF9 75%, transparent 100%)",
+              boxShadow:  "0 0 14px 2px rgba(73,188,249,0.55)",
+              borderRadius: "0 4px 4px 0",
+              transition: limelightReady
+                ? "top 0.42s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.25s"
+                : "opacity 0.25s",
+              zIndex: 1,
+              pointerEvents: "none",
+            }}
+          >
+            {/* Rightward fan cone — NARROW at the bar, WIDE as it spreads.
+                Mirror of the reference's polygon(5% 100%, 25% 0, 75% 0, 95% 100%)
+                rotated 90°: at left edge y = 40%–60% (narrow), at right edge
+                y = 0%–100% (full width). Blurred 3px for a soft spotlight. */}
+            <div aria-hidden style={{
+              position:   "absolute",
+              top:        "50%",
+              left:       3,
+              transform:  "translateY(-50%)",
+              width:      180,
+              height:     180,
+              clipPath:   "polygon(0% 40%, 0% 60%, 100% 70%, 100% 30%)",
+              background: "linear-gradient(to right, rgba(73,188,249,0.35) 0%, rgba(73,188,249,0.08) 55%, transparent 100%)",
+              filter:     "blur(4px)",
+              pointerEvents: "none",
+            }} />
+          </div>
+
+          {NAV.map(({ icon: Icon, label, href }, i) => (
+            <NavItem
+              key={label}
+              icon={Icon}
+              label={label}
+              active={isActive(href)}
+              locked={!isLoggedIn && AUTH_ITEMS.has(label)}
+              dot={
+                label === "Notifications" && isLoggedIn
+                  ? <NotificationDot events={counts.events} discounts={counts.discounts} />
+                  : undefined
+              }
+              onClick={() => handleClick(label, href)}
+              itemRef={el => { navItemRefs.current[i] = el }}
+            />
+          ))}
+        </div>
       </div>
 
       <div className="flex-1" />
@@ -181,7 +278,7 @@ export default function AppSidebar() {
             onClick={() => router.push("/admin")}
             whileHover={{ x: 2 }}
             whileTap={{ scale: 0.97 }}
-            className="w-full flex items-center gap-3 px-3 py-2.5 text-[14px] font-medium"
+            className="w-full flex items-center gap-3 px-6 py-2.5 text-[18px] font-medium"
             style={{
               borderRadius: 10,
               color: "#6475D1",
@@ -196,20 +293,20 @@ export default function AppSidebar() {
           </motion.button>
         </div>
       )}
-
       {/* Logout / Login */}
       {isLoggedIn ? (
         <motion.button
           onClick={logout}
           whileHover={{ x: 4 }}
           whileTap={{ scale: 0.97 }}
-          className="flex items-center gap-3 px-8 py-5 text-[16px] font-medium w-full"
+          className="flex items-center gap-3 px-6 py-5 text-[18px] font-medium w-full"
           style={{
             color: "rgba(255,255,255,0.35)",
-            borderTop: "1px solid rgba(255,255,255,0.05)",
             background: "transparent",
-            border: "none",
             cursor: "pointer",
+            // Use longhand-only — mixing `border` shorthand with `borderTop*`
+            // longhand makes React warn about conflicting style updates.
+            borderWidth: 0,
             borderTopWidth: 1,
             borderTopStyle: "solid",
             borderTopColor: "rgba(255,255,255,0.05)",
@@ -223,12 +320,13 @@ export default function AppSidebar() {
           onClick={() => router.push("/login")}
           whileHover={{ x: 4 }}
           whileTap={{ scale: 0.97 }}
-          className="flex items-center gap-3 px-8 py-5 text-[16px] font-semibold w-full"
+          className="flex items-center gap-3 px-6 py-5 text-[18px] font-semibold w-full"
           style={{
             color: "#48BCF9",
             background: "transparent",
-            border: "none",
             cursor: "pointer",
+            // Longhand-only — see logout button above.
+            borderWidth: 0,
             borderTopWidth: 1,
             borderTopStyle: "solid",
             borderTopColor: "rgba(255,255,255,0.05)",
@@ -237,6 +335,6 @@ export default function AppSidebar() {
           <LogIn size={15} /> Log in
         </motion.button>
       )}
-    </motion.aside>
+    </aside>
   )
 }
