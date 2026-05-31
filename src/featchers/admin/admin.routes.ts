@@ -7,6 +7,13 @@ import { getAnalytics } from "./analytics.controller.js"
 import { broadcastNotification, broadcastHistory } from "./broadcast.controller.js"
 import { listPromos, createPromo, updatePromo, deletePromo } from "../promos/promo.controller.js"
 import {
+  listManualLinks,
+  createManualLink,
+  updateManualLink,
+  deleteManualLink,
+} from "../games/manualLinks.controller.js"
+import { adminLLMChat, analyzeLink } from "./llm.controller.js"
+import {
   adminListTickets,
   adminGetTicket,
   adminUpdateTicket,
@@ -36,6 +43,16 @@ adminRouter.delete("/promos/:id", deletePromo)
 // ── Broadcast ─────────────────────────────────────────────────────────────────
 adminRouter.post("/broadcast",         broadcastNotification)
 adminRouter.get("/broadcast/history",  broadcastHistory)
+
+// ── Manual game links ─────────────────────────────────────────────────────────
+adminRouter.get("/game-links",        listManualLinks)
+adminRouter.post("/game-links",       createManualLink)
+adminRouter.patch("/game-links/:id",  updateManualLink)
+adminRouter.delete("/game-links/:id", deleteManualLink)
+
+// ── AI Assistant (Claude-powered, streaming SSE) ──────────────────────────────
+adminRouter.post("/llm/chat",         adminLLMChat)
+adminRouter.post("/llm/analyze-link", analyzeLink)
 
 // ── Support tickets ───────────────────────────────────────────────────────────
 adminRouter.get("/tickets",                   adminListTickets)

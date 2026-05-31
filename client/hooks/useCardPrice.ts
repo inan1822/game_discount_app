@@ -19,6 +19,7 @@ let   timer:  ReturnType<typeof setTimeout> | null = null
 function flush() {
   timer = null
   const games = [...pending.values()]
+  const pendingIds = games.map(g => g.id)
   pending.clear()
   if (!games.length) return
 
@@ -31,6 +32,16 @@ function flush() {
       }
     })
     .catch(() => {})
+    .finally(() => {
+      // Any game the server didn't return (network error, omitted id) gets null
+      // so subscribers are resolved instead of hanging on the loading shimmer.
+      for (const id of pendingIds) {
+        if (!cache.has(id)) {
+          cache.set(id, null)
+          subs.get(id)?.forEach(cb => cb(null))
+        }
+      }
+    })
 }
 
 // ─── primeCache ───────────────────────────────────────────────────────────────

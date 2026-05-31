@@ -10,6 +10,7 @@ import RequestsPanel  from "@/components/friends/RequestsPanel"
 import AddFriendPanel from "@/components/friends/AddFriendPanel"
 import { SectionHeading } from "@/components/ui/SectionHeading"
 import { GlowCard }       from "@/components/ui/spotlight-card"
+import { listRequests } from "@/lib/api/users"
 
 const TABS = ["Following", "Followers", "Requests", "Add Friend"] as const
 type Tab = typeof TABS[number]
@@ -41,6 +42,15 @@ function FriendsContent() {
   useEffect(() => {
     if (!isLoading && !isLoggedIn) router.replace("/login")
   }, [isLoading, isLoggedIn, router])
+
+  // Fetch incoming request count at hub level so the Requests badge is visible
+  // on ALL tabs, not just when the Requests tab has been opened.
+  useEffect(() => {
+    if (!isLoggedIn) return
+    listRequests()
+      .then(d => setIncomingCount(d.incoming.length))
+      .catch(() => {})
+  }, [isLoggedIn])
 
   const handleTabClick = (tab: Tab) => {
     setActiveTab(tab)

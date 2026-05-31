@@ -17,6 +17,8 @@ import webhookRouter from "./src/featchers/webhooks/webhook.routes.js"
 import mongoConnect from "./src/config/db.js"
 import { startKeyCleanupJob } from "./src/featchers/products/keyCleanup.js"
 import { startNotifyCron } from "./src/jobs/notify.cron.js"
+import { startStockMonitor } from "./src/jobs/stockMonitor.js"
+import { startHealthPinger } from "./src/jobs/healthPinger.js"
 import rateLimit from "express-rate-limit"
 import cors from "cors"
 import helmet from "helmet"
@@ -46,6 +48,9 @@ if (!process.env.STRIPE_WEBHOOK_SECRET) {
     const msg = "[Startup] STRIPE_WEBHOOK_SECRET not set — paid-order key delivery is broken"
     if (IS_PROD) throw new Error(msg)
     console.warn(msg)
+}
+if (!process.env.ANTHROPIC_API_KEY) {
+    console.warn("[Startup] ANTHROPIC_API_KEY not set — Admin AI assistant will be disabled")
 }
 if (!process.env.STRIPE_SECRET_KEY) {
     const msg = "[Startup] STRIPE_SECRET_KEY not set — checkout is broken"
@@ -153,6 +158,8 @@ mongoConnect().then(() => {
     // Release reserved keys whose checkouts crashed / were cancelled.
     startKeyCleanupJob()
     startNotifyCron()
+    startStockMonitor()
+    startHealthPinger()
 }).catch(err => {
     console.error("Failed to connect to DB:", err)
     process.exit(1)

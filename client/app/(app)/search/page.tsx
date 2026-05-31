@@ -47,7 +47,7 @@ export default function SearchPage() {
   }, [isLoggedIn])
 
   useEffect(() => {
-    if (!query.trim()) {
+    if (!query.trim() || query.trim().length < 2) {
       setResults([])
       setSearched(false)
       return

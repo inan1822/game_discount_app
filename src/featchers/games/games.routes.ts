@@ -21,6 +21,7 @@ import {
     getGameGiveaways,
     getGameEvents,
 } from "./games.controller.js"
+import { getManualLinksForGame } from "./manualLinks.controller.js"
 
 const gamesRouter = Router()
 
@@ -80,6 +81,10 @@ gamesRouter.get("/trending", getTrendingGames)
 
 // GET /api/v1/games/genre?genre=action&page=1
 gamesRouter.get("/genre", getGamesByGenre)
+
+// ── Manual links (public) ─────────────────────────────────────────────────────
+// GET /api/v1/games/:rawgId/manual-links → admin-curated store/website links
+gamesRouter.get("/:rawgId/manual-links", getManualLinksForGame)
 
 // ── Detail (must be last to avoid catching /popular etc.) ────────────────────
 // GET /api/v1/games/:id

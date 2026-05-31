@@ -48,7 +48,19 @@ function KeyCell({ orderId }: { orderId: string }) {
 
   async function copyCode() {
     if (!code) return
-    await navigator.clipboard.writeText(code)
+    try {
+      await navigator.clipboard.writeText(code)
+    } catch {
+      // Fallback for HTTP (non-secure) environments
+      const el = document.createElement("textarea")
+      el.value = code
+      el.style.position = "fixed"
+      el.style.opacity = "0"
+      document.body.appendChild(el)
+      el.select()
+      document.execCommand("copy")
+      document.body.removeChild(el)
+    }
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
   }

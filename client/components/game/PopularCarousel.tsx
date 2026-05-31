@@ -171,7 +171,7 @@ function TileInfo({ game, price, platforms }: {
 }) {
   return (
     <div className="absolute bottom-0 left-0 right-0 px-5 py-4">
-      <p className="text-white font-bold text-[17px] leading-tight line-clamp-2 mb-1">{game.name}</p>
+      <p className="text-white font-bold text-[18px] leading-tight line-clamp-2 mb-1">{game.name}</p>
       {game.genres.length > 0 && (
         <p className="text-[12px] mb-2.5 truncate" style={{ color: "rgba(255,255,255,0.50)" }}>
           {game.genres.slice(0, 3).join(" · ")}
@@ -199,7 +199,7 @@ function TileInfo({ game, price, platforms }: {
                       : price === null      ? "rgba(255,255,255,0.30)"
                       : price.isFree        ? "#48BCF9"
                       : "#5BDE8A",
-              fontSize: price != null && price !== undefined ? 16 : 12,
+              fontSize: price != null && price !== undefined ? 18 : 13,
             }}>
             {price === undefined
               ? "···"

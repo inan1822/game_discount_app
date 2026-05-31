@@ -214,9 +214,8 @@ export default function SectionPage() {
 
             {/* Bell + Avatar */}
             <div className="flex items-center gap-3 mr-4">
-              <motion.div whileHover={{ scale: 1.15, rotate: 10 }} whileTap={{ scale: 0.9 }} className="relative cursor-pointer">
+              <motion.div whileHover={{ scale: 1.15, rotate: 10 }} whileTap={{ scale: 0.9 }} className="relative cursor-pointer" onClick={() => router.push("/notifications")}>
                 <Bell size={16} style={{ color: "rgba(255,255,255,0.45)" }} />
-                <div className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-[#FF6B4A]" />
               </motion.div>
               {isLoggedIn ? (
                 <motion.div

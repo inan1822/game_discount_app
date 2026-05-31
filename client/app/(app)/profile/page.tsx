@@ -13,7 +13,7 @@ import { useAuth } from "@/context/AuthContext"
 import StatsRow from "@/components/profile/StatsRow"
 import AvatarPicker from "@/components/profile/AvatarPicker"
 import PreferenceToggle from "@/components/profile/PreferenceToggle"
-import { getMyStats, updateNotificationPrefs, type MyStats } from "@/lib/api/users"
+import { getMyStats, updateNotificationPrefs, updatePrivacy, type MyStats } from "@/lib/api/users"
 import { toast } from "react-toastify"
 
 const cardStyle = {
@@ -66,6 +66,7 @@ export default function ProfilePage() {
 
   const [threshold, setThreshold] = useState<number>(10)
   const [thresholdSaving, setThresholdSaving] = useState(false)
+  const [privacySaving, setPrivacySaving] = useState(false)
 
   // Sync threshold once user data is available
   useEffect(() => {
@@ -73,6 +74,21 @@ export default function ProfilePage() {
       setThreshold(user.notificationPrefs.discountThreshold)
     }
   }, [user?.notificationPrefs?.discountThreshold])
+
+  const handlePrivacyToggle = async () => {
+    if (privacySaving || !user) return
+    const next = !user.isPrivate
+    updateUser({ isPrivate: next })
+    setPrivacySaving(true)
+    try {
+      await updatePrivacy(next)
+    } catch {
+      updateUser({ isPrivate: !next })
+      toast.error("Failed to update privacy setting")
+    } finally {
+      setPrivacySaving(false)
+    }
+  }
 
   const handlePrefChange = async (pref: "events" | "discounts", next: boolean) => {
     try {
@@ -183,37 +199,43 @@ export default function ProfilePage() {
               <h1 className="text-white text-xl font-bold">{user.name}</h1>
               <p className="text-sm mt-1" style={{ color: "rgba(255,255,255,0.55)" }}>{user.email}</p>
 
-              {/* Private toggle — visual only this phase */}
               <button
                 type="button"
-                title="Coming soon"
-                disabled
-                className="mt-4 inline-flex items-center gap-2 px-3 py-1.5 text-[12px] cursor-not-allowed"
+                onClick={handlePrivacyToggle}
+                disabled={privacySaving}
+                className="mt-4 inline-flex items-center gap-2 px-3 py-1.5 text-[12px]"
                 style={{
-                  background: "rgba(255,255,255,0.04)",
-                  border: "1px solid rgba(255,255,255,0.06)",
+                  background: user?.isPrivate ? "rgba(174,59,214,0.12)" : "rgba(255,255,255,0.04)",
+                  border: user?.isPrivate ? "1px solid rgba(174,59,214,0.30)" : "1px solid rgba(255,255,255,0.06)",
                   borderRadius: 999,
-                  color: "rgba(255,255,255,0.45)",
+                  color: user?.isPrivate ? "#AE3BD6" : "rgba(255,255,255,0.55)",
+                  cursor: privacySaving ? "wait" : "pointer",
+                  opacity: privacySaving ? 0.6 : 1,
+                  transition: "all 0.2s",
                 }}
               >
-                Private Account
+                {user?.isPrivate ? "Private Account" : "Public Account"}
                 <span
-                  className="inline-block"
                   style={{
                     width: 26,
                     height: 14,
                     borderRadius: 999,
-                    background: "rgba(255,255,255,0.08)",
+                    background: user?.isPrivate ? "#AE3BD6" : "rgba(255,255,255,0.15)",
                     position: "relative",
+                    display: "inline-block",
+                    transition: "background 0.2s",
+                    flexShrink: 0,
                   }}
                 >
                   <span
                     style={{
                       position: "absolute",
-                      top: 2, left: 2,
+                      top: 2,
+                      left: user?.isPrivate ? 14 : 2,
                       width: 10, height: 10,
                       borderRadius: "50%",
-                      background: "rgba(255,255,255,0.4)",
+                      background: "white",
+                      transition: "left 0.2s",
                     }}
                   />
                 </span>

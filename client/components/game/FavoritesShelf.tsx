@@ -55,7 +55,7 @@ function FavCard({
           <div className="absolute bottom-0 left-0 right-0 px-4 py-3"
             style={{ background: "rgba(28,30,42,0.75)", backdropFilter: "blur(8px)", WebkitBackdropFilter: "blur(8px)" }}>
             <div className="flex items-center justify-between gap-2">
-              <p className="text-white font-semibold text-[13px] leading-tight truncate flex-1">{game.name}</p>
+              <p className="text-white font-semibold text-[18px] leading-tight truncate flex-1">{game.name}</p>
               {rating && (
                 <span className="text-[11px] font-bold flex-shrink-0 px-1.5 py-0.5"
                   style={{
@@ -82,7 +82,7 @@ function FavCard({
                           : price === null      ? "rgba(255,255,255,0.30)"
                           : price.isFree        ? "#48BCF9"
                           : "#5BDE8A",
-                  fontSize: price != null && price !== undefined ? 13 : 11,
+                  fontSize: price != null && price !== undefined ? 18 : 13,
                 }}>
                 {price === undefined ? "···" : price === null ? "—" : price.isFree ? "Free" : `$${price.price.toFixed(2)}`}
               </span>

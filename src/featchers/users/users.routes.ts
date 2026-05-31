@@ -2,7 +2,7 @@ import { Router } from "express"
 import rateLimit from "express-rate-limit"
 import { authMiddleware } from "../../shared/middlewares/shared.middlewares.js"
 import { isAdmin } from "../../shared/middlewares/shared.admin.js"
-import { getUser, getAll, deleteUser, updateUser, promoteToAdmin, deleteMyUser, getMyStats, getAvatarGallery, updateAvatar, updateNotificationPrefs, editProfile, confirmPendingEmail, changePassword, disconnectProvider, deleteAccount } from "./users.controller.js"
+import { getUser, getAll, deleteUser, updateUser, promoteToAdmin, deleteMyUser, getMyStats, getAvatarGallery, updateAvatar, updateNotificationPrefs, updatePrivacy, editProfile, confirmPendingEmail, changePassword, disconnectProvider, deleteAccount } from "./users.controller.js"
 import { uploadAvatarSingle } from "./avatar.middleware.js"
 import { validateRequest } from "../../shared/middlewares/validateRequst.js"
 import { editProfileSchema, changePasswordSchema, confirmPendingEmailSchema, deleteAccountSchema } from "../../shared/validators/profile.schemas.js"
@@ -65,6 +65,9 @@ userRouter.patch("/me/avatar", authMiddleware, uploadAvatarSingle, updateAvatar)
 
 // Update notification preferences
 userRouter.patch("/me/notification-prefs", authMiddleware, updateNotificationPrefs)
+
+// Toggle private account
+userRouter.patch("/me/privacy", authMiddleware, updatePrivacy)
 
 // Edit profile (name / email) — requires currentPassword reauth
 userRouter.patch("/me/profile", profileMutateLimiter, authMiddleware, validateRequest(editProfileSchema, "body"), editProfile)

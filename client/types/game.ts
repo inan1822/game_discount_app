@@ -91,4 +91,32 @@ export interface PriceResult {
   dealLink: string
   /** Set when this row represents a DLC discount (returned by /games/dlc-deals). */
   dlcName?: string
+  /** True when this row is an admin-curated manual link (not an auto ITAD deal). */
+  isManual?: boolean
+  /** Platform a manual link is tied to — drives the console-chip filter. */
+  manualPlatform?: ManualLinkPlatform
+  /** Subscription service that includes this game for free. */
+  subscriptionName?: string | null
+  /** ISO string — when the deal expires (manual links only). */
+  discountExpiresAt?: string | null
+  /** True when admin has flagged this as limited stock. */
+  isLimitedStock?: boolean
+}
+
+/** Admin-curated manual store/website link for a game (GET /games/:rawgId/manual-links). */
+export type ManualLinkPlatform = "pc" | "ps" | "xbox" | "switch" | "all"
+
+export interface ManualLink {
+  _id:               string
+  rawgId:            string
+  label:             string
+  url:               string
+  platform:          ManualLinkPlatform
+  price:             number | null
+  storeIcon:         string
+  note:              string
+  subscriptionName:  string | null
+  discountExpiresAt: string | null
+  isLimitedStock:    boolean
+  isActive:          boolean
 }

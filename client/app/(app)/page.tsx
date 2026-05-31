@@ -463,10 +463,16 @@ export default function HomePage() {
     setSearchOpen(false); setQuery(""); setSearchResults([])
   }, [])
 
+  // Stable ref so the callback identity never changes — prevents re-rendering
+  // every GameCard whenever any wishlist toggle fires.
+  const wishlistIdsRef = useRef(wishlistIds)
+  wishlistIdsRef.current = wishlistIds
+
   const handleToggleFavorite = useCallback(async (e: React.MouseEvent, game: Game) => {
     e.stopPropagation()
     if (!isLoggedIn) { router.push("/login"); return }
-    const id = String(game.id); const had = wishlistIds.has(id)
+    const id = String(game.id)
+    const had = wishlistIdsRef.current.has(id)
     setWishlistIds(p => { const n = new Set(p); had ? n.delete(id) : n.add(id); return n })
     try {
       if (had) {
@@ -479,7 +485,7 @@ export default function HomePage() {
     } catch {
       setWishlistIds(p => { const n = new Set(p); had ? n.add(id) : n.delete(id); return n })
     }
-  }, [isLoggedIn, wishlistIds, router])
+  }, [isLoggedIn, router])
 
   const visibleSections   = ALL_SECTIONS.filter(s => !s.authOnly || isLoggedIn)
   const userInitial       = user?.name?.charAt(0)?.toUpperCase() ?? "?"
@@ -775,7 +781,7 @@ export default function HomePage() {
                           onSeeAll={() => router.push(`/section/${toSlug(key)}`)}
                           delay={delay}
                         />
-                        <ScrollableRow gap={48}>
+                        <ScrollableRow gap={48} paddingTop={16} paddingBottom={16} paddingLeft={12} paddingRight={12}>
                           {games.map((game, i) => (
                             <motion.div key={game.id}
                               initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
@@ -805,7 +811,7 @@ export default function HomePage() {
                         onSeeAll={() => router.push(`/section/${toSlug(key)}`)}
                         delay={delay}
                       />
-                      <ScrollableRow gap={36}>
+                      <ScrollableRow gap={36} paddingTop={16} paddingBottom={16} paddingLeft={12} paddingRight={12}>
                         {games.map((game, i) => (
                           <motion.div key={game.id}
                             initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}

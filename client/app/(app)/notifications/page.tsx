@@ -167,21 +167,29 @@ export default function NotificationsPage() {
   }, [hasMore, loadingMore, load])
 
   const handleMarkRead = async (id: string) => {
-    await markRead(id)
     setItems(prev => prev.map(n => n._id === id ? { ...n, read: true } : n))
     refreshCounts()
+    try { await markRead(id) } catch {
+      setItems(prev => prev.map(n => n._id === id ? { ...n, read: false } : n))
+      refreshCounts()
+    }
   }
 
   const handleDelete = async (id: string) => {
-    await deleteNotification(id)
     setItems(prev => prev.filter(n => n._id !== id))
     refreshCounts()
+    try { await deleteNotification(id) } catch {
+      // Refetch on error to restore correct state
+      load(true)
+    }
   }
 
   const handleMarkAllRead = async () => {
-    await markAllRead()
     setItems(prev => prev.map(n => ({ ...n, read: true })))
     refreshCounts()
+    try { await markAllRead() } catch {
+      load(true)
+    }
   }
 
   const visibleItems = items.filter(n => {

@@ -87,7 +87,7 @@ function BigCard({ game, rank, isFavorited, onToggleFavorite }: CardProps) {
                           : price === null      ? "rgba(255,255,255,0.30)"
                           : price.isFree        ? "#48BCF9"
                           : "#5BDE8A",
-                  fontSize: price != null && price !== undefined ? 16 : 12,
+                  fontSize: price != null && price !== undefined ? 18 : 13,
                 }}>
                 {price === undefined ? "···" : price === null ? "—" : price.isFree ? "Free" : `$${price.price.toFixed(2)}`}
               </span>
@@ -127,7 +127,7 @@ function MedCard({ game, rank, isFavorited, onToggleFavorite }: CardProps) {
 
         <div className="absolute bottom-0 left-0 right-0 px-3 py-3"
           style={{ background: "rgba(28,30,42,0.78)", backdropFilter: "blur(8px)", WebkitBackdropFilter: "blur(8px)" }}>
-          <p className="text-white font-bold text-[13px] leading-tight truncate mb-1">{game.name}</p>
+          <p className="text-white font-bold text-[18px] leading-tight truncate mb-1">{game.name}</p>
           <div className="flex items-center justify-between gap-1">
             <div className="flex gap-1 flex-wrap">
               {platforms.map(p => (
@@ -150,7 +150,7 @@ function MedCard({ game, rank, isFavorited, onToggleFavorite }: CardProps) {
                           : price === null      ? "rgba(255,255,255,0.30)"
                           : price.isFree        ? "#48BCF9"
                           : "#5BDE8A",
-                  fontSize: price != null && price !== undefined ? 13 : 10,
+                  fontSize: price != null && price !== undefined ? 18 : 13,
                 }}>
                 {price === undefined ? "···" : price === null ? "—" : price.isFree ? "Free" : `$${price.price.toFixed(2)}`}
               </span>
@@ -189,7 +189,7 @@ function SmallCard({ game, rank, isFavorited, onToggleFavorite }: CardProps) {
 
         <div className="absolute bottom-0 left-0 right-0 px-2.5 py-2"
           style={{ background: "rgba(28,30,42,0.75)", backdropFilter: "blur(8px)", WebkitBackdropFilter: "blur(8px)" }}>
-          <p className="text-white font-semibold text-[11px] leading-tight truncate mb-0.5">{game.name}</p>
+          <p className="text-white font-semibold text-[18px] leading-tight truncate mb-0.5">{game.name}</p>
           <div className="flex items-center gap-1">
             {price && price.cut > 0 && (
               <span className="font-bold text-[9px] px-1 py-0.5"
@@ -203,7 +203,7 @@ function SmallCard({ game, rank, isFavorited, onToggleFavorite }: CardProps) {
                         : price === null      ? "rgba(255,255,255,0.30)"
                         : price.isFree        ? "#48BCF9"
                         : "#5BDE8A",
-                fontSize: price != null && price !== undefined ? 12 : 9,
+                fontSize: price != null && price !== undefined ? 18 : 13,
               }}>
               {price === undefined ? "···" : price === null ? "—" : price.isFree ? "Free" : `$${price.price.toFixed(2)}`}
             </span>

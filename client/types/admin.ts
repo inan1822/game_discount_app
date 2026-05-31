@@ -180,6 +180,56 @@ export interface PromoValidation {
   finalAmount:    number
 }
 
+// ── Manual game links ──────────────────────────────────────────────────────────
+
+export type ManualLinkPlatform = "pc" | "ps" | "xbox" | "switch" | "all"
+
+export interface AdminManualLink {
+  _id:               string
+  rawgId:            string
+  rawgName:          string
+  label:             string
+  url:               string
+  platform:          ManualLinkPlatform
+  price:             number | null
+  storeIcon:         string
+  note:              string
+  subscriptionName:  string | null   // e.g. "PS Plus Extra", "Xbox Game Pass"
+  discountExpiresAt: string | null   // ISO date — when the deal ends
+  isLimitedStock:    boolean         // show "Limited" badge
+  inStock:           boolean         // admin manually marks out-of-stock
+  isActive:          boolean
+  healthStatus:      "ok" | "dead" | "unknown"
+  lastHealthCheck:   string | null
+  aiTracking:        boolean
+  aiTrackFailures:   number
+  createdAt:         string
+  updatedAt:         string
+}
+
+export interface CreateManualLinkInput {
+  rawgId:            string
+  rawgName?:         string
+  label:             string
+  url:               string
+  platform:          ManualLinkPlatform
+  price:             number | null
+  storeIcon?:        string
+  note?:             string
+  subscriptionName?: string | null
+  discountExpiresAt?: string | null
+  isLimitedStock?:   boolean
+  inStock?:          boolean
+}
+
+export type UpdateManualLinkInput = Partial<
+  Pick<AdminManualLink,
+    "label" | "url" | "platform" | "price" | "storeIcon" | "note" |
+    "subscriptionName" | "discountExpiresAt" | "isLimitedStock" | "inStock" | "isActive" |
+    "aiTracking" | "healthStatus" | "aiTrackFailures"
+  >
+>
+
 // ── Broadcast ────────────────────────────────────────────────────────────────
 
 export interface BroadcastHistory {

@@ -205,6 +205,9 @@ export default function WishlistPage() {
     if (intervalRef.current) clearInterval(intervalRef.current)
   }
 
+  // Clear timers on unmount so setState is never called on an unmounted component.
+  useEffect(() => () => clearTimers(), [])
+
   function confirmRemoval(item: WishlistItem) {
     toggle({ id: parseInt(item.gameId), name: item.gameName, cover: item.gameCover, slug: item.gameSlug })
   }

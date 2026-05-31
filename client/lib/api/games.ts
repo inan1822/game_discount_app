@@ -1,5 +1,5 @@
 import api from "./axios"
-import type { Game, GiveawayItem, GameEvent } from "@/types/game"
+import type { Game, GiveawayItem, GameEvent, ManualLink, PriceResult } from "@/types/game"
 
 export const searchGames = async (q: string, page = 1): Promise<Game[]> => {
   const { data } = await api.get("/games/search", { params: { q, page } })
@@ -137,6 +137,35 @@ export const getGameGiveaways = async (title: string): Promise<GiveawayItem[]> =
   try {
     const { data } = await api.get("/games/giveaways", { params: { title } })
     return data.data ?? []
+  } catch {
+    return []
+  }
+}
+
+/**
+ * Manual Links — admin-curated store/website links for a game.
+ * Mapped into PriceResult rows so they merge into the detail-page "WHERE TO BUY"
+ * list (sorted by price, filtered by the platform chip). No auth required.
+ */
+export const getGameManualLinks = async (rawgId: string): Promise<PriceResult[]> => {
+  try {
+    const { data } = await api.get(`/games/${rawgId}/manual-links`)
+    const links = (data.data ?? []) as ManualLink[]
+    return links.map(l => ({
+      storeID:          `manual-${l._id}`,
+      storeName:        l.label,
+      storeIcon:        l.storeIcon ?? "",
+      salePrice:        l.price != null ? l.price.toFixed(2) : "N/A",
+      normalPrice:      "N/A",
+      savings:          0,
+      dealID:           l._id,
+      dealLink:         l.url,
+      isManual:         true,
+      manualPlatform:   l.platform,
+      subscriptionName: l.subscriptionName ?? null,
+      discountExpiresAt: l.discountExpiresAt ?? null,
+      isLimitedStock:   l.isLimitedStock ?? false,
+    }))
   } catch {
     return []
   }

@@ -3,6 +3,7 @@ import axios from "axios"
 import type {
   Order, OrderStatus, Product, KeyImportResult, AdminUser, AnalyticsData,
   PromoCode, PromoCodesPage, BroadcastHistory,
+  AdminManualLink, CreateManualLinkInput, UpdateManualLinkInput,
 } from "@/types/admin"
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000"
@@ -158,4 +159,28 @@ export async function sendBroadcast(payload: {
 export async function fetchBroadcastHistory(): Promise<BroadcastHistory[]> {
   const { data } = await axios.get(`${API_URL}/api/v1/admin/broadcast/history`, { withCredentials: true })
   return ((data?.data ?? data).history ?? []) as BroadcastHistory[]
+}
+
+// ── Manual game links ─────────────────────────────────────────────────────────
+
+export async function listGameLinks(rawgId?: string): Promise<AdminManualLink[]> {
+  const { data } = await axios.get(`${API_URL}/api/v1/admin/game-links`, {
+    params: rawgId ? { rawgId } : undefined,
+    withCredentials: true,
+  })
+  return (data?.data ?? data) as AdminManualLink[]
+}
+
+export async function createGameLink(input: CreateManualLinkInput): Promise<AdminManualLink> {
+  const { data } = await axios.post(`${API_URL}/api/v1/admin/game-links`, input, { withCredentials: true })
+  return (data?.data ?? data) as AdminManualLink
+}
+
+export async function updateGameLink(id: string, patch: UpdateManualLinkInput): Promise<AdminManualLink> {
+  const { data } = await axios.patch(`${API_URL}/api/v1/admin/game-links/${id}`, patch, { withCredentials: true })
+  return (data?.data ?? data) as AdminManualLink
+}
+
+export async function deleteGameLink(id: string): Promise<void> {
+  await axios.delete(`${API_URL}/api/v1/admin/game-links/${id}`, { withCredentials: true })
 }

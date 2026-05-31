@@ -195,6 +195,24 @@ export const disconnectProvider = async (req: Request, res: Response) => {
     }
 }
 
+export const updatePrivacy = async (req: Request, res: Response) => {
+    try {
+        const { isPrivate } = req.body as { isPrivate: boolean }
+        if (typeof isPrivate !== "boolean") {
+            return res.status(400).json({ status: "400", message: "isPrivate must be a boolean", data: null })
+        }
+        const updated = await userModel
+            .findByIdAndUpdate(req.user!.id, { $set: { isPrivate } }, { new: true })
+            .select("isPrivate")
+            .lean()
+        if (!updated) return res.status(404).json({ status: "404", message: "User not found", data: null })
+        return res.status(200).json({ status: "200", message: "Privacy updated", data: { isPrivate: updated.isPrivate } })
+    } catch (error) {
+        const { status, message } = getErrorInfo(error)
+        res.status(status).json({ status: String(status), message, data: null })
+    }
+}
+
 export const updateNotificationPrefs = async (req: Request, res: Response) => {
     try {
         const { events, discounts, discountThreshold } = req.body as {

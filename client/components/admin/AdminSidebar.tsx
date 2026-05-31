@@ -4,9 +4,10 @@ import { usePathname, useRouter } from "next/navigation"
 import { motion } from "framer-motion"
 import {
   LayoutDashboard, ShoppingCart, Package, Users, BarChart2,
-  Megaphone, Settings, Menu, X, UserCircle,
+  Megaphone, Settings, Menu, X, UserCircle, Link2,
 } from "lucide-react"
 import api from "@/lib/api/axios"
+import { AIAssistant } from "@/components/admin/AIAssistant"
 
 // ── Nav sections (grouped like the user sidebar's MENU / SOCIAL) ───────────────
 
@@ -20,6 +21,7 @@ const SECTIONS: NavSection[] = [
       { href: "/admin",          label: "Dashboard", icon: LayoutDashboard },
       { href: "/admin/orders",   label: "Orders",    icon: ShoppingCart },
       { href: "/admin/products", label: "Products",  icon: Package },
+      { href: "/admin/game-links", label: "Game Links", icon: Link2 },
       { href: "/admin/users",    label: "Users",     icon: Users },
     ],
   },
@@ -276,6 +278,9 @@ export function AdminSidebar() {
             )
           })}
         </div>
+
+        {/* AI Assistant trigger — sits just above Sign out */}
+        <AIAssistant />
 
         {/* Switch to User view */}
         <div className="px-3 pb-2">

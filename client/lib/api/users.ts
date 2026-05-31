@@ -31,6 +31,10 @@ export async function updateNotificationPrefs(prefs: {
   await api.patch("/users/me/notification-prefs", prefs)
 }
 
+export async function updatePrivacy(isPrivate: boolean): Promise<void> {
+  await api.patch("/users/me/privacy", { isPrivate })
+}
+
 export interface EditProfilePayload {
   name?: string
   email?: string

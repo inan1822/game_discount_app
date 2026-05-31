@@ -5,6 +5,7 @@ import { motion } from "framer-motion"
 import type { Game } from "@/types/game"
 import { useCardPrice } from "@/hooks/useCardPrice"
 import { rawgImage } from "@/lib/rawgImage"
+import { TiltCard } from "@/components/ui/TiltCard"
 
 interface GameCardProps {
   game:              Game
@@ -142,14 +143,15 @@ export default function GameCard({
   const platforms = [...new Set(safePlatforms.map(platformLabel))].slice(0, 3)
 
   return (
-    <motion.div
+    <TiltCard
+      tiltLimit={12}
+      scale={1.04}
+      spotlight
+      className="flex-shrink-0 select-none group/card"
+      style={{ width: cardW, cursor: "pointer", overflow: "visible" }}
       onClick={() => router.push(`/game/${game.id}`)}
-      whileHover={{ y: -4, transition: { duration: 0.2, ease: "easeOut" } }}
-      whileTap={{ scale: 0.98 }}
-      className="relative flex-shrink-0 cursor-pointer select-none group/card"
-      style={{ width: cardW }}
     >
-          {onToggleFavorite && (
+      {onToggleFavorite && (
         <StarButton isFavorited={isFavorited} onToggle={onToggleFavorite} />
       )}
 
@@ -271,6 +273,6 @@ export default function GameCard({
           </div>
         </div>
       </div>
-    </motion.div>
+    </TiltCard>
   )
 }

@@ -6,8 +6,8 @@ import { motion, AnimatePresence } from "framer-motion"
 import {
   ArrowLeft, Heart, ExternalLink, Tag, Zap, Calendar, Monitor, ShoppingCart, Gift,
 } from "lucide-react"
-import { getGameById, getGameDeals, getGameDlcDeals, getGameGiveaways, getGameEvents } from "@/lib/api/games"
-import { addToWishlist, removeFromWishlist, getWishlist } from "@/lib/api/wishlist"
+import { getGameById, getGameDeals, getGameDlcDeals, getGameGiveaways, getGameEvents, getGameManualLinks } from "@/lib/api/games"
+import { addToWishlist, removeFromWishlist, checkWishlist } from "@/lib/api/wishlist"
 import { fetchStoreProductsByGame } from "@/lib/api/shop"
 import { listFriendsWithGame } from "@/lib/api/users"
 import { useAuth } from "@/context/AuthContext"
@@ -303,10 +303,26 @@ function DiscountRow({ deal, isCheapest }: { deal: PriceResult; isCheapest: bool
         </div>
       )}
 
-      {/* Store name + "Best Deal" badge */}
+      {/* Store name + badges */}
       <div className="flex flex-col min-w-0 flex-1">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <span className="text-white text-[15px] font-semibold truncate">{deal.storeName}</span>
+          {deal.subscriptionName && (
+            <span
+              className="text-[9px] font-bold px-1.5 py-0.5 rounded-full flex-shrink-0"
+              style={{ background: "rgba(174,59,214,0.18)", color: "#AE3BD6" }}
+            >
+              {deal.subscriptionName.toUpperCase()}
+            </span>
+          )}
+          {deal.isManual && !deal.subscriptionName && (
+            <span
+              className="text-[9px] font-bold px-1.5 py-0.5 rounded-full flex-shrink-0"
+              style={{ background: "rgba(100,117,209,0.18)", color: "#6475D1" }}
+            >
+              ADMIN PICK
+            </span>
+          )}
           {isCheapest && (
             <span
               className="text-[9px] font-bold px-1.5 py-0.5 rounded-full flex-shrink-0"
@@ -315,7 +331,25 @@ function DiscountRow({ deal, isCheapest }: { deal: PriceResult; isCheapest: bool
               BEST DEAL
             </span>
           )}
+          {deal.isLimitedStock && (
+            <span
+              className="text-[9px] font-bold px-1.5 py-0.5 rounded-full flex-shrink-0"
+              style={{ background: "rgba(245,158,11,0.15)", color: "#F59E0B" }}
+            >
+              LIMITED
+            </span>
+          )}
         </div>
+        {/* Discount expiry countdown */}
+        {deal.discountExpiresAt && (() => {
+          const daysLeft = Math.ceil((new Date(deal.discountExpiresAt).getTime() - Date.now()) / 86_400_000)
+          if (daysLeft <= 0) return null
+          return (
+            <span className="text-[10px] mt-0.5" style={{ color: "rgba(245,158,11,0.85)" }}>
+              ⏱ {daysLeft} day{daysLeft !== 1 ? "s" : ""} left on this deal
+            </span>
+          )
+        })()}
         {/* DLC name — shown only on rows returned from /games/dlc-deals */}
         {deal.dlcName && (
           <span
@@ -894,6 +928,7 @@ export default function GameDetailPage() {
 
   const [game,          setGame]          = useState<Game | null>(null)
   const [deals,         setDeals]         = useState<PriceResult[]>([])
+  const [manualLinks,   setManualLinks]   = useState<PriceResult[]>([])
   const [giveaways,     setGiveaways]     = useState<GiveawayItem[]>([])
   const [events,        setEvents]        = useState<GameEvent[]>([])
   const [loadingGame,   setLoadingGame]   = useState(true)
@@ -912,19 +947,6 @@ export default function GameDetailPage() {
   const [dlcDeals,        setDlcDeals]        = useState<PriceResult[] | null>(null)
   const [loadingDlcDeals, setLoadingDlcDeals] = useState(false)
   const [friendsWithGame, setFriendsWithGame] = useState<FriendWithGame[]>([])
-
-  // When the game loads, if the current platform tab isn't supported (e.g. PC
-  // default selected but game is PS-only), switch to the first available one.
-  useEffect(() => {
-    if (!game) return
-    const avail = detectAvailablePlatforms(game.platforms)
-    if (!avail[selectedPlatform]) {
-      const fallback: ConsolePlatform =
-        avail.pc ? "pc" : avail.xbox ? "xbox" : avail.switch ? "switch" : "ps"
-      setSelectedPlatform(fallback)
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [game])
 
   // Lazy-fetch DLC deals the first time the user toggles DLC-only mode on.
   // Cached for the lifetime of the page mount — toggling off then on again is free.
@@ -948,25 +970,31 @@ export default function GameDetailPage() {
   // Fetch DisLow's own keys for this game (by numeric RAWG id)
   useEffect(() => {
     if (!id) return
+    let ignore = false
     setLoadingStoreProducts(true)
     fetchStoreProductsByGame(id)
-      .then(p => setStoreProducts(p))
-      .catch(() => setStoreProducts([]))
-      .finally(() => setLoadingStoreProducts(false))
+      .then(p => { if (!ignore) setStoreProducts(p) })
+      .catch(() => { if (!ignore) setStoreProducts([]) })
+      .finally(() => { if (!ignore) setLoadingStoreProducts(false) })
+    return () => { ignore = true }
   }, [id])
 
   // Stable router reference for useEffect deps
   const routerPush = useCallback((path: string) => router.push(path), [router])
 
-  // Load game, then deals + giveaways + events in parallel
+  // Load game, then deals + giveaways + manual links + events in parallel.
+  // `ignore` guards against a stale response (from a previously-viewed game)
+  // overwriting state after the user has navigated to a different game.
   useEffect(() => {
     if (!id) return
+    let ignore = false
     setLoadingGame(true)
     setLoadingDeals(true)
     setLoadingEvents(true)
 
     getGameById(id)
       .then(raw => {
+        if (ignore) return
         // Coerce platforms/genres to clean string[] — bad upstream data caused
         // "p.toLowerCase is not a function" crashes downstream.
         const g: Game = {
@@ -978,46 +1006,61 @@ export default function GameDetailPage() {
             ? raw.genres.filter((x): x is string => typeof x === "string")
             : [],
         }
+        // Pick the first available platform now (same tick as setGame, so React
+        // batches both — no intermediate render of the wrong platform tab).
+        const avail = detectAvailablePlatforms(g.platforms)
+        const firstPlatform: ConsolePlatform =
+          avail.pc ? "pc" : avail.xbox ? "xbox" : avail.switch ? "switch" : avail.ps ? "ps" : "pc"
         setGame(g)
+        setSelectedPlatform(firstPlatform)
 
-        // Deals + giveaways in parallel (both use game title / steamAppId)
+        // Deals + giveaways + manual links in parallel
         Promise.all([
           getGameDeals(g.name, g.steamAppId, g.released?.slice(0, 4)).catch(() => []),
           getGameGiveaways(g.name).catch(() => []),
-        ]).then(([d, gv]) => {
+          getGameManualLinks(id).catch(() => []),
+        ]).then(([d, gv, ml]) => {
+          if (ignore) return
           setDeals(d as PriceResult[])
           setGiveaways(gv as GiveawayItem[])
-        }).finally(() => setLoadingDeals(false))
+          setManualLinks(ml as PriceResult[])
+        }).finally(() => { if (!ignore) setLoadingDeals(false) })
 
         // Events — only possible when we have a Steam AppID
         if (g.steamAppId) {
           getGameEvents(g.steamAppId)
             .catch(() => [])
-            .then(ev => setEvents(ev as GameEvent[]))
-            .finally(() => setLoadingEvents(false))
+            .then(ev => { if (!ignore) setEvents(ev as GameEvent[]) })
+            .finally(() => { if (!ignore) setLoadingEvents(false) })
         } else {
           setEvents([])
           setLoadingEvents(false)
         }
       })
-      .catch(() => routerPush("/"))
-      .finally(() => setLoadingGame(false))
+      .catch(() => { if (!ignore) routerPush("/") })
+      .finally(() => { if (!ignore) setLoadingGame(false) })
+
+    return () => { ignore = true }
   }, [id, routerPush])
 
   // Check whether this game is already in the user's wishlist
   useEffect(() => {
     if (!isLoggedIn || !id) return
-    getWishlist()
-      .then((list: { gameId: string }[]) => setInWishlist(list.some(w => w.gameId === id)))
-      .catch(() => console.warn("[Wishlist] Failed to load wishlist"))
+    let ignore = false
+    checkWishlist(id)
+      .then(v => { if (!ignore) setInWishlist(v) })
+      .catch(() => console.warn("[Wishlist] Failed to check wishlist"))
+    return () => { ignore = true }
   }, [isLoggedIn, id])
 
   // Fetch which friends (people I follow) have this game in their favorites
   useEffect(() => {
     if (!isLoggedIn || !id) return
+    let ignore = false
     listFriendsWithGame(id)
-      .then(setFriendsWithGame)
-      .catch(() => setFriendsWithGame([]))
+      .then(f => { if (!ignore) setFriendsWithGame(f) })
+      .catch(() => { if (!ignore) setFriendsWithGame([]) })
+    return () => { ignore = true }
   }, [isLoggedIn, id])
 
   const handleToggleWishlist = async () => {
@@ -1048,31 +1091,45 @@ export default function GameDetailPage() {
 
   // Apply the console-filter chip. When a platform is selected we restrict the
   // deals list to only that platform's stores + a synthetic Store Search entry.
-  // In DLC-only mode the source switches to the DLC deals list and the platform
-  // filter is bypassed (DLCs are PC-store priced; no console editions exist).
-  const visibleDeals  = dlcOnly
-    ? (dlcDeals ?? [])
-    : filterDealsByPlatform(deals, selectedPlatform, game?.name ?? "")
+  // Admin manual links are merged in (filtered by their own platform: a link is
+  // shown when its platform is "all" or matches the selected chip) and the whole
+  // list is sorted cheapest-first, so a manual link can be the Best Deal.
+  // In DLC-only mode the source switches to the DLC deals list and both the
+  // platform filter and manual links are bypassed.
+  const visibleDeals = (() => {
+    if (dlcOnly) return dlcDeals ?? []
+    const manualForPlatform = manualLinks.filter(
+      m => m.manualPlatform === "all" || m.manualPlatform === selectedPlatform,
+    )
+    const combined = [
+      ...manualForPlatform,
+      ...filterDealsByPlatform(deals, selectedPlatform, game?.name ?? ""),
+    ]
+    // Sort by numeric sale price ascending; rows without a real price
+    // ("N/A"/"0.00" synthetic search links) sink to the bottom.
+    const priceOf = (d: PriceResult) => {
+      const p = parseFloat(d.salePrice)
+      return d.salePrice === "N/A" || d.salePrice === "0.00" || Number.isNaN(p) ? Infinity : p
+    }
+    return combined.sort((a, b) => priceOf(a) - priceOf(b))
+  })()
   // Split gift-card/wallet-voucher rows into a separate sub-section rendered below main deals.
   const mainDeals     = visibleDeals.filter(d => !isGiftCardRow(d))
   const giftCardDeals = visibleDeals.filter(d => isGiftCardRow(d))
 
-  // Cheapest deal for the "Buy" button — based on the currently visible list,
-  // so the floating Buy button respects an active filter.
-  const cheapestDeal = visibleDeals.length > 0
-    ? visibleDeals.reduce((a, b) => {
-        const pa = parseFloat(a.salePrice)
-        const pb = parseFloat(b.salePrice)
-        if (isNaN(pa)) return b
-        if (isNaN(pb)) return a
-        return pa <= pb ? a : b
-      })
+  // Cheapest deal for the "Buy" button — only real-priced rows count, so the
+  // button never points at a synthetic "Store Search" ("N/A"/"0.00") entry.
+  const priceableDeals = visibleDeals.filter(
+    d => d.salePrice !== "N/A" && d.salePrice !== "0.00" && !Number.isNaN(parseFloat(d.salePrice)),
+  )
+  const cheapestDeal = priceableDeals.length > 0
+    ? priceableDeals.reduce((a, b) => (parseFloat(a.salePrice) <= parseFloat(b.salePrice) ? a : b))
     : null
 
   // No content to show in discounts tab
   const discountsEmpty = !loadingDeals && !loadingStoreProducts &&
-    deals.length === 0 && giveaways.length === 0 && !hasConsolePlatforms &&
-    storeProducts.length === 0
+    deals.length === 0 && manualLinks.length === 0 && giveaways.length === 0 &&
+    !hasConsolePlatforms && storeProducts.length === 0
 
   if (loadingGame) return <PageSkeleton />
   if (!game) return null
@@ -1092,7 +1149,7 @@ export default function GameDetailPage() {
           {/* ── LEFT PANEL ── */}
           <motion.div
             {...fadeUp(0.08)}
-            className="flex flex-col flex-shrink-0 overflow-y-auto"
+            className="flex flex-col flex-shrink-0 overflow-y-auto pt-2"
             style={{ width: 594, scrollbarWidth: "none" }}
           >
 
@@ -1223,15 +1280,24 @@ export default function GameDetailPage() {
               </div>
             )}
 
-            {/* Back button — bottom of left panel */}
+            {/* Back button — glassmorphism, top of left panel (design spec) */}
             <motion.button
               onClick={() => router.back()}
               whileHover={{ x: -3 }}
               whileTap={{ scale: 0.95 }}
-              className="mt-6 self-start"
-              style={{ background: "none", border: "none", padding: 0, cursor: "pointer" }}
+              className="self-start flex items-center gap-2 text-[13px] font-medium mb-4 order-first"
+              style={{
+                background:           "rgba(28,30,42,0.60)",
+                backdropFilter:       "blur(6px)",
+                WebkitBackdropFilter: "blur(6px)",
+                borderRadius:         10,
+                border:               "none",
+                padding:              "7px 14px",
+                color:                "#b3bade",
+                cursor:               "pointer",
+              }}
             >
-              <img src="/icons/back-button.svg" alt="Back" style={{ height: 36 }} />
+              ← Back
             </motion.button>
           </motion.div>
 
