@@ -2,7 +2,7 @@ import type { Metadata } from "next"
 import { Nunito } from "next/font/google"
 import "./globals.css"
 import { AuthProvider } from "@/context/AuthContext"
-import { WishlistProvider } from "@/context/WishlistContext"
+import { ReduxProvider } from "@/store/ReduxProvider"
 import { ToastContainer } from "react-toastify"
 import "react-toastify/dist/ReactToastify.css"
 
@@ -46,7 +46,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en" className="dark">
       <body className={`${nunito.variable} font-sans antialiased bg-[#12131a] text-white`}>
         <AuthProvider>
-          <WishlistProvider>
+          <ReduxProvider>
             <div className="min-h-screen">
               {children}
             </div>
@@ -61,7 +61,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 borderRadius: "12px"
               }}
             />
-          </WishlistProvider>
+          </ReduxProvider>
         </AuthProvider>
       </body>
     </html>
