@@ -90,12 +90,31 @@ Every color has **one and only one meaning**. Breaking this breaks the UX.
 /* Borders */
 --border-subtle:  rgba(188,188,201,0.15);
 --border-faint:   rgba(255,255,255,0.05);
+--border-stroke:  rgba(31,37,57,0.6);   /* stroke on cards/rows — #1F2439 at 60% opacity */
 
 /* Shadows */
 --shadow-card:    6px 4px 49px 0px rgba(0,0,0,0.7);
 --shadow-purple:  3px 7px 20px 0px #A521D3B0;
 --shadow-blue:    3px 7px 20px 0px #6475D1B0;
 ```
+
+### Stroke / Border Color Rule
+
+Any shape that has a visible border/stroke **must** use `#1F2439`.
+
+```tsx
+// ✅ CORRECT
+border: "1px solid rgba(31,37,57,0.6)"   // #1F2439 at 60% opacity
+
+// ❌ WRONG
+border: "1px solid #1F2439"              // no opacity
+border: "1px solid rgba(188,188,201,0.15)"
+border: "1px solid rgba(255,255,255,0.08)"
+```
+
+This applies to: cards, rows, panels, inputs, modals, tab bars — any element with a stroke.
+
+---
 
 ### Border Radius — Global Rule
 
@@ -173,43 +192,186 @@ Every frosted-glass element follows one of two recipes:
 
 ## Layout Rules
 
-### Desktop Layout (≥ 1024px)
+### 🚨 THE WIDTH RULE — NON-NEGOTIABLE, NO EXCEPTIONS 🚨
+
+**Every desktop page in the main app uses `max-width: 1600px` with 96px side padding.**
+
+This is not a guideline. This is not "recommended unless." There is no "narrow form so 600px is fine" override. There is no "feed reads better narrow so 700px is fine" override. There is no "settings page so a centered card looks cleaner" override.
+
+**1600px. Period. Every page. Including:**
+- Feeds (notifications, favourites)
+- Forms (profile/edit, profile/password, login, register, checkout)
+- Detail pages (game, friend profile, order detail)
+- Lists (friends, search results, account/orders)
+- Admin pages (orders, products, users, analytics)
+
+If the content inside is naturally narrow (a settings form, a single column of text), the **content** within the 1600px container can be narrow — but the **page wrapper** is still 1600px. Put the narrow card inside; do not shrink the wrapper.
+
+**Wrong:** `<div className="max-w-2xl mx-auto px-8 py-10">` ← clamps page to 672px
+**Wrong:** `<div className="max-w-lg mx-auto px-8 py-10">` ← clamps page to 512px
+**Wrong:** `<div style={{ paddingLeft: 20, paddingRight: 96 }}>` ← full-width is fine but breaks the 96px rule
+**Wrong:** `<div style={{ paddingLeft: 96, paddingRight: 96 }}>` ← uses 96px but no 1600px cap
+**Right (the only correct pattern):**
+
+```tsx
+<div className="flex-1 min-w-0 overflow-y-auto" style={{ scrollbarWidth: "none" }}>
+  <div
+    style={{
+      width:        "min(calc(100% - 192px), 1600px)",
+      marginInline: "auto",
+      paddingBlock: 40, // py-10 equivalent — adjust per page
+    }}
+  >
+    {/* page content goes here */}
+    {/* if your content (a form, a card) is naturally narrow,           */}
+    {/* center it INSIDE this wrapper with its own max-w + mx-auto.     */}
+    {/* the OUTER wrapper still spans 1600px so the page feels unified. */}
+  </div>
+</div>
+```
+
+**Why the formula `min(calc(100% - 192px), 1600px)`:**
+- `100% - 192px` = full available width minus 96px on each side (192/2)
+- `min(..., 1600px)` = caps at 1600px on ultrawide displays
+- Result: on a 1440px screen → content is ~1248px; on a 4K display → content is exactly 1600px centered
+
+### Desktop Layout (≥ 1024px) — visual
 ```
 ┌──────────────────────────────────────────────────────────────┐
-│ AppSidebar (240px fixed) │  20px gap  │  Content area       │
-│                          │            │  max-w: 1600px       │
-│                          │            │  96px side padding   │
+│ AppSidebar (240px fixed) │ ← content column (1600px max) → │
+│                          │  96px ┃ content area ┃  96px     │
+│                          │       ┗━━━━━━━━━━━━━━┛           │
 └──────────────────────────────────────────────────────────────┘
 ```
 
 - Sidebar: 240px, full height, glassmorphism (40% opacity)
-- Content NEVER touches the sidebar — always 20px gap (`paddingLeft: 20`)
-- Content max-width: **1600px** — caps layout on ultrawide screens, centered with `marginInline: "auto"`
-- Side padding: **96px** (`paddingInline: 96`) on the content wrapper — never use a narrower value
+- Content column: `width: min(calc(100% - 192px), 1600px); margin-inline: auto`
+- Side padding is BAKED INTO the formula (96px each side via `- 192px`)
+- Do NOT add extra `paddingLeft`/`paddingRight` — the formula already handles it
 - Floating header width formula: `min(calc(100% - 192px), 1600px)` — matches the content column exactly
-- Content `max-width` is 1600px on ALL main app pages unless a page has an explicit override
 
-### Mobile Layout (< 768px)
-- Fixed bottom navigation bar (4 tabs)
-- Side drawer for full navigation (swipe or hamburger)
-- Floating header bar: radius 12, 60% opacity, blur 8px
+### Common mistake — do not use `paddingLeft: 20, paddingRight: 96`
+A few legacy pages (`friends/page.tsx`, `friends/[id]/page.tsx`) currently use `paddingLeft: 20, paddingRight: 96` with no max-width. **This is a legacy bug, not a pattern to copy.** Those pages need to be refactored to the 1600px formula above. Do not propagate this anti-pattern to new pages.
+
+### Layout Rule — ONE layout, NO mobile/desktop split
+
+**NEVER** use `hidden md:block` / `md:hidden` to render two separate layouts.
+Every page has a single unified layout. The sidebar handles all navigation — there is no `BottomNav`.
+
+```tsx
+// ✅ CORRECT — one layout
+return (
+  <div style={{ width: "min(calc(100% - 192px), 1600px)", marginInline: "auto", paddingBlock: 40 }}>
+    ...
+  </div>
+)
+
+// ❌ WRONG — split layouts
+return (
+  <>
+    <div className="hidden md:block">...desktop...</div>
+    <div className="md:hidden">...mobile...</div>
+  </>
+)
+```
+
+### Navigation
+- **Desktop & tablet:** `AppSidebar` (left sidebar, 240px, glassmorphism) — the ONLY navigation
+- **`BottomNav` is deleted.** Do not recreate it, do not import it, do not reference it.
+- All nav links, protected routes, and active states live in `AppSidebar` only.
 
 ### Page Outer Wrapper (all main app pages)
+
+The outer shell (`<main>` + `<PageBackground>` + `<AppSidebar>`) is provided by `(app)/layout.tsx`. **Do NOT re-render it inside pages.** Each page only renders the inner content column.
+
+The reference template `(app)/layout.tsx` already does:
 ```tsx
 <main className="relative w-screen h-screen overflow-hidden"
       style={{ background: "#1E2532" }}>
   <PageBackground />
   <div className="relative flex h-full" style={{ zIndex: 3 }}>
     <AppSidebar />
-    <div className="flex-1 min-w-0 overflow-y-auto"
-         style={{ scrollbarWidth: "none" }}>
-      {/* page content */}
+    <div className="flex-1 min-w-0 h-full pt-4"
+         style={{ scrollbarWidth: "none", overflowY: "auto" }}>
+      {children} {/* ← your page renders inside this scrollable column */}
     </div>
   </div>
 </main>
 ```
 
-**ALWAYS use this wrapper on every new main app page.**
+### Page Content Template (every new main-app page MUST start with this)
+
+```tsx
+export default function MyPage() {
+  return (
+    // Shell (sidebar + background) provided by (app)/layout.tsx
+    <div
+      style={{
+        width:        "min(calc(100% - 192px), 1600px)",
+        marginInline: "auto",
+        paddingBlock: 40,
+      }}
+    >
+      <SectionHeading title="Page Title" />
+      {/* your page content here */}
+    </div>
+  )
+}
+```
+
+### Page Title / Section Heading Rule
+
+**Every page title and section heading uses `<SectionHeading>` — never a raw `<h1>` or `<h2>`.**
+
+```tsx
+import { SectionHeading } from "@/components/ui/SectionHeading"
+
+// Basic usage
+<SectionHeading title="Notifications" />
+
+// With a right-side action (e.g. "Mark all read", "See all")
+<SectionHeading title="Notifications" right={<button ...>Mark all read</button>} />
+
+// With a "See all" link (built-in)
+<SectionHeading title="Popular" onSeeAll={() => router.push("/section/popular")} />
+```
+
+**What `SectionHeading` renders:**
+```tsx
+<h2
+  className="text-white font-bold"
+  style={{
+    fontSize:   26,
+    lineHeight: 1.2,
+    textShadow: "0 0 18px #6174D9, 0 0 36px #6174D9, 0 0 60px #6174D9",
+  }}
+>
+  {title}
+</h2>
+```
+- `font-bold`, `fontSize: 26`, white text
+- Blue glow: `textShadow: "0 0 18px #6174D9, 0 0 36px #6174D9, 0 0 60px #6174D9"`
+- Framer Motion entrance: fade up + slight 3-D tilt (`rotateX: -22 → 0`, `y: 18 → 0`, `scale: 0.95 → 1`)
+- `delay` prop staggers sections (pass `delay={0.1 * index}` in loops)
+- `right` prop for right-aligned slot (action buttons, counts, etc.)
+
+**Never write:**
+```tsx
+<h1 className="text-white text-[26px] font-bold">My Page</h1>  // ← wrong
+<h2 className="text-white font-bold text-2xl">My Page</h2>      // ← wrong
+```
+
+That's it. The width formula gives you 96px gutters on each side AND a 1600px cap, automatically. You don't add paddingLeft, paddingRight, max-w-anything, or mx-auto on this wrapper. The formula does all of it.
+
+**If your content should be narrow (a settings form, a single text column):** nest a narrower container INSIDE the 1600px wrapper:
+```tsx
+<div style={{ width: "min(calc(100% - 192px), 1600px)", marginInline: "auto", paddingBlock: 40 }}>
+  <h1 ...>Settings</h1>
+  <div className="max-w-lg mx-auto"> {/* narrow content inside wide page */}
+    <form>...</form>
+  </div>
+</div>
+```
 
 ---
 
@@ -249,10 +411,8 @@ Atmospheric blur blobs (purple + blue, `blur-[315px]`). Import and render at the
 - Platform/console icons = same muted color as text, NEVER brand colors
 - Hover: framer-motion tilt effect
 
-### `BottomNav` (`components/layout/BottomNav.tsx`)
-Mobile only. 4 tabs: Home · Notifications · Search · [varies].
-Active tab: `#AE3BD6` (purple). Inactive: `#9fa0a1`.
-`bg-bg-primary/80 + backdrop-blur-md`, fixed bottom.
+### ~~`BottomNav`~~ — DELETED
+`BottomNav` no longer exists. The file has been deleted. `AppSidebar` is the sole navigation. Do not recreate a bottom nav bar under any circumstances.
 
 ### Inputs / Form Fields
 ```tsx
@@ -289,7 +449,7 @@ Desktop: AppSidebar + scrollable multi-section game grid.
 Mobile: floating glassmorphism header (radius 12, 60% opacity) with scrollable tabs (Popular | New | Trended | Favorites | Notifications) + expandable search icon.
 
 Tab meanings:
-- **Favorites** → only games the user has hearted/saved
+- **Favorites** → only games the user has starred/saved
 - **For You** → recommendations based on user's Favorites list
 - **Popular** → globally popular right now
 - **New** → recently released
@@ -400,14 +560,16 @@ Two tabs:
 
 ---
 
-### `/wishlist` — Favourites
-**Purpose:** Games the user has saved/hearted. Equivalent of a watchlist.
+### `/favourites` — Favourites
+**Purpose:** Games the user has saved/starred. Equivalent of a watchlist.
 
-Simple list view: cover thumbnail · game name · date added · remove heart button.
+Simple list view: cover thumbnail · game name · date added · remove star button (blue `#48BCF9` star — same `StarButton` used on game cards).
 Click row → navigate to `/game/[id]`.
-Empty state: heart icon + "No games saved yet" message.
+Empty state: faint outlined star icon + "No games saved yet" message.
 
-Desktop: AppSidebar + list. Mobile: back button + list + BottomNav.
+**Star button rule**: NEVER use a heart icon anywhere in the favourites flow. The toggle/remove action always uses the blue `StarButton` SVG (filled `#48BCF9` + blur glow). This matches the star shown on `GameCard` and `GameDetail`.
+
+Layout: single unified layout — `SectionHeading` title + glassmorphism card rows. No desktop/mobile split.
 
 ---
 
@@ -638,15 +800,16 @@ Use the `PageBackground` component instead of placing blobs manually. Only put i
 
 ## Rules Summary — Never Break These
 
-1. **Color semantics**: PURPLE = events. GREEN = discounts/prices. BLUE = general theme. CYAN = sidebar nav active. Never swap them.
-2. **No hardcoded hex** — always use the CSS variables or inline style tokens from this document.
-3. **No slate-* Tailwind** — use inline styles with DisLow tokens.
-4. **AppSidebar is the single NAV** — never copy-paste sidebar markup into a page.
-5. **PageBackground once** — never render it more than once per page tree.
-6. **20px gap** — content always has 20px left padding after the sidebar. Never flush.
-7. **Glassmorphism** — every surface that overlays content must have backdrop-filter blur. See recipes above.
-8. **Border radius 10px default** — game cards 15px, floating header 12px, pills 999px, avatars 50%.
-9. **Game card**: purple left-side pill for events. Price = white text in overlay. No green dot on cards.
+1. **🚨 Page width = `min(calc(100% - 192px), 1600px)` — EVERY page, ALWAYS.** No `max-w-2xl`, no `max-w-lg`, no `max-w-3xl` on the page wrapper. No "this page is narrow so I'll skip the cap." Forms, feeds, lists, details — all 1600px. If the content inside should be narrow, narrow the CONTENT, not the wrapper. (See "THE WIDTH RULE" section.)
+2. **Color semantics**: PURPLE = events. GREEN = discounts/prices. BLUE = general theme. CYAN = sidebar nav active. Never swap them.
+3. **No hardcoded hex** — always use the CSS variables or inline style tokens from this document.
+4. **No slate-* Tailwind** — use inline styles with DisLow tokens.
+5. **AppSidebar is the single NAV** — never copy-paste sidebar markup into a page.
+6. **PageBackground once** — never render it more than once per page tree.
+7. **96px side padding is BAKED INTO the width formula** — do NOT add extra paddingLeft/paddingRight on the page wrapper. The `calc(100% - 192px)` already gives 96px on each side.
+8. **Glassmorphism** — every surface that overlays content must have backdrop-filter blur. See recipes above.
+9. **Border radius 10px default** — game cards 15px, floating header 12px, pills 999px, avatars 50%.
+10. **Game card**: purple left-side pill for events. Price = white text in overlay. No green dot on cards.
 10. **Events tab ≠ Discounts tab**: Events = in-game activities. Discounts = store prices. Never mix.
 11. **Mobile = floating pill header** (radius 12, 60% opacity, blur 8px). Desktop = sidebar.
 12. **Log Out** = always red `#ef4444`, dark red bg `rgba(239,68,68,0.06)`. Pinned bottom in sidebar.
@@ -658,3 +821,8 @@ Use the `PageBackground` component instead of placing blobs manually. Only put i
 18. **httpOnly cookie only** — JWT never in localStorage. Auth state via `AuthContext` → `/auth/me`.
 19. **RAWG never called from frontend directly** — proxy through `/api/v1/games/*`.
 20. **CheapShark called directly from browser** — always with `User-Agent: DisLow/1.0 (email)`.
+21. **NEVER use a heart icon** — the favourite/save toggle is always the blue `StarButton` (`#48BCF9`, filled + blur glow when active). No `Heart` from lucide-react anywhere in the app.
+22. **Sidebar SOCIAL order** = Friends → Chat → Profile. The Chat item toggles the floating chat window (does NOT navigate to a URL). Never reorder these three.
+23. **Notifications page has 4 tabs** = All · Events · Discounts · **Messages** (blue `#6475D1`). Messages shows the conversation list from the chat system — NOT notification records. Never add chat messages to the All/Events/Discounts feeds.
+24. **`NotificationDot`** lights up for events (purple), discounts (green), AND unread messages (blue `#6475D1`). All three can appear together as a conic-gradient split. Never show only events+discounts and ignore chat unread.
+25. **Chat window** is opened exclusively from the sidebar Chat button — there is no floating launcher bubble. The window is a draggable + resizable glassmorphism overlay (drag via titlebar only, resize from bottom-right grip).

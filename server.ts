@@ -12,6 +12,7 @@ import orderRouter from "./src/featchers/orders/order.routes.js"
 import productRouter from "./src/featchers/products/product.routes.js"
 import storeRouter from "./src/featchers/store/store.routes.js"
 import checkoutRouter from "./src/featchers/checkout/checkout.routes.js"
+import chatRouter from "./src/featchers/chat/chat.routes.js"
 import webhookRouter from "./src/featchers/webhooks/webhook.routes.js"
 import mongoConnect from "./src/config/db.js"
 import { startKeyCleanupJob } from "./src/featchers/products/keyCleanup.js"
@@ -54,7 +55,9 @@ if (!process.env.STRIPE_SECRET_KEY) {
 
 const app = express()
 
-app.use(helmet())
+app.use(helmet({
+    crossOriginResourcePolicy: { policy: "cross-origin" },
+}))
 app.use(morgan(process.env.NODE_ENV === "production" ? "combined" : "dev"))
 
 // ── Stripe webhook — MUST be registered BEFORE express.json() ───────────────
@@ -124,6 +127,7 @@ app.use("/api/v1/admin/orders",   globalLimiter, orderRouter)
 app.use("/api/v1/admin/products", globalLimiter, productRouter)
 app.use("/api/v1/store",          globalLimiter, storeRouter)
 app.use("/api/v1/checkout",       globalLimiter, checkoutRouter)
+app.use("/api/v1/chat",           globalLimiter, chatRouter)
 
 app.get("/", (_req, res) => {
     res.status(200).json({ status: "ok", message: "DisLow API is running" })

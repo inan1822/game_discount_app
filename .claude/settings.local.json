@@ -41,7 +41,15 @@
       "PowerShell(Stop-Process -Id 40916 -Force)",
       "WebFetch(domain:21st.dev)",
       "Bash(git mv *)",
-      "PowerShell(Get-Process node -ErrorAction SilentlyContinue)"
+      "PowerShell(Get-Process node -ErrorAction SilentlyContinue)",
+      "Bash(curl -s http://localhost:3001/api/v1/games/popular)",
+      "Bash(curl -s -X OPTIONS http://localhost:5000/api/v1/games/popular -H 'Origin: http://localhost:3000' -H 'Access-Control-Request-Method: GET' -H 'Access-Control-Request-Headers: content-type' -i)",
+      "Bash(curl -s -X GET http://localhost:5000/api/v1/games/popular -H 'Origin: http://localhost:3000' -H 'Content-Type: application/json' -i)",
+      "Bash(curl -s -X GET http://localhost:5000/api/v1/games/popular -H 'Origin: http://localhost:3000' -i)",
+      "mcp__Claude_in_Chrome__tabs_context_mcp",
+      "mcp__Claude_in_Chrome__navigate",
+      "Bash(xargs sed -i 's/borderRadius: 14/borderRadius: 10/g')",
+      "Bash(Select-String -Pattern \"favourites\" -SimpleMatch)"
     ]
   }
 }

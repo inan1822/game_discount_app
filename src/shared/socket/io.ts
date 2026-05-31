@@ -1,6 +1,7 @@
-import { Server as SocketIOServer } from "socket.io"
+import { Server as SocketIOServer, Socket } from "socket.io"
 import type { Server as HttpServer } from "http"
 import jwt from "jsonwebtoken"
+import { registerChatHandlers } from "../../featchers/chat/chat.socket.js"
 
 let io: SocketIOServer | null = null
 
@@ -56,6 +57,10 @@ export function initSocket(httpServer: HttpServer, allowedOrigins: string[]): So
             console.log(`[Socket] user ${user.id} connected`)
         }
 
+        // Chat relay handlers (typing indicators etc.) — message delivery is
+        // driven server-side from the chat service via emitToUser().
+        registerChatHandlers(socket)
+
         socket.on("disconnect", () => {
             console.log(`[Socket] ${user.role} ${user.id} disconnected`)
         })
@@ -77,3 +82,15 @@ export function emitNotification(userId: string, payload: object) {
         // Socket not initialized yet (e.g. during tests) — ignore
     }
 }
+
+/** Emit an arbitrary event to a specific user's socket room (all their tabs/devices). */
+export function emitToUser(userId: string, event: string, payload: object) {
+    try {
+        getIO().to(`user:${userId}`).emit(event, payload)
+    } catch {
+        // Socket not initialized yet (e.g. during tests) — ignore
+    }
+}
+
+/** Re-export the socket type for handler modules. */
+export type { Socket }
