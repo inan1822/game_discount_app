@@ -3,12 +3,12 @@ import {
   getWishlist,
   addToWishlist as apiAdd,
   removeFromWishlist as apiRemove,
-  type WishlistItemDTO,
 } from "@/lib/api/wishlist"
+import type { WishlistItem } from "@/types/game"
 
 // ─── State ──────────────────────────────────────────────────────────────────
 interface WishlistState {
-  items:   WishlistItemDTO[]
+  items:   WishlistItem[]
   loading: boolean
 }
 
@@ -26,11 +26,11 @@ export const fetchWishlist = createAsyncThunk(
   },
 )
 
+// Add a game — returns the saved item from the API (with real _id)
 export const addWishlistItem = createAsyncThunk(
   "wishlist/add",
-  async (item: WishlistItemDTO) => {
-    await apiAdd(item)
-    return item
+  async (game: { gameId: string; gameName: string; gameCover: string | null; gameSlug: string }) => {
+    return await apiAdd(game)
   },
 )
 
@@ -57,7 +57,7 @@ const wishlistSlice = createSlice({
     builder
       // fetch
       .addCase(fetchWishlist.pending,   (state) => { state.loading = true })
-      .addCase(fetchWishlist.fulfilled, (state, action: PayloadAction<WishlistItemDTO[]>) => {
+      .addCase(fetchWishlist.fulfilled, (state, action: PayloadAction<WishlistItem[]>) => {
         state.items   = action.payload
         state.loading = false
       })
@@ -65,10 +65,10 @@ const wishlistSlice = createSlice({
         state.items   = []
         state.loading = false
       })
-      // add (optimistic-friendly — append on success)
-      .addCase(addWishlistItem.fulfilled, (state, action: PayloadAction<WishlistItemDTO>) => {
+      // add — prepend on success (newest first)
+      .addCase(addWishlistItem.fulfilled, (state, action: PayloadAction<WishlistItem>) => {
         if (!state.items.some(i => String(i.gameId) === String(action.payload.gameId))) {
-          state.items.push(action.payload)
+          state.items.unshift(action.payload)
         }
       })
       // remove

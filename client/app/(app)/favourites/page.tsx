@@ -3,7 +3,9 @@
 import { useRouter } from "next/navigation"
 import { useState, useRef, useMemo, useEffect } from "react"
 import { AnimatePresence, motion } from "framer-motion"
-import { useWishlist } from "@/context/WishlistContext"
+import { useAppSelector, useAppDispatch } from "@/store/hooks"
+import { fetchWishlist, removeWishlistItem } from "@/store/wishlistSlice"
+import { useAuth } from "@/context/AuthContext"
 import { useCardPrice } from "@/hooks/useCardPrice"
 import { getGameById } from "@/lib/api/games"
 import { SectionHeading } from "@/components/ui/SectionHeading"
@@ -192,8 +194,17 @@ function FavouriteRow({
 }
 
 export default function WishlistPage() {
-  const router = useRouter()
-  const { items, toggle, isLoading } = useWishlist()
+  const router   = useRouter()
+  const { user } = useAuth()
+
+  // Global wishlist state from the Redux store (Single Source of Truth)
+  const items     = useAppSelector(state => state.wishlist.items)
+  const isLoading = useAppSelector(state => state.wishlist.loading)
+  const dispatch  = useAppDispatch()
+
+  useEffect(() => {
+    if (user) dispatch(fetchWishlist())
+  }, [user, dispatch])
 
   const [pendingIds, setPendingIds] = useState<Set<string>>(new Set())
   const [undoState, setUndoState]   = useState<UndoState | null>(null)
@@ -209,7 +220,7 @@ export default function WishlistPage() {
   useEffect(() => () => clearTimers(), [])
 
   function confirmRemoval(item: WishlistItem) {
-    toggle({ id: parseInt(item.gameId), name: item.gameName, cover: item.gameCover, slug: item.gameSlug })
+    dispatch(removeWishlistItem(item.gameId))
   }
 
   function handleRemove(item: WishlistItem) {
