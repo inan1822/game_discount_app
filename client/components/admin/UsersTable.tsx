@@ -159,8 +159,8 @@ export function UsersTable({ initial }: Props) {
               {["User", "Role", "Status", "Joined", "Last seen", "Actions"].map(h => (
                 <th key={h} style={{
                   padding: "10px 16px", textAlign: "left",
-                  fontSize: 11, fontWeight: 700, color: "#9fa0a1",
-                  letterSpacing: "0.08em", textTransform: "uppercase",
+                  fontSize: 13, fontWeight: 700, color: "#9fa0a1",
+                  letterSpacing: "0.1em", textTransform: "uppercase",
                 }}>
                   {h}
                 </th>
@@ -170,7 +170,7 @@ export function UsersTable({ initial }: Props) {
           <tbody>
             {users.length === 0 && (
               <tr>
-                <td colSpan={6} style={{ padding: "40px 16px", textAlign: "center", color: "#9fa0a1", fontSize: 14 }}>
+                <td colSpan={6} style={{ padding: "40px 16px", textAlign: "center", color: "#9fa0a1", fontSize: 13 }}>
                   No users match your filters.
                 </td>
               </tr>

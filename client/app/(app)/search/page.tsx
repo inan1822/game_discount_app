@@ -1,12 +1,16 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useRef, useCallback } from "react"
 import { Search, X } from "lucide-react"
+import { motion, AnimatePresence } from "framer-motion"
+import { useRouter } from "next/navigation"
 import Fuse from "fuse.js"
 import { searchGames } from "@/lib/api/games"
+import { getWishlist, addToWishlist, removeFromWishlist } from "@/lib/api/wishlist"
 import GameCard from "@/components/game/GameCard"
-import BottomNav from "@/components/layout/BottomNav"
-import type { Game } from "@/types/game"
+import { SectionHeading } from "@/components/ui/SectionHeading"
+import { useAuth } from "@/context/AuthContext"
+import type { Game, WishlistItem } from "@/types/game"
 
 // Fuse.js options for re-ranking RAWG results by title relevance.
 // RAWG returns results ranked by its own relevance model — Fuse re-sorts
@@ -20,16 +24,27 @@ const FUSE_OPTS: Fuse.IFuseOptions<Game> = {
 }
 
 export default function SearchPage() {
-  const [query,   setQuery]   = useState("")
-  const [results, setResults] = useState<Game[]>([])
-  const [loading, setLoading] = useState(false)
-  const [searched, setSearched] = useState(false)
-  const inputRef   = useRef<HTMLInputElement>(null)
+  const router   = useRouter()
+  const { user } = useAuth()
+  const isLoggedIn = !!user
+
+  const [query,      setQuery]      = useState("")
+  const [results,    setResults]    = useState<Game[]>([])
+  const [loading,    setLoading]    = useState(false)
+  const [searched,   setSearched]   = useState(false)
+  const [wishlistIds, setWishlistIds] = useState<Set<string>>(new Set())
+
+  const inputRef    = useRef<HTMLInputElement>(null)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
+  useEffect(() => { inputRef.current?.focus() }, [])
+
   useEffect(() => {
-    inputRef.current?.focus()
-  }, [])
+    if (!isLoggedIn) return
+    getWishlist()
+      .then((items) => setWishlistIds(new Set((items as WishlistItem[]).map(w => w.gameId))))
+      .catch(() => {})
+  }, [isLoggedIn])
 
   useEffect(() => {
     if (!query.trim()) {
@@ -38,9 +53,7 @@ export default function SearchPage() {
       return
     }
     if (debounceRef.current) clearTimeout(debounceRef.current)
-    debounceRef.current = setTimeout(() => {
-      handleSearch(query)
-    }, 500)
+    debounceRef.current = setTimeout(() => { handleSearch(query) }, 500)
     return () => { if (debounceRef.current) clearTimeout(debounceRef.current) }
   }, [query])
 
@@ -56,8 +69,6 @@ export default function SearchPage() {
         const fuse   = new Fuse(data, FUSE_OPTS)
         const ranked = fuse.search(q)
         if (ranked.length > 0 && (ranked[0].score ?? 1) < 0.3) {
-          // Fuse found high-confidence matches — use Fuse order for those,
-          // then append anything Fuse didn't rank (score too low / unmatched).
           const rankedIds = new Set(ranked.map(r => r.item.id))
           const reordered = [
             ...ranked.map(r => r.item),
@@ -69,7 +80,6 @@ export default function SearchPage() {
         }
       }
 
-      // Fall back to RAWG's native ordering when Fuse isn't confident
       setResults(data)
       setSearched(true)
     } catch {
@@ -80,129 +90,121 @@ export default function SearchPage() {
     }
   }
 
+  const handleToggleFavorite = useCallback(async (e: React.MouseEvent, game: Game) => {
+    e.stopPropagation()
+    if (!isLoggedIn) { router.push("/login"); return }
+    const id = String(game.id)
+    const had = wishlistIds.has(id)
+    setWishlistIds(prev => { const n = new Set(prev); had ? n.delete(id) : n.add(id); return n })
+    try {
+      if (had) await removeFromWishlist(id)
+      else await addToWishlist({ gameId: id, gameName: game.name, gameCover: game.cover, gameSlug: game.slug })
+    } catch {
+      setWishlistIds(prev => { const n = new Set(prev); had ? n.add(id) : n.delete(id); return n })
+    }
+  }, [isLoggedIn, wishlistIds, router])
+
+  const clearSearch = () => { setQuery(""); setResults([]); setSearched(false) }
+
   return (
-    <>
-      {/* ── Desktop layout — shell from (app)/layout.tsx ── */}
-      <div className="hidden md:block flex-1 min-w-0 overflow-y-auto" style={{ scrollbarWidth: "none" }}>
-        <div className="contents">
-            <div
-              className="py-10"
-              style={{
-                // Match home: cap on ultrawide, 96px side padding otherwise, centered.
-                width: "min(calc(100% - 192px), 1600px)",
-                marginInline: "auto",
-              }}
-            >
-              <h1 className="text-white text-2xl font-bold mb-6">Search Games</h1>
-              {/* Search input */}
-              <div
-                className="flex items-center gap-3 mb-8 px-4 py-3"
-                style={{
-                  background: "rgba(30,38,51,0.50)",
-                  border: "1px solid rgba(255,255,255,0.08)",
-                  borderRadius: 12,
-                  backdropFilter: "blur(10px)",
-                  WebkitBackdropFilter: "blur(10px)",
-                }}
-              >
-                <Search size={18} style={{ color: "#9fa0a1", flexShrink: 0 }} />
-                <input
-                  ref={inputRef}
-                  type="text"
-                  placeholder="Search games..."
-                  value={query}
-                  onChange={e => setQuery(e.target.value)}
-                  style={{
-                    flex: 1,
-                    background: "transparent",
-                    border: "none",
-                    outline: "none",
-                    color: "#fff",
-                    fontSize: 14,
-                  }}
-                  placeholder-color="#9fa0a1"
-                />
-                {query && (
-                  <button onClick={() => setQuery("")} style={{ background: "none", border: "none", cursor: "pointer", color: "#9fa0a1" }}>
-                    <X size={16} />
-                  </button>
-                )}
-              </div>
+    <div
+      style={{
+        width:        "min(calc(100% - 192px), 1600px)",
+        marginInline: "auto",
+        paddingBlock: 40,
+      }}
+    >
+      <SectionHeading title="Search" />
 
-              {loading ? (
-                <div className="grid grid-cols-3 gap-4">
-                  {[...Array(6)].map((_, i) => (
-                    <div key={i} className="rounded-[20px] bg-[#1c1e2a] animate-pulse" style={{ height: 280 }} />
-                  ))}
-                </div>
-              ) : searched && results.length === 0 ? (
-                <div className="text-center py-16" style={{ color: "#9fa0a1", fontSize: 14 }}>
-                  No games found for &ldquo;{query}&rdquo;
-                </div>
-              ) : results.length > 0 ? (
-                <div className="grid grid-cols-2 xl:grid-cols-3 gap-x-12 gap-y-10">
-                  {results.map(game => (
-                    <GameCard key={game.id} game={game} />
-                  ))}
-                </div>
-              ) : (
-                <div className="text-center py-16" style={{ color: "#9fa0a1", fontSize: 14 }}>
-                  Type to search for games
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-
-      {/* ── Mobile layout (unchanged) ── */}
-      <div className="md:hidden relative pb-24 min-h-screen">
-        <div className="blob-blue w-48 h-48 top-0 -right-16" />
-
-        <header className="relative z-10 px-5 pt-12 pb-4">
-          <h1 className="text-xl font-bold text-white mb-4">Search Games</h1>
-          <div className="glass rounded-full px-4 py-3 flex items-center gap-3">
-            <Search size={18} className="text-[#9fa0a1] flex-shrink-0" />
-            <input
-              type="text"
-              placeholder="Search games..."
-              value={query}
-              onChange={e => setQuery(e.target.value)}
-              className="flex-1 bg-transparent text-white placeholder-[#9fa0a1] outline-none text-sm"
-            />
-            {query && (
-              <button onClick={() => setQuery("")}>
-                <X size={16} className="text-[#9fa0a1] hover:text-white" />
-              </button>
-            )}
-          </div>
-        </header>
-
-        <main className="relative z-10 px-5">
-          {loading ? (
-            <div className="grid grid-cols-2 gap-3">
-              {[...Array(6)].map((_, i) => (
-                <div key={i} className="rounded-[20px] bg-[#1c1e2a] animate-pulse" style={{ height: 250 }} />
-              ))}
-            </div>
-          ) : searched && results.length === 0 ? (
-            <div className="text-center py-16 text-[#9fa0a1] text-sm">
-              No games found for &quot;{query}&quot;
-            </div>
-          ) : results.length > 0 ? (
-            <div className="grid grid-cols-2 gap-3">
-              {results.map(game => (
-                <GameCard key={game.id} game={game} />
-              ))}
-            </div>
-          ) : (
-            <div className="text-center py-16 text-[#9fa0a1] text-sm">
-              Type to search for games
-            </div>
-          )}
-        </main>
-
-        <BottomNav />
+      {/* Search input */}
+      <div
+        className="flex items-center gap-3 mb-8 px-4 py-3"
+        style={{
+          background:           "rgba(30,38,51,0.50)",
+          border:               "1px solid #1F2439",
+          borderRadius:         10,
+          backdropFilter:       "blur(10px)",
+          WebkitBackdropFilter: "blur(10px)",
+        }}
+      >
+        <Search size={18} style={{ color: "#9fa0a1", flexShrink: 0 }} />
+        <input
+          ref={inputRef}
+          type="text"
+          placeholder="Search games..."
+          value={query}
+          onChange={e => setQuery(e.target.value)}
+          style={{
+            flex:       1,
+            background: "transparent",
+            border:     "none",
+            outline:    "none",
+            color:      "#fff",
+            fontSize:   16,
+          }}
+        />
+        {query && (
+          <button onClick={clearSearch} style={{ background: "none", border: "none", cursor: "pointer", color: "#9fa0a1" }}>
+            <X size={16} />
+          </button>
+        )}
       </div>
-    </>
+
+      <AnimatePresence mode="wait">
+        {loading ? (
+          <motion.div key="loading" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="flex gap-5">
+            {[...Array(5)].map((_, i) => (
+              <div key={i} className="flex-shrink-0 animate-pulse"
+                style={{ width: 220, height: 308, background: "rgba(255,255,255,0.05)", borderRadius: 10 }} />
+            ))}
+          </motion.div>
+        ) : searched && results.length === 0 ? (
+          <motion.div key="empty" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
+            className="flex items-center justify-center py-16"
+            style={{ background: "rgba(255,255,255,0.03)", borderRadius: 10, border: "1px dashed rgba(255,255,255,0.08)" }}>
+            <p className="text-[13px]" style={{ color: "rgba(255,255,255,0.3)" }}>
+              No games found for &ldquo;{query}&rdquo;
+            </p>
+          </motion.div>
+        ) : results.length > 0 ? (
+          <motion.section key="results" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-white font-bold text-[15px]">
+                Search results for{" "}
+                <span style={{ color: "#48BCF9" }}>&ldquo;{query}&rdquo;</span>
+              </h2>
+              <motion.button onClick={clearSearch}
+                whileHover={{ x: 2, color: "rgba(255,255,255,0.8)" }} whileTap={{ scale: 0.97 }}
+                className="text-[11px] flex items-center gap-1"
+                style={{ color: "rgba(255,255,255,0.35)", background: "none", border: "none", cursor: "pointer" }}>
+                <X size={11} /> Clear
+              </motion.button>
+            </div>
+            <div className="flex flex-wrap gap-5">
+              {results.map((game, i) => (
+                <motion.div key={game.id}
+                  initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: i * 0.04, duration: 0.4, ease: "easeOut" }}>
+                  <GameCard
+                    game={game}
+                    isFavorited={wishlistIds.has(String(game.id))}
+                    onToggleFavorite={e => handleToggleFavorite(e, game)}
+                  />
+                </motion.div>
+              ))}
+            </div>
+          </motion.section>
+        ) : (
+          <motion.div key="idle" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="flex items-center justify-center py-16"
+            style={{ background: "rgba(255,255,255,0.03)", borderRadius: 10, border: "1px dashed rgba(255,255,255,0.08)" }}>
+            <p className="text-[13px]" style={{ color: "rgba(255,255,255,0.3)" }}>
+              Type to search for games
+            </p>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
   )
 }

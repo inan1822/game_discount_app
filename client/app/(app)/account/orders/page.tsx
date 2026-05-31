@@ -14,6 +14,11 @@ import {
   ShoppingBag, ChevronLeft, ChevronRight, Key, Copy, Check,
   MessageCircle, Receipt, Ticket as TicketIcon, Eye, EyeOff,
 } from "lucide-react"
+import { SectionHeading } from "@/components/ui/SectionHeading"
+import { GlowCard }      from "@/components/ui/spotlight-card"
+import { motion }        from "framer-motion"
+import { searchGames }   from "@/lib/api/games"
+import { rawgImage }     from "@/lib/rawgImage"
 
 const currency = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" })
 
@@ -49,50 +54,46 @@ function KeyCell({ orderId }: { orderId: string }) {
   }
 
   return (
-    <div style={{ marginTop: 10 }}>
+    <div style={{ marginTop: 10, display: "flex", alignItems: "center", gap: 8, height: 28 }}>
       {shown && code ? (
-        <div style={{
-          display: "flex", alignItems: "center", gap: 8,
-          background: "rgba(68,214,44,0.06)",
-          border: "1px solid rgba(68,214,44,0.20)",
-          borderRadius: 8, padding: "8px 12px",
-        }}>
-          <Key className="w-3.5 h-3.5 flex-shrink-0" style={{ color: "#44d62c" }} />
-          <code style={{ color: "#44d62c", fontSize: 13, fontWeight: 700, letterSpacing: "0.06em", flex: 1 }}>
-            {code}
-          </code>
+        <>
+          <div style={{
+            display: "inline-flex", alignItems: "center", gap: 8,
+            background: "rgba(100,117,209,0.10)",
+            borderRadius: 8, padding: "6px 12px",
+          }}>
+            <button
+              onClick={() => setShown(false)}
+              style={{ background: "none", border: "none", cursor: "pointer", color: "#44d62c", padding: 0, flexShrink: 0 }}
+              title="Hide key"
+            >
+              <EyeOff className="w-3.5 h-3.5" />
+            </button>
+            <code style={{
+              color: "#44d62c", fontSize: 13, fontWeight: 700, letterSpacing: "0.06em",
+              textShadow: "0 0 10px rgba(68,214,44,0.6), 0 0 20px rgba(68,214,44,0.3)",
+            }}>
+              {code}
+            </code>
+          </div>
           <button
             onClick={copyCode}
-            style={{
-              background: copied ? "rgba(68,214,44,0.15)" : "rgba(188,188,201,0.08)",
-              border: "none", borderRadius: 6, cursor: "pointer",
-              color: copied ? "#44d62c" : "#9fa0a1",
-              padding: "4px 8px", fontSize: 11, fontWeight: 600,
-              display: "flex", alignItems: "center", gap: 3, flexShrink: 0,
-            }}
+            style={{ background: "none", border: "none", cursor: "pointer", padding: 2, flexShrink: 0, color: copied ? "#44d62c" : "#9fa0a1" }}
+            title="Copy key"
           >
-            {copied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
-            {copied ? "Copied!" : "Copy"}
+            {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
           </button>
-          <button
-            onClick={() => setShown(false)}
-            style={{
-              background: "none", border: "none", cursor: "pointer",
-              color: "#9fa0a1", padding: 2,
-            }}
-          >
-            <EyeOff className="w-3.5 h-3.5" />
-          </button>
-        </div>
+        </>
       ) : (
+        /* Eye icon + label share the same background button */
         <button
           onClick={reveal}
           disabled={loading}
           style={{
             display: "flex", alignItems: "center", gap: 6,
             background: "rgba(100,117,209,0.10)",
-            border: "1px solid rgba(100,117,209,0.20)",
-            borderRadius: 8, padding: "6px 12px", cursor: loading ? "wait" : "pointer",
+            border: "none", borderRadius: 8, padding: "6px 12px",
+            cursor: loading ? "wait" : "pointer",
             color: "#6475D1", fontSize: 12, fontWeight: 600,
           }}
         >
@@ -111,19 +112,38 @@ function OrderCard({
   order: Order
   onGetHelp: (order: Order) => void
 }) {
+  const [cover, setCover] = useState<string | null>(null)
+
+  useEffect(() => {
+    const name = order.items[0]?.productName
+    if (!name) return
+    searchGames(name, 1)
+      .then(results => { if (results[0]?.cover) setCover(results[0].cover) })
+      .catch(() => {})
+  }, [order.items])
+
   return (
     <div style={{ ...PANEL, padding: "16px 18px" }}>
       <div className="flex items-start justify-between gap-4 flex-wrap">
         {/* Cover + info */}
         <div style={{ display: "flex", gap: 12, flex: 1, minWidth: 0 }}>
-          {/* Image placeholder (game cover from product) */}
+          {/* Game cover */}
           <div style={{
-            width: 52, height: 52, borderRadius: 8, flexShrink: 0,
-            background: "rgba(100,117,209,0.12)",
+            width: 207, height: 117, borderRadius: 10, flexShrink: 0,
+            background: "rgba(100,117,209,0.10)",
             border: "1px solid rgba(100,117,209,0.15)",
+            overflow: "hidden",
             display: "flex", alignItems: "center", justifyContent: "center",
           }}>
-            <Receipt className="w-5 h-5" style={{ color: "rgba(100,117,209,0.40)" }} />
+            {cover ? (
+              <img
+                src={rawgImage(cover)}
+                alt={order.items[0]?.productName}
+                style={{ width: "100%", height: "100%", objectFit: "cover" }}
+              />
+            ) : (
+              <Receipt className="w-6 h-6" style={{ color: "rgba(100,117,209,0.35)" }} />
+            )}
           </div>
 
           <div style={{ flex: 1, minWidth: 0 }}>
@@ -131,7 +151,7 @@ function OrderCard({
               #{order._id.slice(-10).toUpperCase()} · {new Date(order.createdAt).toLocaleDateString()}
             </p>
             <p style={{
-              color: "#fff", fontSize: 14, fontWeight: 700, marginBottom: 4,
+              color: "#fff", fontSize: 18, fontWeight: 700, marginBottom: 4,
               whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
             }}>
               {order.items[0]?.productName ?? "Order"}
@@ -144,10 +164,11 @@ function OrderCard({
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
               <StatusBadge status={order.status} />
               <span style={{ color: "#9fa0a1", fontSize: 12 }}>·</span>
-              <span style={{ color: "#fff", fontSize: 14, fontWeight: 800 }}>
+              <span style={{ color: "#fff", fontSize: 16, fontWeight: 800 }}>
                 {currency.format(order.totalAmount)}
               </span>
             </div>
+            {order.status === "delivered" && <KeyCell orderId={order._id} />}
           </div>
         </div>
 
@@ -169,8 +190,6 @@ function OrderCard({
         </div>
       </div>
 
-      {/* Key reveal — only for delivered orders */}
-      {order.status === "delivered" && <KeyCell orderId={order._id} />}
     </div>
   )
 }
@@ -232,7 +251,8 @@ export default function MyOrdersPage() {
   const router = useRouter()
 
   // Tab state
-  const [tab, setTab] = useState<"orders" | "tickets">("orders")
+  const [tab, setTab]         = useState<"orders" | "tickets">("orders")
+  const [hoveredTab, setHoveredTab] = useState<"orders" | "tickets" | null>(null)
 
   // Orders state
   const [orders,        setOrders]        = useState<Order[]>([])
@@ -325,46 +345,78 @@ export default function MyOrdersPage() {
   return (
     // Shell (sidebar + background) provided by (app)/layout.tsx
     <>
-      <div className="flex-1 min-w-0 overflow-y-auto px-4 py-10" style={{ scrollbarWidth: "none", color: "#fff" }}>
-        <div className="max-w-3xl mx-auto">
-
-        {/* Header */}
-        <header style={{ marginBottom: 28 }}>
-          <h1 style={{ fontSize: 24, fontWeight: 800, color: "#fff" }}>Purchase History</h1>
-          <p style={{ color: "#9fa0a1", fontSize: 13, marginTop: 6 }}>
-            {ordersTotal > 0 ? `${ordersTotal} order${ordersTotal !== 1 ? "s" : ""}` : "Your purchase history"}
-          </p>
-        </header>
+      <div
+        style={{
+          width:        "min(calc(100% - 192px), 1600px)",
+          marginInline: "auto",
+          paddingBlock: 40,
+          color:        "#fff",
+        }}
+      >
+        <SectionHeading
+          title="Purchase History"
+          right={
+            ordersTotal > 0 ? (
+              <span style={{ color: "#9fa0a1", fontSize: 13 }}>
+                {ordersTotal} order{ordersTotal !== 1 ? "s" : ""}
+              </span>
+            ) : undefined
+          }
+        />
 
         {/* Tabs */}
-        <div style={{
-          display: "flex", gap: 6,
-          background: "rgba(28,30,42,0.50)",
-          border: "1px solid rgba(188,188,201,0.10)",
-          borderRadius: 10, padding: 4, marginBottom: 20,
-        }}>
-          {([
-            { key: "orders",  label: "Orders",  Icon: Receipt    },
-            { key: "tickets", label: "Support", Icon: TicketIcon },
-          ] as const).map(({ key, label, Icon }) => (
-            <button
-              key={key}
-              onClick={() => setTab(key)}
+        {(() => {
+          const focusedTab = hoveredTab ?? tab
+          const glowBase   = focusedTab === "orders" ? "120" : "220"
+          const pinnedXp   = focusedTab === "orders" ? 0.25 : 0.75
+          return (
+            <GlowCard
+              customSize
+              glowColor={focusedTab === "orders" ? "green" : "blue"}
+              pinned={{ xp: pinnedXp, yp: 0.5 }}
+              className="!rounded-[12px] !p-1 !aspect-auto !backdrop-blur-none !shadow-none mb-5 flex gap-1"
               style={{
-                flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
-                background: tab === key ? "rgba(100,117,209,0.20)" : "transparent",
-                border: tab === key ? "1px solid rgba(100,117,209,0.30)" : "1px solid transparent",
-                borderRadius: 8, padding: "9px 0", cursor: "pointer",
-                color: tab === key ? "#6475D1" : "#9fa0a1",
-                fontSize: 13, fontWeight: tab === key ? 700 : 400,
-                transition: "all 0.15s",
+                width:      "100%",
+                background: "rgba(28,30,42,0.40)",
+                border:     "1px solid rgba(31,37,57,0.6)",
+                ["--base"   as any]: glowBase,
+                ["--spread" as any]: "0",
+                ["--size"   as any]: "500",
               }}
             >
-              <Icon className="w-4 h-4" />
-              {label}
-            </button>
-          ))}
-        </div>
+              {([
+                { key: "orders",  label: "Orders",  Icon: Receipt,    color: "#44D62C" },
+                { key: "tickets", label: "Support", Icon: TicketIcon, color: "#6475D1" },
+              ] as const).map(({ key, label, Icon, color }) => {
+                const isActive  = tab === key
+                const isHovered = hoveredTab === key
+                return (
+                  <motion.button
+                    key={key}
+                    onClick={() => setTab(key)}
+                    onMouseEnter={() => setHoveredTab(key)}
+                    onMouseLeave={() => setHoveredTab(null)}
+                    whileTap={{ scale: 0.96 }}
+                    className="flex-1 relative z-10 after:absolute after:inset-[-60px] after:content-['']"
+                    style={{
+                      display: "flex", alignItems: "center", justifyContent: "center", gap: 7,
+                      borderRadius: 9, padding: "8px 0",
+                      fontSize: 18, fontWeight: isActive ? 700 : 500,
+                      color:      isActive || isHovered ? color : "rgba(255,255,255,0.4)",
+                      background: "transparent",
+                      border:     "1px solid transparent",
+                      cursor:     "pointer",
+                      transition: "all 0.25s",
+                    }}
+                  >
+                    <Icon className="w-[18px] h-[18px]" />
+                    {label}
+                  </motion.button>
+                )
+              })}
+            </GlowCard>
+          )
+        })()}
 
         {/* ── Orders Tab ── */}
         {tab === "orders" && (
@@ -373,7 +425,7 @@ export default function MyOrdersPage() {
               <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                 {Array.from({ length: 4 }).map((_, i) => (
                   <div key={i} style={{
-                    height: 96, borderRadius: 10,
+                    height: 145, borderRadius: 10,
                     background: "rgba(28,30,42,0.50)",
                     animation: "pulse 1.5s ease-in-out infinite",
                   }} />
@@ -519,8 +571,6 @@ export default function MyOrdersPage() {
             )}
           </>
         )}
-        </div>
-
       </div>
 
       {/* Support drawer */}

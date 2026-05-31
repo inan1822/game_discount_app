@@ -1,6 +1,13 @@
 import { fetchProduct } from "@/lib/api/admin.server"
 import { ProductForm } from "@/components/admin/ProductForm"
+import { SectionHeading } from "@/components/ui/SectionHeading"
 import { notFound } from "next/navigation"
+
+const PAGE: React.CSSProperties = {
+  width: "min(calc(100% - 192px), 1600px)",
+  marginInline: "auto",
+  paddingBlock: 40,
+}
 
 interface Props {
   params: Promise<{ id: string }>
@@ -12,11 +19,9 @@ export default async function EditProductPage({ params }: Props) {
   if (!product) notFound()
 
   return (
-    <div className="space-y-6">
-      <header>
-        <h1 style={{ fontSize: 24, fontWeight: 700, color: "#fff" }}>Edit Product</h1>
-        <p style={{ fontSize: 13, color: "#9fa0a1", marginTop: 4 }}>{product.name}</p>
-      </header>
+    <div style={PAGE}>
+      <SectionHeading title="Edit Product" />
+      <p style={{ fontSize: 13, color: "#9fa0a1", marginTop: -8, marginBottom: 20 }}>{product.name}</p>
       <ProductForm mode="edit" product={product} />
     </div>
   )

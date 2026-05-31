@@ -1,7 +1,8 @@
-"use client"
+﻿"use client"
 
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
+import Image from "next/image"
 import Link from "next/link"
 import {
   ChevronRight, Pencil, Lock, Link2,
@@ -18,7 +19,7 @@ import { toast } from "react-toastify"
 const cardStyle = {
   background: "rgba(28,30,42,0.70)",
   border: "1px solid rgba(255,255,255,0.05)",
-  borderRadius: 14,
+  borderRadius: 10,
   backdropFilter: "blur(8px)",
   WebkitBackdropFilter: "blur(8px)",
 } as const
@@ -149,13 +150,13 @@ export default function ProfilePage() {
                 aria-label="Change avatar"
               >
                 {user.avatar ? (
-                  <img
+                  <Image
                     src={user.avatar}
                     alt="Your avatar"
                     width={80}
                     height={80}
-                    loading="lazy"
-                    style={{ borderRadius: "50%", width: 80, height: 80, objectFit: "cover", display: "block" }}
+                    sizes="80px"
+                    style={{ borderRadius: "50%", objectFit: "cover", display: "block" }}
                   />
                 ) : (
                   <div
@@ -164,8 +165,8 @@ export default function ProfilePage() {
                       width: 80,
                       height: 80,
                       borderRadius: "50%",
-                      background: "linear-gradient(135deg, #AE3BD6, #6475D1)",
-                      boxShadow: "0 8px 24px rgba(174,59,214,0.35)",
+                      background: "linear-gradient(135deg, #6475D1, #2ab7e6)",
+                      boxShadow: "0 8px 24px rgba(100,117,209,0.35)",
                     }}
                   >
                     {userInitial}

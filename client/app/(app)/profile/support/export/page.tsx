@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
@@ -11,7 +11,7 @@ import { exportMyData } from "@/lib/api/support"
 const cardStyle = {
   background: "rgba(28,30,42,0.70)",
   border: "1px solid rgba(255,255,255,0.05)",
-  borderRadius: 14,
+  borderRadius: 10,
   backdropFilter: "blur(8px)",
   WebkitBackdropFilter: "blur(8px)",
 } as const

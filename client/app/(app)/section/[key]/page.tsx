@@ -185,7 +185,7 @@ export default function SectionPage() {
             initial={{ opacity: 0, y: -18 }} animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, ease: "easeOut", delay: 0.08 }}
             className="flex items-center gap-4 flex-shrink-0"
-            style={{ height: 52, ...glassStyle, borderRadius: 12, margin: "12px 80px 0", position: "relative", zIndex: 100 }}
+            style={{ height: 52, ...glassStyle, borderRadius: 12, margin: "12px 96px 0", position: "relative", zIndex: 100 }}
           >
             {/* Back */}
             <motion.button onClick={() => router.push("/")}
@@ -230,7 +230,7 @@ export default function SectionPage() {
                 <motion.button onClick={() => router.push("/login")}
                   whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.97 }}
                   className="text-[12px] font-semibold px-3 py-1"
-                  style={{ borderRadius: 8, background: "rgba(52,82,229,0.15)", color: "#48BCF9", border: "1px solid rgba(72,188,249,0.2)" }}>
+                  style={{ borderRadius: 8, background: "rgba(100,117,209,0.15)", color: "#6475D1", border: "1px solid rgba(100,117,209,0.25)" }}>
                   Login
                 </motion.button>
               )}
@@ -239,7 +239,7 @@ export default function SectionPage() {
 
           {/* CONTENT — grid layout, infinite scroll */}
           <div className="flex-1 overflow-y-auto pt-6 pb-8"
-            style={{ scrollbarWidth: "none", paddingLeft: 80, paddingRight: 80 }}>
+            style={{ scrollbarWidth: "none", paddingLeft: 96, paddingRight: 96 }}>
 
             {loading ? (
               /* Initial skeleton */
@@ -288,7 +288,7 @@ export default function SectionPage() {
                         <motion.div key={i}
                           animate={{ opacity: [0.3, 1, 0.3], scale: [0.8, 1, 0.8] }}
                           transition={{ repeat: Infinity, duration: 1.2, delay: i * 0.2 }}
-                          style={{ width: 6, height: 6, borderRadius: "50%", background: "#48BCF9" }} />
+                          style={{ width: 6, height: 6, borderRadius: "50%", background: "#6475D1" }} />
                       ))}
                     </div>
                   )}

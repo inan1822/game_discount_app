@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { toast } from "react-toastify"
 import { listFollowing, unfollow } from "@/lib/api/users"
+import { useChat } from "@/context/ChatContext"
 import type { FriendListItem } from "@/types/user"
 import FriendRow, { ActionButton } from "./FriendRow"
 import FriendSearchBar from "./FriendSearchBar"
@@ -11,6 +12,7 @@ import { ListSkeleton, EmptyState, GroupHeader } from "./PanelChrome"
 export default function FollowingPanel() {
   const [items, setItems] = useState<FriendListItem[] | null>(null)
   const [filter, setFilter] = useState("")
+  const { openChat } = useChat()
 
   useEffect(() => {
     let cancelled = false
@@ -62,7 +64,7 @@ export default function FollowingPanel() {
       meta={`${u.sharedGamesCount} shared games · ${u.sharedFriendsCount} shared friends`}
       actions={
         <>
-          <ActionButton variant="default" ariaLabel={`Message ${u.displayName}`} onClick={() => toast.info("Messaging coming soon")}>
+          <ActionButton variant="default" ariaLabel={`Message ${u.displayName}`} onClick={() => openChat(u._id)}>
             Message
           </ActionButton>
           <ActionButton variant="muted" ariaLabel={`Unfollow ${u.displayName}`} onClick={() => handleUnfollow(u._id)}>

@@ -20,8 +20,8 @@ export function ListSkeleton() {
           className="flex items-center gap-3 px-4 py-3 animate-pulse"
           style={{
             background: "rgba(28,30,42,0.50)",
-            border: "1px solid rgba(255,255,255,0.04)",
-            borderRadius: 14,
+            border: "1px solid rgba(31,37,57,0.6)",
+            borderRadius: 10,
           }}
         >
           <div className="rounded-full" style={{ width: 44, height: 44, background: "rgba(255,255,255,0.06)" }} />
@@ -41,8 +41,8 @@ export function EmptyState({ title, hint }: { title: string; hint?: string }) {
       className="flex flex-col items-center justify-center text-center py-14 px-4"
       style={{
         background: "rgba(255,255,255,0.03)",
-        border: "1px dashed rgba(255,255,255,0.08)",
-        borderRadius: 14,
+        border: "1px dashed rgba(31,37,57,0.6)",
+        borderRadius: 10,
       }}
     >
       <p className="text-[14px] text-white font-semibold mb-1">{title}</p>

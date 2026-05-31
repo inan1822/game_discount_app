@@ -1,22 +1,102 @@
 "use client"
 
-import { useEffect, useRef, useState, useCallback } from "react"
+import { useEffect, useRef, useState, useCallback, useLayoutEffect } from "react"
 import { useRouter } from "next/navigation"
 import { BellRing, CheckCheck } from "lucide-react"
 import { useAuth } from "@/context/AuthContext"
+import { useChat } from "@/context/ChatContext"
 import { useUnreadCount } from "@/hooks/useUnreadCount"
 import {
   getNotifications, markRead, markAllRead, deleteNotification,
 } from "@/lib/api/notifications"
 import type { Notification } from "@/types/notification"
+import { GlowCard } from "@/components/ui/spotlight-card"
+import { SectionHeading } from "@/components/ui/SectionHeading"
+import Avatar from "@/components/friends/Avatar"
+
+type Tab = "all" | "events" | "discounts" | "messages"
+
+// Semantic neon palette — glow follows the active tab and rows use their type color.
+// `hue` is the HSL hue that matches `hex` — used to lock the GlowCard spotlight
+// to a single color (otherwise GlowCard renders a gradient that drifts off-color).
+const NEON = {
+  all:       { hex: "#48BCF9", rgb: "72,188,249",  glow: "blue"   as const, hue: 200 },
+  events:    { hex: "#A521D3", rgb: "168,85,247",  glow: "purple" as const, hue: 287 },
+  discounts: { hex: "#44D62C", rgb: "68,214,44",   glow: "green"  as const, hue: 110 },
+  messages:  { hex: "#6475D1", rgb: "100,117,209", glow: "blue"   as const, hue: 230 },
+}
+
+// Where the spotlight pins on the tab bar (xp ∈ [0,1] from left to right)
+const TAB_PIN: Record<Tab, number> = {
+  all:       0.125, // center of the first quarter
+  events:    0.375,
+  discounts: 0.625,
+  messages:  0.875, // center of the last quarter
+}
 
 const cardStyle = {
-  background: "rgba(28,30,42,0.70)",
-  border: "1px solid rgba(255,255,255,0.05)",
-  borderRadius: 14,
-  backdropFilter: "blur(8px)",
+  background:           "rgba(28,30,42,0.70)",
+  border:               "1px solid rgba(188,188,201,0.15)",
+  borderRadius:         12,
+  backdropFilter:       "blur(8px)",
   WebkitBackdropFilter: "blur(8px)",
 } as const
+
+
+// Animates ONLY the spotlight color (--base / --spread).
+// Position (--x, --y, --xp, --yp) is handled entirely by GlowCard's own
+// `pinned` logic — which is proven to work (same approach as the game detail page).
+// Separating concerns this way means the hook never has to fight React over --x/--y,
+// and avoids the glowEl-null initialization race that broke the previous version.
+//
+// `containerRef` is read inside useLayoutEffect where the DOM is committed and
+// querySelector is guaranteed to find the [data-glow] element — no intermediate
+// state needed.
+function useHueAnimation(
+  containerRef: React.RefObject<HTMLDivElement | null>,
+  targetHue: number,
+  duration = 450,
+) {
+  const hueRef      = useRef(targetHue)
+  const rafRef      = useRef<number | null>(null)
+  const initialized = useRef(false)
+
+  useLayoutEffect(() => {
+    const el = containerRef.current?.querySelector<HTMLElement>("[data-glow]")
+    if (!el) return
+
+    const write = (hue: number) => {
+      el.style.setProperty("--base",   hue.toFixed(2))
+      el.style.setProperty("--spread", "0")
+    }
+
+    if (!initialized.current) {
+      hueRef.current = targetHue
+      write(targetHue)
+      initialized.current = true
+      return
+    }
+
+    const start = hueRef.current
+    // Synchronously write current hue before this frame paints.
+    // Overwrites React's --base reset (from glowColor in getInlineStyles) so
+    // the animation never flashes to the wrong color for even one frame.
+    write(start)
+    const startAt = performance.now()
+    const ease    = (t: number) => 1 - Math.pow(1 - t, 3)
+
+    const tick = (now: number) => {
+      const t = Math.min(1, (now - startAt) / duration)
+      const hue = start + (targetHue - start) * ease(t)
+      hueRef.current = hue
+      write(hue)
+      if (t < 1) rafRef.current = requestAnimationFrame(tick)
+    }
+    rafRef.current = requestAnimationFrame(tick)
+
+    return () => { if (rafRef.current != null) cancelAnimationFrame(rafRef.current) }
+  }, [targetHue]) // containerRef is a stable ref object — safe to omit
+}
 
 function formatRelative(iso: string): string {
   const ms = Date.now() - new Date(iso).getTime()
@@ -32,8 +112,17 @@ export default function NotificationsPage() {
   const router       = useRouter()
   const { user, isLoading } = useAuth()
   const { counts, refresh: refreshCounts } = useUnreadCount()
+  const { myId, conversations, totalUnread: chatUnread, openConversation, refreshConversations } = useChat()
 
-  const [tab, setTab] = useState<"all" | "events" | "discounts">("all")
+  const [tab, setTab] = useState<Tab>("all")
+  const [hoveredTab, setHoveredTab] = useState<Tab | null>(null)
+  // Which tab drives the glow + colors: hovered one takes precedence, otherwise active
+  const focusTab = hoveredTab ?? tab
+
+  // wrapRef wraps the GlowCard. useHueAnimation reads [data-glow] from it directly.
+  const wrapRef = useRef<HTMLDivElement>(null)
+  useHueAnimation(wrapRef, NEON[focusTab].hue)
+
   const [items, setItems]     = useState<Notification[]>([])
   const [hasMore, setHasMore] = useState(false)
   const [loading, setLoading] = useState(true)
@@ -60,7 +149,12 @@ export default function NotificationsPage() {
     }
   }, [user, items])
 
-  useEffect(() => { load(true) }, [user?._id, tab])
+  // Messages tab shows the chat conversation list — not the notifications feed.
+  useEffect(() => {
+    if (tab === "messages") { setLoading(false); refreshConversations(); return }
+    load(true)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?._id, tab])
 
   // Infinite scroll observer
   useEffect(() => {
@@ -106,88 +200,199 @@ export default function NotificationsPage() {
 
   return (
     // Shell (sidebar + background) provided by (app)/layout.tsx
-    <div className="flex-1 min-w-0 overflow-y-auto" style={{ scrollbarWidth: "none" }}>
-          <div className="max-w-2xl mx-auto px-8 py-10">
+    // Width follows THE WIDTH RULE: min(calc(100% - 192px), 1600px), centered.
+    <div
+      style={{
+        width:         "min(calc(100% - 192px), 1600px)",
+        marginInline:  "auto",
+        paddingBlock:  40,
+      }}
+    >
+      <SectionHeading
+        title="Notifications"
+        right={tab !== "messages" && counts.total > 0 ? (
+          <button
+            onClick={handleMarkAllRead}
+            className="flex items-center gap-2 text-[14px] font-semibold transition-colors"
+            style={{
+              color:        NEON.all.hex,
+              background:   `rgba(${NEON.all.rgb},0.10)`,
+              border:       "none",
+              borderRadius: 999,
+              padding:      "6px 16px",
+              cursor:       "pointer",
+              marginBottom: 2,
+            }}
+          >
+            <CheckCheck size={14} />
+            Mark all read
+          </button>
+        ) : undefined}
+      />
 
-            {/* Header */}
-            <div className="flex items-center justify-between mb-6">
-              <h1 className="text-white text-2xl font-bold">Notifications</h1>
-              {counts.total > 0 && (
-                <button
-                  onClick={handleMarkAllRead}
-                  className="flex items-center gap-1.5 text-[12px] font-medium transition-colors hover:text-white"
-                  style={{ color: "#48BCF9", background: "transparent", border: "none", cursor: "pointer" }}
-                >
-                  <CheckCheck size={14} />
-                  Mark all read
-                </button>
-              )}
-            </div>
-
-            {/* Tab bar */}
-            <div
-              className="flex gap-1.5 mb-6 p-1"
-              style={{ background: "rgba(28,30,42,0.70)", borderRadius: 10, border: "1px solid rgba(255,255,255,0.05)" }}
+      {/* Tab bar — pinned handles spotlight position (same approach as game detail page).
+          useHueAnimation owns --base/--spread for smooth color transitions.
+          No manual mode — GlowCard's own cursor tracking + applyPinned work freely. */}
+      <div ref={wrapRef} className="mb-5">
+      <GlowCard
+        customSize
+        pinned={{ xp: TAB_PIN[focusTab], yp: 0.95 }}
+        className="!rounded-[12px] !p-1 !aspect-auto !backdrop-blur-none !shadow-none flex gap-1"
+        style={{
+          width:                "100%",
+          background:           "rgba(28, 30, 42, 0.40)",
+          backdropFilter:       "blur(8px)",
+          WebkitBackdropFilter: "blur(8px)",
+          ["--bg-spot-opacity" as any]:      "0.18",
+          ["--border-spot-opacity" as any]:  "0.9",
+          ["--border-light-opacity" as any]: "0.5",
+          ["--size" as any]:                 "350",
+          ["--saturation" as any]:           "90",
+          ["--lightness" as any]:            "60",
+        } as React.CSSProperties}
+      >
+        {(["all", "events", "discounts", "messages"] as const).map(t => {
+          const active  = tab === t
+          const hovered = hoveredTab === t
+          // Show this tab's neon color when active OR when hovered
+          const lit     = active || hovered
+          const badge   = t === "messages" && chatUnread > 0 ? chatUnread : 0
+          return (
+            <button
+              key={t}
+              onClick={() => setTab(t)}
+              onMouseEnter={() => setHoveredTab(t)}
+              onMouseLeave={() => setHoveredTab(null)}
+              className="flex-1 px-8 py-[6px] text-[18px] relative z-10 capitalize transition-colors after:absolute after:inset-[-60px] after:content-[''] inline-flex items-center justify-center gap-2"
+              style={{
+                borderRadius: 9,
+                background:   "transparent",
+                color:        lit    ? NEON[t].hex : "rgba(255,255,255,0.4)",
+                fontWeight:   active ? 700 : hovered ? 600 : 500,
+                border:       "1px solid transparent",
+                boxShadow:    "none",
+                transition:   "color 0.45s cubic-bezier(.2,.7,.3,1), font-weight 0.25s",
+                cursor:       "pointer",
+              }}
             >
-              {(["all", "events", "discounts"] as const).map(t => (
+              {t}
+              {badge > 0 && (
+                <span style={{
+                  background: NEON.messages.hex, color: "#fff",
+                  minWidth: 20, height: 20, padding: "0 6px", borderRadius: 999,
+                  fontSize: 11, fontWeight: 700, lineHeight: "20px",
+                  display: "inline-flex", alignItems: "center", justifyContent: "center",
+                }}>
+                  {badge > 99 ? "99+" : badge}
+                </span>
+              )}
+            </button>
+          )
+        })}
+      </GlowCard>
+      </div>
+
+      {/* Messages tab → chat conversation list (most recent first) */}
+      {tab === "messages" ? (
+        conversations.length === 0 ? (
+          <div className="text-center py-20">
+            <BellRing size={40} className="mx-auto mb-3 opacity-20 text-white" />
+            <p className="text-white/40 text-sm">No conversations yet</p>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {conversations.map(c => {
+              const preview = c.lastMessage
+                ? `${c.lastMessage.senderId === myId ? "You: " : ""}${c.lastMessage.body}`
+                : "No messages yet"
+              return (
                 <button
-                  key={t}
-                  onClick={() => setTab(t)}
-                  className="flex-1 py-1.5 text-[12px] font-medium capitalize transition-colors"
+                  key={c._id}
+                  onClick={() => openConversation(c)}
+                  className="relative flex items-center gap-4 px-5 py-4 w-full text-left transition-colors"
                   style={{
-                    borderRadius: 8,
-                    border: "none",
+                    ...cardStyle,
+                    background: c.unread > 0 ? "rgba(28,30,42,0.80)" : "rgba(28,30,42,0.50)",
                     cursor: "pointer",
-                    background: tab === t
-                      ? t === "events"    ? "rgba(168,85,247,0.18)"
-                      : t === "discounts" ? "rgba(34,197,94,0.18)"
-                      : "rgba(72,188,249,0.15)"
-                      : "transparent",
-                    color: tab === t
-                      ? t === "events"    ? "#A855F7"
-                      : t === "discounts" ? "#22C55E"
-                      : "#48BCF9"
-                      : "rgba(255,255,255,0.4)",
                   }}
                 >
-                  {t}
-                </button>
-              ))}
-            </div>
-
-            {/* Notification list */}
-            {loading ? (
-              <div className="text-white/40 text-sm text-center py-12">Loading…</div>
-            ) : visibleItems.length === 0 ? (
-              <div className="text-center py-16">
-                <BellRing size={40} className="mx-auto mb-3 opacity-20 text-white" />
-                <p className="text-white/40 text-sm">No notifications yet</p>
-              </div>
-            ) : (
-              <div className="space-y-2">
-                {visibleItems.map(n => (
-                  <NotificationRow
-                    key={n._id}
-                    notif={n}
-                    onRead={handleMarkRead}
-                    onDelete={handleDelete}
-                    onNavigate={(slug) => {
-                      handleMarkRead(n._id)
-                      if (slug) router.push(`/game/${slug}`)
-                    }}
-                  />
-                ))}
-
-                {/* Infinite scroll trigger */}
-                {hasMore && (
-                  <div ref={loaderRef} className="py-4 text-center text-white/30 text-sm">
-                    {loadingMore ? "Loading more…" : ""}
+                  <Avatar name={c.other.name} url={c.other.avatar} online={c.other.isOnline} size={44} />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-baseline justify-between gap-4">
+                      <p className="text-[16px] font-semibold leading-snug truncate"
+                         style={{ color: c.unread > 0 ? "white" : "rgba(255,255,255,0.6)" }}>
+                        {c.other.name}
+                      </p>
+                      {c.lastMessage && (
+                        <p className="text-[11px] flex-shrink-0" style={{ color: "rgba(255,255,255,0.35)" }}>
+                          {formatRelative(c.lastMessage.createdAt)}
+                        </p>
+                      )}
+                    </div>
+                    <p className="text-[13px] mt-1 leading-relaxed truncate"
+                       style={{ color: c.unread > 0 ? "rgba(255,255,255,0.7)" : "rgba(255,255,255,0.45)" }}>
+                      {preview}
+                    </p>
                   </div>
-                )}
-              </div>
-            )}
+                  {c.unread > 0 && (
+                    <span style={{
+                      background: NEON.messages.hex, color: "#fff",
+                      minWidth: 20, height: 20, padding: "0 6px", borderRadius: 999,
+                      fontSize: 11, fontWeight: 700, flexShrink: 0,
+                      display: "inline-flex", alignItems: "center", justifyContent: "center",
+                    }}>
+                      {c.unread > 99 ? "99+" : c.unread}
+                    </span>
+                  )}
+                </button>
+              )
+            })}
           </div>
+        )
+      ) : loading ? (
+        <div className="space-y-2">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <div
+              key={i}
+              style={{
+                height:       64,
+                borderRadius: 12,
+                background:   "rgba(28,30,42,0.50)",
+                border:       "1px solid rgba(188,188,201,0.10)",
+                animation:    "pulse 1.5s ease-in-out infinite",
+              }}
+            />
+          ))}
         </div>
+      ) : visibleItems.length === 0 ? (
+        <div className="text-center py-20">
+          <BellRing size={40} className="mx-auto mb-3 opacity-20 text-white" />
+          <p className="text-white/40 text-sm">No notifications yet</p>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {visibleItems.map(n => (
+            <NotificationRow
+              key={n._id}
+              notif={n}
+              onRead={handleMarkRead}
+              onDelete={handleDelete}
+              onNavigate={(slug) => {
+                handleMarkRead(n._id)
+                if (slug) router.push(`/game/${slug}`)
+              }}
+            />
+          ))}
+
+          {/* Infinite scroll trigger */}
+          {hasMore && (
+            <div ref={loaderRef} className="py-4 text-center text-white/30 text-sm">
+              {loadingMore ? "Loading more…" : ""}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
   )
 }
 
@@ -197,64 +402,83 @@ function NotificationRow({ notif, onRead, onDelete, onNavigate }: {
   onDelete: (id: string) => void
   onNavigate: (slug: string | null) => void
 }) {
-  const accentColor = notif.type === "event" ? "#A855F7" : "#22C55E"
+  // Row buttons follow the row's TYPE color: events = purple, discounts = green
+  const palette     = notif.type === "event" ? NEON.events : NEON.discounts
+  const accentColor = palette.hex
+  const accentRgb   = palette.rgb
+  const clickable   = !!(notif.gameSlug || notif.link)
 
   return (
     <div
-      className="relative flex items-start gap-3 px-4 py-3 transition-colors"
+      className="relative flex items-center gap-4 px-5 py-4 transition-colors"
       style={{
         ...cardStyle,
-        borderRadius: 12,
-        borderLeft: `4px solid ${accentColor}`,
         background: notif.read
           ? "rgba(28,30,42,0.50)"
           : "rgba(28,30,42,0.80)",
-        cursor: notif.gameSlug || notif.link ? "pointer" : "default",
+        cursor:     clickable ? "pointer" : "default",
       }}
       onClick={() => onNavigate(notif.gameSlug)}
     >
-      {/* Unread dot */}
+      {/* Unread dot — left edge, vertically centered */}
       {!notif.read && (
         <span
-          className="absolute right-3 top-3"
-          style={{ width: 6, height: 6, borderRadius: "50%", background: accentColor, display: "inline-block" }}
+          className="flex-shrink-0"
+          style={{ width: 8, height: 8, borderRadius: "50%", background: accentColor }}
+          aria-hidden
         />
       )}
 
+      {/* Title + body — main column */}
       <div className="flex-1 min-w-0">
-        <p
-          className="text-[13px] font-semibold leading-snug"
-          style={{ color: notif.read ? "rgba(255,255,255,0.6)" : "white" }}
-        >
-          {notif.title}
-        </p>
+        <div className="flex items-baseline justify-between gap-4">
+          <p
+            className="text-[16px] font-semibold leading-snug truncate"
+            style={{ color: notif.read ? "rgba(255,255,255,0.6)" : "white" }}
+          >
+            {notif.title}
+          </p>
+          <p
+            className="text-[11px] flex-shrink-0"
+            style={{ color: "rgba(255,255,255,0.35)" }}
+          >
+            {formatRelative(notif.createdAt)}
+          </p>
+        </div>
         {notif.body && (
-          <p className="text-[11px] mt-0.5 leading-relaxed" style={{ color: "rgba(255,255,255,0.4)" }}>
+          <p
+            className="text-[13px] mt-1 leading-relaxed truncate"
+            style={{ color: "rgba(255,255,255,0.45)" }}
+          >
             {notif.body}
           </p>
         )}
-        <p className="text-[10px] mt-1.5" style={{ color: "rgba(255,255,255,0.25)" }}>
-          {formatRelative(notif.createdAt)}
-        </p>
       </div>
 
       {/* Actions */}
-      <div className="flex flex-col gap-1.5 flex-shrink-0" onClick={e => e.stopPropagation()}>
+      <div className="flex items-center gap-2 flex-shrink-0" onClick={e => e.stopPropagation()}>
         {!notif.read && (
           <button
             onClick={() => onRead(notif._id)}
-            className="text-[10px] transition-colors hover:text-white"
-            style={{ color: "#48BCF9", background: "transparent", border: "none", cursor: "pointer", padding: "2px 4px" }}
+            className="text-[14px] font-semibold transition-colors"
+            style={{
+              color:        accentColor,
+              background:   `rgba(${accentRgb},0.10)`,
+              border:       "none",
+              borderRadius: 999,
+              padding:      "6px 16px",
+              cursor:       "pointer",
+            }}
           >
             Read
           </button>
         )}
         <button
           onClick={() => onDelete(notif._id)}
-          className="text-[10px] transition-colors hover:text-white"
-          style={{ color: "rgba(255,255,255,0.3)", background: "transparent", border: "none", cursor: "pointer", padding: "2px 4px" }}
+          aria-label="Dismiss"
+          style={{ background: "none", border: "none", padding: "4px", cursor: "pointer", color: "rgba(255,255,255,0.35)", fontSize: 18, lineHeight: 1, display: "flex", alignItems: "center" }}
         >
-          Dismiss
+          ×
         </button>
       </div>
     </div>

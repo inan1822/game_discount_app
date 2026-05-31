@@ -4,9 +4,16 @@ import {
   AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
 } from "recharts"
-import { TrendingUp, ShoppingCart, Users, Package, BarChart2 } from "lucide-react"
+import { TrendingUp, ShoppingCart, Users, Package } from "lucide-react"
 import { fetchAnalytics } from "@/lib/api/admin.client"
+import { SectionHeading } from "@/components/ui/SectionHeading"
 import type { AnalyticsData } from "@/types/admin"
+
+const PAGE: React.CSSProperties = {
+  width: "min(calc(100% - 192px), 1600px)",
+  marginInline: "auto",
+  paddingBlock: 40,
+}
 
 const currency = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 })
 const currencyFull = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" })
@@ -76,8 +83,8 @@ function KpiCard({
           <Icon className="w-5 h-5" style={{ color }} />
         </div>
         <div>
-          <p style={{ color: "#9fa0a1", fontSize: 12, marginBottom: 4 }}>{label}</p>
-          <p style={{ color: "#fff", fontSize: 22, fontWeight: 800, lineHeight: 1 }}>{value}</p>
+          <p style={{ color: "#9fa0a1", fontSize: 11, fontWeight: 500, marginBottom: 4 }}>{label}</p>
+          <p style={{ color: "#fff", fontSize: 28, fontWeight: 800, lineHeight: 1 }}>{value}</p>
           {sub && <p style={{ color: "#9fa0a1", fontSize: 11, marginTop: 4 }}>{sub}</p>}
         </div>
       </div>
@@ -147,46 +154,39 @@ export default function AnalyticsPage() {
     : []
 
   return (
-    <div className="space-y-6">
+    <div style={PAGE}>
       {/* Header + period toggle */}
-      <header className="flex items-center justify-between flex-wrap gap-4">
-        <div className="flex items-center gap-3">
-          <div style={{
-            width: 36, height: 36, borderRadius: 10,
-            background: "rgba(100,117,209,0.15)",
-            display: "flex", alignItems: "center", justifyContent: "center",
+      <SectionHeading
+        title="Analytics"
+        right={
+          <div className="flex gap-1" style={{
+            background: "rgba(28,30,42,0.70)",
+            border: "1px solid rgba(188,188,201,0.15)",
+            borderRadius: 10, padding: 4,
           }}>
-            <BarChart2 className="w-4 h-4" style={{ color: "#6475D1" }} />
+            {PERIODS.map(p => (
+              <button
+                key={p.value}
+                onClick={() => setPeriod(p.value)}
+                style={{
+                  background: period === p.value ? "#6475D1" : "transparent",
+                  color:  period === p.value ? "#fff" : "#9fa0a1",
+                  border: "none", borderRadius: 8,
+                  padding: "6px 14px", fontSize: 13, fontWeight: 600,
+                  cursor: "pointer", transition: "background 0.15s, color 0.15s",
+                }}
+              >
+                {p.label}
+              </button>
+            ))}
           </div>
-          <div>
-            <h1 style={{ fontSize: 22, fontWeight: 800, color: "#fff" }}>Analytics</h1>
-            <p style={{ color: "#9fa0a1", fontSize: 12 }}>Store performance overview</p>
-          </div>
-        </div>
+        }
+      />
+      <p style={{ color: "#9fa0a1", fontSize: 13, marginTop: -8, marginBottom: 24 }}>
+        Store performance overview
+      </p>
 
-        {/* Period selector */}
-        <div className="flex gap-1" style={{
-          background: "rgba(28,30,42,0.70)",
-          border: "1px solid rgba(188,188,201,0.15)",
-          borderRadius: 10, padding: 4,
-        }}>
-          {PERIODS.map(p => (
-            <button
-              key={p.value}
-              onClick={() => setPeriod(p.value)}
-              style={{
-                background: period === p.value ? "#6475D1" : "transparent",
-                color:  period === p.value ? "#fff" : "#9fa0a1",
-                border: "none", borderRadius: 8,
-                padding: "6px 14px", fontSize: 13, fontWeight: 600,
-                cursor: "pointer", transition: "background 0.15s, color 0.15s",
-              }}
-            >
-              {p.label}
-            </button>
-          ))}
-        </div>
-      </header>
+      <div className="space-y-6">
 
       {/* KPI row */}
       {loading ? (
@@ -441,6 +441,7 @@ export default function AnalyticsPage() {
             </div>
           )}
         </div>
+      </div>
       </div>
     </div>
   )

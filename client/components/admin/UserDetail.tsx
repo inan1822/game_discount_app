@@ -110,7 +110,7 @@ export function UserDetail({ initial }: Props) {
 
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-3 flex-wrap mb-1">
-              <h1 style={{ fontSize: 20, fontWeight: 800, color: "#fff" }}>{user.name}</h1>
+              <p style={{ fontSize: 20, fontWeight: 800, color: "#fff" }}>{user.name}</p>
 
               {/* Role badge */}
               <span style={{
@@ -265,8 +265,8 @@ export function UserDetail({ initial }: Props) {
                 <Icon className="w-4 h-4" style={{ color }} />
               </div>
               <div>
-                <p style={{ color: "#9fa0a1", fontSize: 11 }}>{label}</p>
-                <p style={{ color: "#fff", fontSize: 16, fontWeight: 700 }}>{value}</p>
+                <p style={{ color: "#9fa0a1", fontSize: 11, fontWeight: 500 }}>{label}</p>
+                <p style={{ color: "#fff", fontSize: 26, fontWeight: 700, lineHeight: 1.1 }}>{value}</p>
               </div>
             </div>
           </div>

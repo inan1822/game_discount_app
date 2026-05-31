@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation"
 import { AnimatePresence, motion } from "framer-motion"
 import { BellRing, Tag, Zap, CheckCheck } from "lucide-react"
 import { getNotifications, markRead, markAllRead } from "@/lib/api/notifications"
+import { useChat } from "@/context/ChatContext"
+import Avatar from "@/components/friends/Avatar"
 import type { Notification } from "@/types/notification"
 
 interface Props {
@@ -30,15 +32,19 @@ export default function NotificationPopover({ open, onClose, onMutated, anchor =
   const [items, setItems]     = useState<Notification[] | null>(null)
   const [loading, setLoading] = useState(false)
 
-  // Load latest 8 when opened
+  const { myId, conversations, openConversation, refreshConversations } = useChat()
+  const unreadConvos = conversations.filter(c => c.unread > 0)
+
+  // Load latest 8 notifications + refresh conversations when opened
   useEffect(() => {
     if (!open) return
     setLoading(true)
+    refreshConversations()
     getNotifications(8)
       .then(page => setItems(page.items))
       .catch(() => setItems([]))
       .finally(() => setLoading(false))
-  }, [open])
+  }, [open]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Close on outside click
   useEffect(() => {
@@ -132,15 +138,61 @@ export default function NotificationPopover({ open, onClose, onMutated, anchor =
                   <div key={i} className="h-14 rounded animate-pulse" style={{ background: "rgba(255,255,255,0.04)" }} />
                 ))}
               </div>
-            ) : !items || items.length === 0 ? (
-              <div className="text-center py-12 px-4">
-                <BellRing size={24} className="mx-auto mb-2" style={{ color: "rgba(255,255,255,0.18)" }} />
-                <p className="text-[12px]" style={{ color: "rgba(255,255,255,0.4)" }}>
-                  No notifications yet
-                </p>
-              </div>
             ) : (
-              items.map(n => {
+            <>
+              {/* Messages section — unread conversations */}
+              {unreadConvos.length > 0 && (
+                <>
+                  <div className="px-4 pt-3 pb-1 text-[10px] font-bold tracking-wider" style={{ color: "rgba(255,255,255,0.35)" }}>
+                    MESSAGES
+                  </div>
+                  {unreadConvos.slice(0, 4).map(c => (
+                    <motion.button
+                      key={c._id}
+                      onClick={() => { openConversation(c); onClose() }}
+                      whileHover={{ backgroundColor: "rgba(255,255,255,0.04)" }}
+                      className="w-full text-left px-4 py-3 flex gap-3 items-center"
+                      style={{ borderBottom: "1px solid rgba(255,255,255,0.03)", background: "#6475D10d", cursor: "pointer" }}
+                    >
+                      <Avatar name={c.other.name} url={c.other.avatar} online={c.other.isOnline} size={28} />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-white text-[12px] font-semibold leading-tight truncate">{c.other.name}</p>
+                        {c.lastMessage && (
+                          <p className="text-[10.5px] mt-0.5 leading-snug truncate" style={{ color: "rgba(255,255,255,0.45)" }}>
+                            {c.lastMessage.senderId === myId ? "You: " : ""}{c.lastMessage.body}
+                          </p>
+                        )}
+                      </div>
+                      <span style={{
+                        background: "#6475D1", color: "#fff", minWidth: 18, height: 18, padding: "0 5px",
+                        borderRadius: 999, fontSize: 10, fontWeight: 700, flexShrink: 0,
+                        display: "inline-flex", alignItems: "center", justifyContent: "center",
+                      }}>
+                        {c.unread > 99 ? "99+" : c.unread}
+                      </span>
+                    </motion.button>
+                  ))}
+                </>
+              )}
+
+              {/* Notifications section */}
+              {!items || items.length === 0 ? (
+                unreadConvos.length === 0 && (
+                  <div className="text-center py-12 px-4">
+                    <BellRing size={24} className="mx-auto mb-2" style={{ color: "rgba(255,255,255,0.18)" }} />
+                    <p className="text-[12px]" style={{ color: "rgba(255,255,255,0.4)" }}>
+                      No notifications yet
+                    </p>
+                  </div>
+                )
+              ) : (
+              <>
+                {unreadConvos.length > 0 && (
+                  <div className="px-4 pt-3 pb-1 text-[10px] font-bold tracking-wider" style={{ color: "rgba(255,255,255,0.35)" }}>
+                    NOTIFICATIONS
+                  </div>
+                )}
+                {items.map(n => {
                 const isEvent = n.type === "event"
                 const accent  = isEvent ? "#AE3BD6" : "#44d62c"
                 return (
@@ -197,7 +249,10 @@ export default function NotificationPopover({ open, onClose, onMutated, anchor =
                     </div>
                   </motion.button>
                 )
-              })
+              })}
+              </>
+              )}
+            </>
             )}
           </div>
 

@@ -16,9 +16,9 @@ export function StatusBadge({ status }: { status: OrderStatus }) {
       style={{
         background: bg,
         color,
-        borderRadius: 999,
         fontSize: 11,
-        fontWeight: 600,
+        fontWeight: 700,
+        borderRadius: 999,
         padding: "3px 10px",
         whiteSpace: "nowrap",
       }}

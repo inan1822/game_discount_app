@@ -192,8 +192,8 @@ export function PromosTable({ initial }: Props) {
               {["Code", "Discount", "Min order", "Usage", "Expires", "Status", "Actions"].map(h => (
                 <th key={h} style={{
                   padding: "10px 16px", textAlign: "left",
-                  fontSize: 11, fontWeight: 700, color: "#9fa0a1",
-                  letterSpacing: "0.08em", textTransform: "uppercase",
+                  fontSize: 13, fontWeight: 700, color: "#9fa0a1",
+                  letterSpacing: "0.1em", textTransform: "uppercase",
                 }}>
                   {h}
                 </th>
@@ -202,7 +202,7 @@ export function PromosTable({ initial }: Props) {
           </thead>
           <tbody>
             {promos.length === 0 && (
-              <tr><td colSpan={7} style={{ padding: "40px 16px", textAlign: "center", color: "#9fa0a1", fontSize: 14 }}>
+              <tr><td colSpan={7} style={{ padding: "40px 16px", textAlign: "center", color: "#9fa0a1", fontSize: 13 }}>
                 No promo codes yet. Create one above.
               </td></tr>
             )}

@@ -8,6 +8,8 @@ import FollowingPanel from "@/components/friends/FollowingPanel"
 import FollowersPanel from "@/components/friends/FollowersPanel"
 import RequestsPanel  from "@/components/friends/RequestsPanel"
 import AddFriendPanel from "@/components/friends/AddFriendPanel"
+import { SectionHeading } from "@/components/ui/SectionHeading"
+import { GlowCard }       from "@/components/ui/spotlight-card"
 
 const TABS = ["Following", "Followers", "Requests", "Add Friend"] as const
 type Tab = typeof TABS[number]
@@ -49,77 +51,82 @@ function FriendsContent() {
 
   if (isLoading || !isLoggedIn) return null
 
+  const tabXp: Record<Tab, number> = {
+    "Following":  0.125,
+    "Followers":  0.375,
+    "Requests":   0.625,
+    "Add Friend": 0.875,
+  }
+
   return (
     // Shell (sidebar + background) provided by (app)/layout.tsx
-    <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
-          <div className="flex-1 overflow-y-auto" style={{ paddingLeft: 20, paddingRight: 80, paddingTop: 24, scrollbarWidth: "none" }}>
-            <motion.h1
-              initial={{ opacity: 0, y: -8 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="text-white text-[26px] font-bold mb-5"
-            >
-              Friends
-            </motion.h1>
+    <div
+      style={{
+        width:        "min(calc(100% - 192px), 1600px)",
+        marginInline: "auto",
+        paddingBlock: 40,
+      }}
+    >
+      <SectionHeading title="Friends" />
 
-            {/* Tab bar — glass card */}
-            <div
-              className="flex items-stretch overflow-x-auto mb-5"
+      {/* Tab bar */}
+      <GlowCard
+        customSize
+        glowColor="blue"
+        pinned={{ xp: tabXp[activeTab], yp: 0.95 }}
+        className="!rounded-[12px] !p-1 !aspect-auto !backdrop-blur-none !shadow-none mb-5 flex gap-1"
+        style={{
+          width:      "100%",
+          background: "rgba(28,30,42,0.40)",
+          border:     "1px solid rgba(31,37,57,0.6)",
+          ["--base"   as any]: "220",
+          ["--spread" as any]: "0",
+        }}
+      >
+        {TABS.map(tab => {
+          const active     = activeTab === tab
+          const showBadge  = tab === "Requests" && incomingCount > 0
+          return (
+            <motion.button
+              key={tab}
+              onClick={() => handleTabClick(tab)}
+              whileTap={{ scale: 0.96 }}
+              className="flex-1 relative z-10 after:absolute after:inset-[-60px] after:content-['']"
               style={{
-                background: "rgba(28,30,42,0.70)",
-                border: "1px solid rgba(255,255,255,0.05)",
-                borderRadius: 14,
-                padding: 4,
-                backdropFilter: "blur(8px)",
-                WebkitBackdropFilter: "blur(8px)",
-                scrollbarWidth: "none",
+                display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+                borderRadius: 9, padding: "8px 0",
+                fontSize: 18, fontWeight: active ? 700 : 500,
+                color:      active ? "#6475D1" : "rgba(255,255,255,0.4)",
+                background: "transparent",
+                border:     "1px solid transparent",
+                cursor:     "pointer",
+                transition: "all 0.25s",
+                whiteSpace: "nowrap",
               }}
             >
-              {TABS.map(tab => {
-                const active = activeTab === tab
-                const showBadge = tab === "Requests" && incomingCount > 0
-                return (
-                  <button
-                    key={tab}
-                    onClick={() => handleTabClick(tab)}
-                    className="flex-1 px-4 py-2.5 text-[13px] whitespace-nowrap transition-colors relative"
-                    style={{
-                      background: active ? "rgba(100,117,209,0.20)" : "transparent",
-                      color:      active ? "#6475D1"               : "rgba(255,255,255,0.45)",
-                      fontWeight: active ? 600 : 400,
-                      borderRadius: 10,
-                      border: "none",
-                      cursor: "pointer",
-                    }}
-                  >
-                    {tab}
-                    {showBadge && (
-                      <span
-                        className="ml-2 inline-flex items-center justify-center text-[10px] font-bold"
-                        style={{
-                          background: "#6475D1",
-                          color: "#fff",
-                          minWidth: 18,
-                          height: 18,
-                          padding: "0 5px",
-                          borderRadius: 999,
-                        }}
-                      >
-                        {incomingCount}
-                      </span>
-                    )}
-                  </button>
-                )
-              })}
-            </div>
+              {tab}
+              {showBadge && (
+                <span style={{
+                  background: "#6475D1", color: "#fff",
+                  minWidth: 18, height: 18, padding: "0 5px",
+                  borderRadius: 999, fontSize: 10, fontWeight: 700,
+                  display: "inline-flex", alignItems: "center", justifyContent: "center",
+                }}>
+                  {incomingCount}
+                </span>
+              )}
+            </motion.button>
+          )
+        })}
+      </GlowCard>
 
-            <div className="pb-12">
-              {activeTab === "Following"  && <FollowingPanel />}
-              {activeTab === "Followers"  && <FollowersPanel />}
-              {activeTab === "Requests"   && <RequestsPanel onCountChange={setIncomingCount} />}
-              {activeTab === "Add Friend" && <AddFriendPanel />}
-            </div>
-          </div>
-        </div>
+      <div className="pb-12">
+        {activeTab === "Following"  && <FollowingPanel />}
+        {activeTab === "Followers"  && <FollowersPanel />}
+        {activeTab === "Requests"   && <RequestsPanel onCountChange={setIncomingCount} />}
+        {activeTab === "Add Friend" && <AddFriendPanel />}
+      </div>
+    </div>
   )
 }
 

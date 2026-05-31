@@ -32,6 +32,7 @@ export interface DashboardStats {
 export interface OrderItem {
   productId:   string
   productName: string
+  imageUrl?:   string | null
   keyId:       string | null
   quantity:    number
   unitPrice:   number

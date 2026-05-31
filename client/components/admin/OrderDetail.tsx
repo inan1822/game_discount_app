@@ -137,7 +137,7 @@ export function OrderDetail({ order: initial }: { order: Order }) {
           <TableHeader>
             <TableRow style={{ borderColor: "rgba(188,188,201,0.10)" }}>
               {["Product", "Qty", "Unit Price", "Subtotal"].map(h => (
-                <TableHead key={h} style={{ color: "#9fa0a1", fontSize: 12 }}>{h}</TableHead>
+                <TableHead key={h} style={{ color: "#9fa0a1", fontSize: 13, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em" }}>{h}</TableHead>
               ))}
             </TableRow>
           </TableHeader>

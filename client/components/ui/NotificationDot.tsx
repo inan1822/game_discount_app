@@ -1,44 +1,42 @@
 interface Props {
   events: number
   discounts: number
+  messages?: number
   size?: number
 }
 
-export default function NotificationDot({ events, discounts, size = 8 }: Props) {
+/**
+ * Shows up to 3 separate dots — one per category with unread items.
+ * Events = purple, Discounts = green, Messages = blue.
+ * Only dots for categories that actually have unread are rendered.
+ */
+export default function NotificationDot({ events, discounts, messages = 0, size = 8 }: Props) {
   const hasEvents    = events > 0
   const hasDiscounts = discounts > 0
-  const hasAny       = hasEvents || hasDiscounts
+  const hasMessages  = messages > 0
 
-  if (!hasAny) return null
+  if (!hasEvents && !hasDiscounts && !hasMessages) return null
 
-  if (hasEvents && hasDiscounts) {
-    // Split dot: left half purple, right half green
-    return (
-      <span
-        style={{
-          display: "inline-block",
-          width: size,
-          height: size,
-          borderRadius: "50%",
-          background: `conic-gradient(#A855F7 0deg 180deg, #22C55E 180deg 360deg)`,
-          flexShrink: 0,
-        }}
-        aria-label="New events and discounts"
-      />
-    )
-  }
+  const dot = (color: string, label: string) => (
+    <span
+      key={label}
+      aria-label={label}
+      style={{
+        display:      "inline-block",
+        width:        size,
+        height:       size,
+        borderRadius: "50%",
+        background:   color,
+        flexShrink:   0,
+      }}
+    />
+  )
 
   return (
-    <span
-      style={{
-        display: "inline-block",
-        width: size,
-        height: size,
-        borderRadius: "50%",
-        background: hasEvents ? "#A855F7" : "#22C55E",
-        flexShrink: 0,
-      }}
-      aria-label={hasEvents ? "New events" : "New discounts"}
-    />
+    <span style={{ display: "inline-flex", alignItems: "center", gap: 3 }}>
+      {hasEvents    && dot("#A855F7", "New events")}
+      {hasDiscounts && dot("#22C55E", "New discounts")}
+      {hasMessages  && dot("#6475D1", "New messages")}
+    </span>
   )
 }

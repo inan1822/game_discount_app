@@ -1,5 +1,6 @@
 import { StatsCard } from "@/components/admin/StatsCard"
 import { RevenueChart } from "./RevenueChart"
+import { StatusBadge } from "@/components/admin/StatusBadge"
 import { fetchDashboardStats } from "@/lib/api/admin.server"
 
 const currency = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" })
@@ -66,14 +67,14 @@ export async function DashboardContent() {
           ) : (
             <ul className="divide-y" style={{ borderColor: "rgba(188,188,201,0.10)" }}>
               {stats.recentOrders.map(o => (
-                <li key={o.id} className="py-3 flex items-center justify-between">
-                  <div>
-                    <p style={{ color: "#fff", fontSize: 14 }}>{o.productName}</p>
-                    <p style={{ color: "#9fa0a1", fontSize: 12 }}>{o.customerEmail}</p>
+                <li key={o.id} className="py-3 flex items-center justify-between gap-4">
+                  <div className="min-w-0">
+                    <p style={{ color: "#fff", fontSize: 13, fontWeight: 600 }}>{o.productName}</p>
+                    <p style={{ color: "#9fa0a1", fontSize: 11 }}>{o.customerEmail}</p>
                   </div>
-                  <div className="text-right">
-                    <p style={{ color: "#fff", fontSize: 14 }}>{currency.format(o.amount)}</p>
-                    <p style={{ color: "#9fa0a1", fontSize: 12, textTransform: "capitalize" }}>{o.status}</p>
+                  <div className="flex items-center gap-3 flex-shrink-0">
+                    <StatusBadge status={o.status} />
+                    <p style={{ color: "#fff", fontSize: 13, fontWeight: 700 }}>{currency.format(o.amount)}</p>
                   </div>
                 </li>
               ))}
@@ -91,8 +92,8 @@ export async function DashboardContent() {
             <ul className="space-y-3">
               {stats.topProducts.map(p => (
                 <li key={p.id} className="flex items-center justify-between">
-                  <span style={{ color: "#fff", fontSize: 14 }}>{p.name}</span>
-                  <span style={{ color: "#9fa0a1", fontSize: 12 }}>{p.sold} sold</span>
+                  <span style={{ color: "#fff", fontSize: 13 }}>{p.name}</span>
+                  <span style={{ color: "#9fa0a1", fontSize: 11 }}>{p.sold} sold</span>
                 </li>
               ))}
             </ul>

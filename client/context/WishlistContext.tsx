@@ -45,7 +45,7 @@ export const WishlistProvider = ({ children }: { children: ReactNode }) => {
 
   const toggle = async (game: { id: number; name: string; cover: string | null; slug: string }) => {
     if (!isAuthenticated) {
-      toast.info("Sign in to save games to your wishlist")
+      toast.info("Sign in to save games to your favourites")
       return
     }
 
@@ -57,10 +57,10 @@ export const WishlistProvider = ({ children }: { children: ReactNode }) => {
       setItems(prev => prev.filter(i => i.gameId !== gameId))
       try {
         await removeFromWishlist(gameId)
-        toast.success(`Removed from wishlist`)
+        toast.success(`Removed from favourites`)
       } catch {
         await loadWishlist()
-        toast.error("Failed to update wishlist")
+        toast.error("Failed to update favourites")
       }
     } else {
       // Optimistic add
@@ -81,10 +81,10 @@ export const WishlistProvider = ({ children }: { children: ReactNode }) => {
           gameSlug: game.slug
         })
         setItems(prev => prev.map(i => i._id === "temp" ? newItem : i))
-        toast.success(`${game.name} added to wishlist ❤️`)
+        toast.success(`${game.name} added to favourites ❤️`)
       } catch {
         await loadWishlist()
-        toast.error("Failed to update wishlist")
+        toast.error("Failed to update favourites")
       }
     }
   }

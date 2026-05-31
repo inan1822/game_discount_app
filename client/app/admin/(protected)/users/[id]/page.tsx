@@ -1,6 +1,13 @@
 import { fetchAdminUser } from "@/lib/api/admin.server"
 import { UserDetail } from "@/components/admin/UserDetail"
+import { SectionHeading } from "@/components/ui/SectionHeading"
 import { notFound } from "next/navigation"
+
+const PAGE: React.CSSProperties = {
+  width: "min(calc(100% - 192px), 1600px)",
+  marginInline: "auto",
+  paddingBlock: 40,
+}
 
 interface Props {
   params: Promise<{ id: string }>
@@ -12,7 +19,8 @@ export default async function AdminUserDetailPage({ params }: Props) {
   if (!detail) notFound()
 
   return (
-    <div>
+    <div style={PAGE}>
+      <SectionHeading title="User Detail" />
       <UserDetail initial={detail} />
     </div>
   )

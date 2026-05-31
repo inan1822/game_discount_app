@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useRef, useState } from "react"
+import Image from "next/image"
 import { toast } from "react-toastify"
 import { getAvatarGallery, updateAvatar } from "@/lib/api/users"
 
@@ -72,7 +73,7 @@ export default function AvatarPicker({ currentAvatar, onClose, onUpdated }: Prop
       onClick={onClose}
     >
       <div
-        className="relative w-full max-w-sm rounded-[14px] p-6"
+        className="relative w-full max-w-sm rounded-[10px] p-6"
         style={{
           background: "rgba(28,30,42,0.95)",
           border: "1px solid rgba(255,255,255,0.08)",
@@ -104,7 +105,7 @@ export default function AvatarPicker({ currentAvatar, onClose, onUpdated }: Prop
                   width: 72,
                   height: 72,
                   margin: "0 auto",
-                  outline: isActive ? "2px solid #AE3BD6" : "2px solid transparent",
+                  outline: isActive ? "2px solid #6475D1" : "2px solid transparent",
                   outlineOffset: 2,
                 }}
               >
@@ -113,11 +114,12 @@ export default function AvatarPicker({ currentAvatar, onClose, onUpdated }: Prop
                     <span className="h-5 w-5 animate-spin rounded-full border-2 border-white border-t-transparent" />
                   </div>
                 ) : null}
-                <img
+                <Image
                   src={path}
                   alt="avatar option"
                   width={72}
                   height={72}
+                  sizes="72px"
                   style={{ display: "block" }}
                 />
               </button>

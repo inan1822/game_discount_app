@@ -4,14 +4,14 @@ export default function ComingSoon({ title, phase }: { title: string; phase: num
   return (
     <main
       className="min-h-screen flex items-center justify-center px-6"
-      style={{ background: "#1E2532" }}
+      style={{ background: "var(--background)" }}
     >
       <div
         className="max-w-sm w-full text-center px-6 py-10"
         style={{
           background: "rgba(28,30,42,0.70)",
           border: "1px solid rgba(255,255,255,0.05)",
-          borderRadius: 14,
+          borderRadius: 10,
           backdropFilter: "blur(8px)",
           WebkitBackdropFilter: "blur(8px)",
         }}
@@ -24,9 +24,9 @@ export default function ComingSoon({ title, phase }: { title: string; phase: num
           href="/profile"
           className="inline-block px-4 py-2 text-sm font-medium"
           style={{
-            background: "rgba(72,188,249,0.13)",
-            color: "#48BCF9",
-            border: "1px solid rgba(72,188,249,0.2)",
+            background: "rgba(100,117,209,0.13)",
+            color: "#6475D1",
+            border: "1px solid rgba(100,117,209,0.2)",
             borderRadius: 10,
           }}
         >

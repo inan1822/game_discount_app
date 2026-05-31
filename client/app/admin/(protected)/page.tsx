@@ -1,14 +1,21 @@
 import { Suspense } from "react"
 import { DashboardContent } from "./DashboardContent"
 import { DashboardSkeleton } from "@/components/admin/DashboardSkeleton"
+import { SectionHeading } from "@/components/ui/SectionHeading"
+
+const PAGE: React.CSSProperties = {
+  width: "min(calc(100% - 192px), 1600px)",
+  marginInline: "auto",
+  paddingBlock: 40,
+}
 
 export default function AdminDashboardPage() {
   return (
-    <div className="space-y-6">
-      <header>
-        <h1 style={{ fontSize: 24, fontWeight: 700, color: "#fff" }}>Dashboard</h1>
-        <p style={{ fontSize: 13, color: "#9fa0a1", marginTop: 4 }}>Overview of store activity</p>
-      </header>
+    <div style={PAGE}>
+      <SectionHeading title="Dashboard" />
+      <p style={{ fontSize: 13, color: "#9fa0a1", marginTop: -8, marginBottom: 20 }}>
+        Overview of store activity
+      </p>
       <Suspense fallback={<DashboardSkeleton />}>
         <DashboardContent />
       </Suspense>

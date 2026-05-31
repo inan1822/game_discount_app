@@ -12,6 +12,9 @@ interface GlowCardProps {
   customSize?: boolean;
   /** When provided, pins the spotlight to a fraction (0..1) of the card's own box instead of tracking the cursor. */
   pinned?: { xp: number; yp: number } | null;
+  /** When true, disables ALL internal positioning (no cursor tracking, no pinned snap).
+   *  Use when a parent component drives `--x`/`--y`/`--xp`/`--yp` itself (e.g. via rAF). */
+  manual?: boolean;
   style?: CSSProperties;
 }
 
@@ -38,13 +41,14 @@ const GlowCard: React.FC<GlowCardProps> = ({
   height,
   customSize = false,
   pinned = null,
+  manual = false,
   style,
 }) => {
   const cardRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const el = cardRef.current;
-    if (!el) return;
+    if (!el || manual) return;  // skip internal positioning when a parent drives the spotlight
 
     // Snap spotlight to pinned corner (called on mount, resize, scroll, and pointer leave)
     const applyPinned = () => {
@@ -86,7 +90,7 @@ const GlowCard: React.FC<GlowCardProps> = ({
       window.removeEventListener('resize', applyPinned);
       window.removeEventListener('scroll', applyPinned, true);
     };
-  }, [pinned]);
+  }, [pinned, manual]);
 
   const { base, spread } = glowColorMap[glowColor];
 

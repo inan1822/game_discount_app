@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from "next/server"
 // ── Route buckets ─────────────────────────────────────────────────────────────
 
 /** Requires a valid session cookie — guests are redirected to /login */
-const PROTECTED = ["/wishlist", "/profile", "/settings"]
+const PROTECTED = ["/favourites", "/profile", "/settings"]
 
 /** Only for logged-out users — authenticated users are redirected to home */
 const AUTH_ONLY = ["/login", "/register", "/forgot-password"]

@@ -1,5 +1,12 @@
 import { fetchProducts } from "@/lib/api/admin.server"
 import { ProductsTable } from "@/components/admin/ProductsTable"
+import { SectionHeading } from "@/components/ui/SectionHeading"
+
+const PAGE: React.CSSProperties = {
+  width: "min(calc(100% - 192px), 1600px)",
+  marginInline: "auto",
+  paddingBlock: 40,
+}
 
 interface Props {
   searchParams: Promise<Record<string, string>>
@@ -16,13 +23,11 @@ export default async function ProductsPage({ searchParams }: Props) {
   })
 
   return (
-    <div className="space-y-6">
-      <header>
-        <h1 style={{ fontSize: 24, fontWeight: 700, color: "#fff" }}>Products</h1>
-        <p style={{ fontSize: 13, color: "#9fa0a1", marginTop: 4 }}>
-          Manage your virtual goods catalogue — game keys, gift cards, subscriptions and more.
-        </p>
-      </header>
+    <div style={PAGE}>
+      <SectionHeading title="Products" />
+      <p style={{ fontSize: 13, color: "#9fa0a1", marginTop: -8, marginBottom: 20 }}>
+        Manage your virtual goods catalogue — game keys, gift cards, subscriptions and more.
+      </p>
       <ProductsTable initialData={data} />
     </div>
   )

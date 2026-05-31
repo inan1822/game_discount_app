@@ -16,8 +16,8 @@ interface Props {
 
 const cardStyle = {
   background: "rgba(28,30,42,0.70)",
-  border: "1px solid rgba(255,255,255,0.05)",
-  borderRadius: 14,
+  border: "1px solid rgba(31,37,57,0.6)",
+  borderRadius: 10,
   backdropFilter: "blur(8px)",
   WebkitBackdropFilter: "blur(8px)",
 } as const
@@ -68,12 +68,14 @@ export const ActionButton = ({
   variant = "default",
   disabled,
   ariaLabel,
+  style: extraStyle,
 }: {
   children: React.ReactNode
   onClick?: () => void
   variant?: "default" | "primary" | "danger" | "muted"
   disabled?: boolean
   ariaLabel?: string
+  style?: React.CSSProperties
 }) => {
   const colors = {
     default: { bg: "rgba(255,255,255,0.06)", fg: "rgba(255,255,255,0.85)" },
@@ -95,6 +97,7 @@ export const ActionButton = ({
         border: "none",
         cursor: disabled ? "not-allowed" : "pointer",
         opacity: disabled ? 0.55 : 1,
+        ...extraStyle,
       }}
     >
       {children}

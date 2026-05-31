@@ -15,21 +15,27 @@
 
 import PageBackground from "@/components/ui/PageBackground"
 import AppSidebar     from "@/components/layout/AppSidebar"
+import { ChatProvider } from "@/context/ChatContext"
+import ChatWindow from "@/components/chat/ChatWindow"
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
-    <main className="relative w-screen h-screen overflow-hidden" style={{ background: "#1E2532" }}>
-      <PageBackground />
-      <div className="relative flex h-full" style={{ zIndex: 3 }}>
-        {/* Sidebar — desktop only. Mobile pages handle their own chrome
-            (BottomNav etc.) inside a md:hidden block. */}
-        <div className="hidden md:block">
-          <AppSidebar />
+    <ChatProvider>
+      <main className="relative w-screen h-screen overflow-hidden" style={{ background: "var(--background)" }}>
+        <PageBackground />
+        <div className="relative flex h-full" style={{ zIndex: 3 }}>
+          {/* Sidebar — desktop only. Mobile pages handle their own chrome
+              (BottomNav etc.) inside a md:hidden block. */}
+          <div className="hidden md:block">
+            <AppSidebar />
+          </div>
+          <div className="flex-1 min-w-0 h-full pt-4 pl-5" style={{ scrollbarWidth: "none", overflowY: "auto", overflowX: "visible" }}>
+            {children}
+          </div>
         </div>
-        <div className="flex-1 min-w-0 h-full pt-4" style={{ scrollbarWidth: "none", overflowY: "auto", overflowX: "visible" }}>
-          {children}
-        </div>
-      </div>
-    </main>
+        {/* Floating chat window — opened via the Chat item in AppSidebar */}
+        <ChatWindow />
+      </main>
+    </ChatProvider>
   )
 }

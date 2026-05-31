@@ -21,6 +21,25 @@ const nextConfig: NextConfig = {
         protocol: "https",
         hostname: "www.cheapshark.com",
       },
+      {
+        protocol: "https",
+        hostname: "res.cloudinary.com",
+      },
+      {
+        // Google OAuth profile pictures
+        protocol: "https",
+        hostname: "lh3.googleusercontent.com",
+      },
+      {
+        // Discord CDN avatars
+        protocol: "https",
+        hostname: "cdn.discordapp.com",
+      },
+      {
+        // Steam avatars
+        protocol: "https",
+        hostname: "avatars.steamstatic.com",
+      },
     ],
   },
 };

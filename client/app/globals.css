@@ -4,6 +4,39 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* ─── GlowCard spotlight properties ───────────────────────────────────────
+   Register --base (HSL hue), --xp (x position 0..1), --yp (y position 0..1)
+   as animatable <number> properties so transitions on these vars actually
+   interpolate frame-by-frame instead of snapping. Used by the GlowCard
+   component (spotlight-card.tsx) and any consumer that wants a smooth
+   color/position fade — e.g. the notifications page tab spotlight.
+*/
+@property --base {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 220;
+}
+@property --xp {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 0.5;
+}
+@property --yp {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 0.5;
+}
+@property --x {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 0;
+}
+@property --y {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 0;
+}
+
 /* ─── DisLow Design Tokens (from Figma) ──────────────────────────────────── */
 :root {
   /* shadcn required vars */

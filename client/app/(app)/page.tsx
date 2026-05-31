@@ -10,6 +10,7 @@ import {
   Star, X,
 } from "lucide-react"
 import { useAuth } from "@/context/AuthContext"
+import { useChat } from "@/context/ChatContext"
 import GameCard from "@/components/game/GameCard"
 import PopularCarousel from "@/components/game/PopularCarousel"
 import NewBentoGrid from "@/components/game/NewBentoGrid"
@@ -241,6 +242,7 @@ export default function HomePage() {
   const { user } = useAuth()
   const isLoggedIn       = !!user
   const { counts: unreadCounts, refresh: refreshUnread } = useUnreadCount()
+  const { totalUnread: chatUnread } = useChat()
 
   const [searchOpen,   setSearchOpen]   = useState(false)
   const [query,        setQuery]        = useState("")
@@ -604,7 +606,7 @@ export default function HomePage() {
                   aria-label="Notifications"
                 >
                   <Bell size={16} style={{ color: notifOpen ? "#48BCF9" : "rgba(255,255,255,0.45)" }} />
-                  {isLoggedIn && unreadCounts.total > 0 && (
+                  {isLoggedIn && unreadCounts.total + chatUnread > 0 && (
                     <span
                       className="absolute -top-0.5 -right-0.5"
                       style={{ width: 8, height: 8, borderRadius: "50%", background: "#FF6B4A" }}

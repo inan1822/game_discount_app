@@ -22,7 +22,7 @@ export default function StatsRow({ following, followers, favorites, loading }: S
       style={{
         background: "rgba(28,30,42,0.70)",
         border: "1px solid rgba(255,255,255,0.05)",
-        borderRadius: 14,
+        borderRadius: 10,
         backdropFilter: "blur(8px)",
         WebkitBackdropFilter: "blur(8px)",
       }}

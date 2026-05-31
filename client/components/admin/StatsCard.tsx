@@ -53,8 +53,8 @@ export function StatsCard({ label, value, deltaPct, icon, accent = "blue" }: Pro
     >
       <div className="flex items-start justify-between">
         <div>
-          <p style={{ fontSize: 13, color: "#9fa0a1" }}>{label}</p>
-          <p style={{ fontSize: 24, fontWeight: 700, color: "#fff", marginTop: 4 }}>{value}</p>
+          <p style={{ fontSize: 11, fontWeight: 500, color: "#9fa0a1" }}>{label}</p>
+          <p style={{ fontSize: 28, fontWeight: 700, color: "#fff", marginTop: 4 }}>{value}</p>
         </div>
         <div
           className="p-2"
@@ -66,7 +66,7 @@ export function StatsCard({ label, value, deltaPct, icon, accent = "blue" }: Pro
       {deltaPct != null && (
         <div
           className="flex items-center gap-1 mt-3"
-          style={{ fontSize: 12, color: positive ? "#44d62c" : "#ef4444" }}
+          style={{ fontSize: 11, color: positive ? "#44d62c" : "#ef4444" }}
         >
           {positive ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
           {Math.abs(deltaPct).toFixed(1)}% vs last period
