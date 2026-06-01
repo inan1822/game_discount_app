@@ -34,7 +34,8 @@ const allowedOrigins = [
 const app = express()
 
 app.use(helmet({ crossOriginResourcePolicy: { policy: "cross-origin" } }))
-app.use(morgan(process.env.NODE_ENV === "test" ? "silent" : process.env.NODE_ENV === "production" ? "combined" : "dev"))
+const ENV = process.env.NODE_ENV as string
+app.use(morgan(ENV === "test" ? "silent" : ENV === "production" ? "combined" : "dev"))
 
 // Stripe webhook must be before express.json()
 app.use("/api/v1/webhooks", express.raw({ type: "application/json" }), webhookRouter)
@@ -53,14 +54,14 @@ const authLimiter = rateLimit({
     windowMs: 60 * 1000, limit: 60,
     standardHeaders: true, legacyHeaders: false,
     message: { status: "429", message: "Too many requests, please slow down", data: null },
-    skip: () => process.env.NODE_ENV === "test",  // disable rate limits in tests
+    skip: () => ENV === "test",  // disable rate limits in tests
 })
 
 const globalLimiter = rateLimit({
     windowMs: 60 * 1000, limit: 2000,
     standardHeaders: true, legacyHeaders: false,
     message: { status: "429", message: "Too many requests, please slow down", data: null },
-    skip: () => process.env.NODE_ENV === "test",
+    skip: () => ENV === "test",
 })
 
 app.use("/api/v1/auth",          authLimiter,   authRouter)
