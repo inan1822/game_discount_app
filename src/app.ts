@@ -24,6 +24,9 @@ const allowedOrigins = [
     "http://localhost:3001",
     "http://127.0.0.1:3000",
     "http://127.0.0.1:3001",
+    // Production URLs — hardcoded as fallback in case env vars aren't picked up
+    "https://game-discount-app-1.onrender.com",
+    "https://crm-dislow.onrender.com",
     ...(process.env.CLIENT_URL ? [process.env.CLIENT_URL] : []),
     ...(process.env.CRM_URL    ? [process.env.CRM_URL]    : []),
 ]
