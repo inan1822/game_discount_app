@@ -1,6 +1,6 @@
 "use client"
 import Link from "next/link"
-import type { Product } from "@/types/admin"
+import type { Product } from "@/shared/types/admin"
 
 const currency = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" })
 

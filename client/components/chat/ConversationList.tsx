@@ -1,7 +1,7 @@
 "use client"
 
 import Avatar from "@/components/friends/Avatar"
-import { useChat } from "@/context/ChatContext"
+import { useChat } from "@/features/chat/state/ChatContext"
 
 function timeAgo(iso: string): string {
   const diff = Date.now() - new Date(iso).getTime()

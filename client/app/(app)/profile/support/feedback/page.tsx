@@ -2,9 +2,9 @@
 
 import { useState } from "react"
 import { toast } from "react-toastify"
-import { useAuth } from "@/context/AuthContext"
+import { useAuth } from "@/features/auth/state/AuthContext"
 import ProfileSubLayout from "@/components/profile/ProfileSubLayout"
-import { submitFeedback } from "@/lib/api/support"
+import { submitFeedback } from "@/features/friends/services/support"
 
 const cardStyle = {
   background: "rgba(28,30,42,0.70)",

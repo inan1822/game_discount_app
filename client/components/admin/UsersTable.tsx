@@ -4,7 +4,7 @@ import { useRouter, usePathname, useSearchParams } from "next/navigation"
 import Link from "next/link"
 import { Search, Shield, Ban, Trash2, ChevronLeft, ChevronRight, UserCheck } from "lucide-react"
 import { updateAdminUser, deleteAdminUser } from "@/lib/api/admin.client"
-import type { AdminUser, AdminUsersPage } from "@/types/admin"
+import type { AdminUser, AdminUsersPage } from "@/shared/types/admin"
 
 const ROLE_OPTS = [
   { value: "",      label: "All roles"  },

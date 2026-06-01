@@ -6,16 +6,16 @@ import { motion, AnimatePresence } from "framer-motion"
 import {
   ArrowLeft, Heart, ExternalLink, Tag, Zap, Calendar, Monitor, ShoppingCart, Gift,
 } from "lucide-react"
-import { getGameById, getGameDeals, getGameDlcDeals, getGameGiveaways, getGameEvents, getGameManualLinks } from "@/lib/api/games"
-import { addToWishlist, removeFromWishlist, checkWishlist } from "@/lib/api/wishlist"
-import { fetchStoreProductsByGame } from "@/lib/api/shop"
-import { listFriendsWithGame } from "@/lib/api/users"
-import { useAuth } from "@/context/AuthContext"
-import type { Game, PriceResult, GiveawayItem, GameEvent } from "@/types/game"
-import type { Product } from "@/types/admin"
-import type { FriendWithGame } from "@/types/user"
-import { GlowCard } from "@/components/ui/spotlight-card"
-import { StarButton } from "@/components/game/GameCard"
+import { getGameById, getGameDeals, getGameDlcDeals, getGameGiveaways, getGameEvents, getGameManualLinks } from "@/features/products/services/games"
+import { addToWishlist, removeFromWishlist, checkWishlist } from "@/features/wishlist/services/wishlist"
+import { fetchStoreProductsByGame } from "@/shared/services/shop"
+import { listFriendsWithGame } from "@/features/profile/services/users"
+import { useAuth } from "@/features/auth/state/AuthContext"
+import type { Game, PriceResult, GiveawayItem, GameEvent } from "@/shared/types/game"
+import type { Product } from "@/shared/types/admin"
+import type { FriendWithGame } from "@/shared/types/user"
+import { GlowCard } from "@/shared/components/spotlight-card"
+import { StarButton } from "@/features/products/components/GameCard"
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 

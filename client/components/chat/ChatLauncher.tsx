@@ -1,7 +1,7 @@
 "use client"
 
 import { MessageCircle } from "lucide-react"
-import { useChat } from "@/context/ChatContext"
+import { useChat } from "@/features/chat/state/ChatContext"
 import ChatWindow from "./ChatWindow"
 
 /**

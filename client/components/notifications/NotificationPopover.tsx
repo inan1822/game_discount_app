@@ -4,10 +4,10 @@ import { useEffect, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
 import { AnimatePresence, motion } from "framer-motion"
 import { BellRing, Tag, Zap, CheckCheck } from "lucide-react"
-import { getNotifications, markRead, markAllRead } from "@/lib/api/notifications"
-import { useChat } from "@/context/ChatContext"
+import { getNotifications, markRead, markAllRead } from "@/features/notifications/services/notifications"
+import { useChat } from "@/features/chat/state/ChatContext"
 import Avatar from "@/components/friends/Avatar"
-import type { Notification } from "@/types/notification"
+import type { Notification } from "@/shared/types/notification"
 
 interface Props {
   open:        boolean

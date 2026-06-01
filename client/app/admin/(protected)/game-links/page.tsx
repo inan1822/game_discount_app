@@ -10,11 +10,11 @@ import {
 import {
   listGameLinks, createGameLink, updateGameLink, deleteGameLink,
 } from "@/lib/api/admin.client"
-import { searchGames } from "@/lib/api/games"
-import { SectionHeading } from "@/components/ui/SectionHeading"
-import { analyzeStoreLink } from "@/lib/api/adminLLM"
-import type { AdminManualLink, ManualLinkPlatform } from "@/types/admin"
-import type { Game } from "@/types/game"
+import { searchGames } from "@/features/products/services/games"
+import { SectionHeading } from "@/shared/components/SectionHeading"
+import { analyzeStoreLink } from "@/shared/services/adminLLM"
+import type { AdminManualLink, ManualLinkPlatform } from "@/shared/types/admin"
+import type { Game } from "@/shared/types/game"
 
 // ── Design tokens ──────────────────────────────────────────────────────────────
 const ACCENT  = "#6475D1"

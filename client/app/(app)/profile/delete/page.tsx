@@ -4,9 +4,9 @@ import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { toast } from "react-toastify"
 import { Trash2, AlertTriangle } from "lucide-react"
-import { useAuth } from "@/context/AuthContext"
+import { useAuth } from "@/features/auth/state/AuthContext"
 import ProfileSubLayout from "@/components/profile/ProfileSubLayout"
-import { deleteAccount } from "@/lib/api/users"
+import { deleteAccount } from "@/features/profile/services/users"
 
 const CONFIRM_PHRASE = "Dont Delete Me :("
 

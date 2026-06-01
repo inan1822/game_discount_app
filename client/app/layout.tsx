@@ -1,8 +1,8 @@
 import type { Metadata } from "next"
 import { Nunito } from "next/font/google"
 import "./globals.css"
-import { AuthProvider } from "@/context/AuthContext"
-import { ReduxProvider } from "@/store/ReduxProvider"
+import { AuthProvider } from "@/features/auth/state/AuthContext"
+import { ReduxProvider } from "@/shared/store/ReduxProvider"
 import { ToastContainer } from "react-toastify"
 import "react-toastify/dist/ReactToastify.css"
 

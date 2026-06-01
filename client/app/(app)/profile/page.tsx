@@ -9,11 +9,11 @@ import {
   HelpCircle, MessageSquare, Bug, FileText, ScrollText, Download, Trash2,
   LogOut,
 } from "lucide-react"
-import { useAuth } from "@/context/AuthContext"
+import { useAuth } from "@/features/auth/state/AuthContext"
 import StatsRow from "@/components/profile/StatsRow"
 import AvatarPicker from "@/components/profile/AvatarPicker"
 import PreferenceToggle from "@/components/profile/PreferenceToggle"
-import { getMyStats, updateNotificationPrefs, updatePrivacy, type MyStats } from "@/lib/api/users"
+import { getMyStats, updateNotificationPrefs, updatePrivacy, type MyStats } from "@/features/profile/services/users"
 import { toast } from "react-toastify"
 
 const cardStyle = {

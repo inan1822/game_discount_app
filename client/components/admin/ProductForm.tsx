@@ -3,11 +3,11 @@ import { useState, useEffect, useRef, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from "@/components/ui/select"
+} from "@/shared/components/select"
 import { createProduct, updateProduct } from "@/lib/api/admin.client"
-import { searchGames, getGameById } from "@/lib/api/games"
-import type { Product } from "@/types/admin"
-import type { Game } from "@/types/game"
+import { searchGames, getGameById } from "@/features/products/services/games"
+import type { Product } from "@/shared/types/admin"
+import type { Game } from "@/shared/types/game"
 import { toast } from "react-toastify"
 import { ArrowLeft, Search, X, Loader2, GamepadIcon, ImageIcon } from "lucide-react"
 

@@ -1,6 +1,6 @@
 import { fetchAdminUser } from "@/lib/api/admin.server"
 import { UserDetail } from "@/components/admin/UserDetail"
-import { SectionHeading } from "@/components/ui/SectionHeading"
+import { SectionHeading } from "@/shared/components/SectionHeading"
 import { notFound } from "next/navigation"
 
 const PAGE: React.CSSProperties = {

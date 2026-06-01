@@ -4,8 +4,8 @@ import { useCallback, useEffect, useRef, useState } from "react"
 import { Search } from "lucide-react"
 import { toast } from "react-toastify"
 import { useDebouncedCallback } from "use-debounce"
-import { searchUsers, follow, acceptRequest } from "@/lib/api/users"
-import type { UserSearchResult, Relationship } from "@/types/user"
+import { searchUsers, follow, acceptRequest } from "@/features/profile/services/users"
+import type { UserSearchResult, Relationship } from "@/shared/types/user"
 import FriendRow, { ActionButton } from "./FriendRow"
 
 function ActionForRelationship({

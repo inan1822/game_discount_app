@@ -3,13 +3,13 @@ import { useState } from "react"
 import { useRouter } from "next/navigation"
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
-} from "@/components/ui/table"
+} from "@/shared/components/table"
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from "@/components/ui/select"
+} from "@/shared/components/select"
 import { StatusBadge } from "./StatusBadge"
 import { updateOrderStatus, resendDeliveryEmail } from "@/lib/api/admin.client"
-import type { Order, OrderStatus, EmailStatus } from "@/types/admin"
+import type { Order, OrderStatus, EmailStatus } from "@/shared/types/admin"
 import { ArrowLeft, Mail, MailCheck, MailX, MailWarning } from "lucide-react"
 import { toast } from "react-toastify"
 

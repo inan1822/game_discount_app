@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { getTrendingGames } from "@/lib/api/games"
+import { getTrendingGames } from "@/features/products/services/games"
 
 // High-quality fallback RAWG covers — portrait format
 const FALLBACK_COVERS = [

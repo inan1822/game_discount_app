@@ -3,14 +3,14 @@
 import { Suspense, useEffect, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { motion } from "framer-motion"
-import { useAuth } from "@/context/AuthContext"
+import { useAuth } from "@/features/auth/state/AuthContext"
 import FollowingPanel from "@/components/friends/FollowingPanel"
 import FollowersPanel from "@/components/friends/FollowersPanel"
 import RequestsPanel  from "@/components/friends/RequestsPanel"
 import AddFriendPanel from "@/components/friends/AddFriendPanel"
-import { SectionHeading } from "@/components/ui/SectionHeading"
-import { GlowCard }       from "@/components/ui/spotlight-card"
-import { listRequests } from "@/lib/api/users"
+import { SectionHeading } from "@/shared/components/SectionHeading"
+import { GlowCard }       from "@/shared/components/spotlight-card"
+import { listRequests } from "@/features/profile/services/users"
 
 const TABS = ["Following", "Followers", "Requests", "Add Friend"] as const
 type Tab = typeof TABS[number]

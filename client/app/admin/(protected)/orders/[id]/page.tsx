@@ -1,6 +1,6 @@
 import { fetchOrder } from "@/lib/api/admin.server"
 import { OrderDetail } from "@/components/admin/OrderDetail"
-import { SectionHeading } from "@/components/ui/SectionHeading"
+import { SectionHeading } from "@/shared/components/SectionHeading"
 import { notFound } from "next/navigation"
 
 const PAGE: React.CSSProperties = {

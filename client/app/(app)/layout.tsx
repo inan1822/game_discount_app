@@ -13,9 +13,9 @@
  * don't inherit the sidebar shell.
  */
 
-import PageBackground from "@/components/ui/PageBackground"
-import AppSidebar     from "@/components/layout/AppSidebar"
-import { ChatProvider } from "@/context/ChatContext"
+import PageBackground from "@/shared/components/PageBackground"
+import AppSidebar     from "@/shared/components/AppSidebar"
+import { ChatProvider } from "@/features/chat/state/ChatContext"
 import ChatWindow from "@/components/chat/ChatWindow"
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {

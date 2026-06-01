@@ -7,7 +7,7 @@ import {
 } from "lucide-react"
 import { updateAdminUser, deleteAdminUser } from "@/lib/api/admin.client"
 import { StatusBadge } from "@/components/admin/StatusBadge"
-import type { AdminUserDetail, AdminUser } from "@/types/admin"
+import type { AdminUserDetail, AdminUser } from "@/shared/types/admin"
 
 const currency = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" })
 

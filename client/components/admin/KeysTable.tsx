@@ -2,9 +2,9 @@
 import { useState } from "react"
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
-} from "@/components/ui/table"
+} from "@/shared/components/table"
 import { keysExportUrl } from "@/lib/api/admin.client"
-import type { GameKey, KeyStatus, KeysPage } from "@/types/admin"
+import type { GameKey, KeyStatus, KeysPage } from "@/shared/types/admin"
 import { Download, Eye, EyeOff } from "lucide-react"
 
 const STATUS_STYLE: Record<KeyStatus, { bg: string; color: string }> = {

@@ -2,7 +2,7 @@
 import { useEffect, useRef } from "react"
 import { useRouter } from "next/navigation"
 import { toast } from "react-toastify"
-import api from "@/lib/api/axios"
+import api from "@/shared/services/axios"
 
 const IDLE_MS = 15 * 60 * 1000
 

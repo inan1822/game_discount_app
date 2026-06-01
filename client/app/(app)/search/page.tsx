@@ -5,12 +5,12 @@ import { Search, X } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
 import { useRouter } from "next/navigation"
 import Fuse from "fuse.js"
-import { searchGames } from "@/lib/api/games"
-import { getWishlist, addToWishlist, removeFromWishlist } from "@/lib/api/wishlist"
-import GameCard from "@/components/game/GameCard"
-import { SectionHeading } from "@/components/ui/SectionHeading"
-import { useAuth } from "@/context/AuthContext"
-import type { Game, WishlistItem } from "@/types/game"
+import { searchGames } from "@/features/products/services/games"
+import { getWishlist, addToWishlist, removeFromWishlist } from "@/features/wishlist/services/wishlist"
+import GameCard from "@/features/products/components/GameCard"
+import { SectionHeading } from "@/shared/components/SectionHeading"
+import { useAuth } from "@/features/auth/state/AuthContext"
+import type { Game, WishlistItem } from "@/shared/types/game"
 
 // Fuse.js options for re-ranking RAWG results by title relevance.
 // RAWG returns results ranked by its own relevance model — Fuse re-sorts

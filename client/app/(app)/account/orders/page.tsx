@@ -2,22 +2,22 @@
 
 import { useState, useEffect, useCallback } from "react"
 import { useRouter } from "next/navigation"
-import { fetchMyOrders } from "@/lib/api/shop"
-import { fetchMyTickets, fetchOrderKey } from "@/lib/api/support"
-import { useAuth } from "@/context/AuthContext"
-import type { Order } from "@/types/admin"
-import type { Ticket } from "@/types/support"
-import { SUBJECT_LABELS, STATUS_LABELS, STATUS_COLORS } from "@/types/support"
+import { fetchMyOrders } from "@/shared/services/shop"
+import { fetchMyTickets, fetchOrderKey } from "@/features/friends/services/support"
+import { useAuth } from "@/features/auth/state/AuthContext"
+import type { Order } from "@/shared/types/admin"
+import type { Ticket } from "@/shared/types/support"
+import { SUBJECT_LABELS, STATUS_LABELS, STATUS_COLORS } from "@/shared/types/support"
 import { StatusBadge } from "@/components/admin/StatusBadge"
 import SupportDrawer from "@/components/support/SupportDrawer"
 import {
   ShoppingBag, ChevronLeft, ChevronRight, Key, Copy, Check,
   MessageCircle, Receipt, Ticket as TicketIcon, Eye, EyeOff,
 } from "lucide-react"
-import { SectionHeading } from "@/components/ui/SectionHeading"
-import { GlowCard }      from "@/components/ui/spotlight-card"
+import { SectionHeading } from "@/shared/components/SectionHeading"
+import { GlowCard }      from "@/shared/components/spotlight-card"
 import { motion }        from "framer-motion"
-import { searchGames }   from "@/lib/api/games"
+import { searchGames }   from "@/features/products/services/games"
 import { rawgImage }     from "@/lib/rawgImage"
 
 const currency = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" })

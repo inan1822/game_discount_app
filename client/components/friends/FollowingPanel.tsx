@@ -2,9 +2,9 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { toast } from "react-toastify"
-import { listFollowing, unfollow } from "@/lib/api/users"
-import { useChat } from "@/context/ChatContext"
-import type { FriendListItem } from "@/types/user"
+import { listFollowing, unfollow } from "@/features/profile/services/users"
+import { useChat } from "@/features/chat/state/ChatContext"
+import type { FriendListItem } from "@/shared/types/user"
 import FriendRow, { ActionButton } from "./FriendRow"
 import FriendSearchBar from "./FriendSearchBar"
 import { ListSkeleton, EmptyState, GroupHeader } from "./PanelChrome"

@@ -6,7 +6,7 @@ import {
   LayoutDashboard, ShoppingCart, Package, Users, BarChart2,
   Megaphone, Settings, Menu, X, UserCircle, Link2,
 } from "lucide-react"
-import api from "@/lib/api/axios"
+import api from "@/shared/services/axios"
 import { AIAssistant } from "@/components/admin/AIAssistant"
 
 // ── Nav sections (grouped like the user sidebar's MENU / SOCIAL) ───────────────

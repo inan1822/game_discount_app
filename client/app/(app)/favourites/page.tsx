@@ -3,13 +3,13 @@
 import { useRouter } from "next/navigation"
 import { useState, useRef, useMemo, useEffect } from "react"
 import { AnimatePresence, motion } from "framer-motion"
-import { useAppSelector, useAppDispatch } from "@/store/hooks"
-import { fetchWishlist, removeWishlistItem } from "@/store/wishlistSlice"
-import { useAuth } from "@/context/AuthContext"
-import { useCardPrice } from "@/hooks/useCardPrice"
-import { getGameById } from "@/lib/api/games"
-import { SectionHeading } from "@/components/ui/SectionHeading"
-import type { WishlistItem, Game } from "@/types/game"
+import { useAppSelector, useAppDispatch } from "@/shared/store/hooks"
+import { fetchWishlist, removeWishlistItem } from "@/features/wishlist/slices/wishlistSlice"
+import { useAuth } from "@/features/auth/state/AuthContext"
+import { useCardPrice } from "@/features/products/utils/useCardPrice"
+import { getGameById } from "@/features/products/services/games"
+import { SectionHeading } from "@/shared/components/SectionHeading"
+import type { WishlistItem, Game } from "@/shared/types/game"
 
 /** Same normaliser as GameCard — short muted platform labels */
 function platformLabel(platform: string): string {

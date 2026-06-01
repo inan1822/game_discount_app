@@ -3,9 +3,9 @@
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { toast } from "react-toastify"
-import { useAuth } from "@/context/AuthContext"
+import { useAuth } from "@/features/auth/state/AuthContext"
 import ProfileSubLayout from "@/components/profile/ProfileSubLayout"
-import { changePassword } from "@/lib/api/users"
+import { changePassword } from "@/features/profile/services/users"
 
 const cardStyle = {
   background: "rgba(28,30,42,0.70)",

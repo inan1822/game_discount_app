@@ -20,7 +20,7 @@ import {
   Sparkles, X, Send, Loader2, Link2, Package, BarChart2,
   ChevronRight, RotateCcw, Copy, Check,
 } from "lucide-react"
-import { streamAdminChat, analyzeStoreLink, type LLMContext, type LLMEvent } from "@/lib/api/adminLLM"
+import { streamAdminChat, analyzeStoreLink, type LLMContext, type LLMEvent } from "@/shared/services/adminLLM"
 import { toast } from "react-toastify"
 
 // ─── Types ────────────────────────────────────────────────────────────────────
