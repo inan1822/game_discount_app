@@ -22,12 +22,13 @@ function randomPassword() {
 
 // ─── DISCORD ─────────────────────────────────────────────────────────────────
 
-export function discordOAuthUrl(): string {
+export function discordOAuthUrl(state: string): string {
     const params = new URLSearchParams({
         client_id:     process.env.DISCORD_CLIENT_ID!,
         redirect_uri:  process.env.DISCORD_REDIRECT_URI!,
         response_type: "code",
         scope:         "identify email",
+        state,
     })
     return `https://discord.com/oauth2/authorize?${params}`
 }
@@ -103,7 +104,7 @@ export async function discordCallback(code: string): Promise<string> {
 
 // ─── GOOGLE ──────────────────────────────────────────────────────────────────
 
-export function googleOAuthUrl(): string {
+export function googleOAuthUrl(state: string): string {
     const params = new URLSearchParams({
         client_id:     process.env.GOOGLE_CLIENT_ID!,
         redirect_uri:  process.env.GOOGLE_REDIRECT_URI!,
@@ -111,6 +112,7 @@ export function googleOAuthUrl(): string {
         scope:         "openid email profile",
         access_type:   "offline",
         prompt:        "select_account",
+        state,
     })
     return `https://accounts.google.com/o/oauth2/v2/auth?${params}`
 }
@@ -179,10 +181,13 @@ export async function googleCallback(code: string): Promise<string> {
 
 // ─── STEAM ───────────────────────────────────────────────────────────────────
 
-export function steamOAuthUrl(): string {
-    const returnTo = process.env.STEAM_RETURN_URL!
-    const realm    = process.env.STEAM_REALM!
-    const params   = new URLSearchParams({
+export function steamOAuthUrl(state: string): string {
+    // Append state as a query param on return_to. Steam echoes return_to back
+    // verbatim, so the state survives the round-trip and we read it from req.query.
+    const baseReturn = process.env.STEAM_RETURN_URL!
+    const returnTo   = `${baseReturn}${baseReturn.includes("?") ? "&" : "?"}state=${encodeURIComponent(state)}`
+    const realm      = process.env.STEAM_REALM!
+    const params     = new URLSearchParams({
         "openid.ns":         "http://specs.openid.net/auth/2.0",
         "openid.mode":       "checkid_setup",
         "openid.return_to":  returnTo,
@@ -194,8 +199,14 @@ export function steamOAuthUrl(): string {
 }
 
 export async function steamCallback(query: Record<string, string>): Promise<string> {
-    // 1. Verify the OpenID assertion with Steam
-    const verifyParams = new URLSearchParams({ ...query, "openid.mode": "check_authentication" })
+    // 1. Verify the OpenID assertion with Steam — only the signed openid.* params.
+    // Stripping non-openid extras (e.g. our `state`) keeps check_authentication
+    // byte-identical to what Steam signed; mixing in extras can produce is_valid:false.
+    const openidOnly: Record<string, string> = {}
+    for (const [k, v] of Object.entries(query)) {
+        if (k.startsWith("openid.")) openidOnly[k] = v
+    }
+    const verifyParams = new URLSearchParams({ ...openidOnly, "openid.mode": "check_authentication" })
 
     const verifyRes = await fetch("https://steamcommunity.com/openid/login", {
         method: "POST",

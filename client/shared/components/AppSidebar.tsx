@@ -14,7 +14,7 @@
 import { useLayoutEffect, useRef, useState } from "react"
 import { useRouter, usePathname } from "next/navigation"
 import { motion } from "framer-motion"
-import { LogIn, Receipt, User, Shield, MessageCircle } from "lucide-react"
+import { LogIn, Receipt, User, Shield, MessageCircle } from "@/shared/icons"
 import { useAuth } from "@/features/auth/state/AuthContext"
 import { useUnreadCount } from "@/features/chat/utils/useUnreadCount"
 import { useChat } from "@/features/chat/state/ChatContext"

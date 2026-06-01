@@ -1,4 +1,5 @@
 "use client"
+import { useState, useEffect } from "react"
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid } from "recharts"
 
 interface Props {
@@ -6,6 +7,16 @@ interface Props {
 }
 
 export function RevenueChart({ data }: Props) {
+  const [mounted, setMounted] = useState(false)
+  useEffect(() => setMounted(true), [])
+
+  if (!mounted) return (
+    <div
+      className="h-64 animate-pulse rounded-[10px]"
+      style={{ background: "rgba(28,30,42,0.30)" }}
+    />
+  )
+
   return (
     <div className="h-64">
       <ResponsiveContainer width="100%" height="100%">
@@ -21,7 +32,7 @@ export function RevenueChart({ data }: Props) {
             }}
             labelStyle={{ color: "#b3bade" }}
             itemStyle={{ color: "#6475D1" }}
-            formatter={(v) => [`$${Number(v).toFixed(2)}`, "Revenue"]}
+            formatter={(v) => [`$${Number.isFinite(Number(v)) ? Number(v).toFixed(2) : "0.00"}`, "Revenue"]}
           />
           <Line type="monotone" dataKey="revenue" stroke="#6475D1" strokeWidth={2} dot={false} />
         </LineChart>

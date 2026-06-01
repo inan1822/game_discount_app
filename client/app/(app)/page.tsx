@@ -5,10 +5,7 @@ import { createPortal } from "react-dom"
 import { useRouter } from "next/navigation"
 import { motion, AnimatePresence } from "framer-motion"
 import { useDebouncedCallback } from "use-debounce"
-import {
-  SlidersHorizontal, Search, Bell,
-  Star, X,
-} from "lucide-react"
+import { SlidersHorizontal, Search, Bell, Star, X } from "@/shared/icons"
 import { useAuth } from "@/features/auth/state/AuthContext"
 import { useChat } from "@/features/chat/state/ChatContext"
 import GameCard from "@/features/products/components/GameCard"

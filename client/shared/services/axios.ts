@@ -7,15 +7,23 @@ const api = axios.create({
   withCredentials: true,
 })
 
-// On 401 → redirect to login UNLESS the call was /auth/me (session restore on mount).
-// /auth/me returning 401 just means "not logged in" — AuthContext handles it silently.
-// Redirecting there would cause an infinite loop: mount → 401 → /login → mount → repeat.
+// On 401 → redirect to login, with these exceptions:
+//   /auth/me          — session restore; 401 = "not logged in", AuthContext handles silently
+//   /users/me/*       — user-action endpoints (change password, edit profile, delete account);
+//                       401 here means "wrong current password", not "session expired"
+//                       The component's catch block must show the error toast instead
+//   /auth/login       — login attempt; 401 = wrong credentials, form handles it
+//   /auth/admin       — 2FA verify; 401 = wrong OTP, form handles it
 api.interceptors.response.use(
   (response) => response,
   (error) => {
     const url: string = error.config?.url ?? ""
-    const isSessionRestore = url.includes("/auth/me")
-    if (error.response?.status === 401 && typeof window !== "undefined" && !isSessionRestore) {
+    const skipRedirect =
+      url.includes("/auth/me") ||
+      url.includes("/users/me") ||
+      url.includes("/auth/login") ||
+      url.includes("/auth/admin")
+    if (error.response?.status === 401 && typeof window !== "undefined" && !skipRedirect) {
       window.location.href = "/login"
     }
     return Promise.reject(error)

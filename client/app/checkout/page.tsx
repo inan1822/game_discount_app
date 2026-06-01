@@ -7,7 +7,7 @@ import { CheckoutForm } from "@/components/shop/CheckoutForm"
 import { createCheckout, fetchStoreProduct, validatePromo } from "@/shared/services/shop"
 import PageBackground from "@/shared/components/PageBackground"
 import type { Product, PromoValidation } from "@/shared/types/admin"
-import { ArrowLeft, ShoppingBag, Tag, X, Check, Key, Copy, PartyPopper } from "lucide-react"
+import { ArrowLeft, ShoppingBag, Tag, X, Check, Key, Copy, PartyPopper } from "@/shared/icons"
 import { useAuth } from "@/features/auth/state/AuthContext"
 
 const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || "")

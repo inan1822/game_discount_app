@@ -13,7 +13,7 @@ import SupportDrawer from "@/components/support/SupportDrawer"
 import {
   ShoppingBag, ChevronLeft, ChevronRight, Key, Copy, Check,
   MessageCircle, Receipt, Ticket as TicketIcon, Eye, EyeOff,
-} from "lucide-react"
+} from "@/shared/icons"
 import { SectionHeading } from "@/shared/components/SectionHeading"
 import { GlowCard }      from "@/shared/components/spotlight-card"
 import { motion }        from "framer-motion"

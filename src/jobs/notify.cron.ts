@@ -26,6 +26,19 @@ const DEDUP_HOURS = 24   // don't re-notify within this window
 
 function sleep(ms: number) { return new Promise(r => setTimeout(r, ms)) }
 
+async function itadLookupByAppId(appId: number): Promise<string | null> {
+    if (!ITAD_KEY) return null
+    try {
+        const { data } = await axios.get(`${ITAD_BASE}/games/lookup/v1`, {
+            params: { key: ITAD_KEY, appid: appId },
+            timeout: 8000,
+        })
+        return data?.found ? (data.game?.id ?? null) : null
+    } catch {
+        return null
+    }
+}
+
 async function itadLookupByTitle(title: string): Promise<string | null> {
     if (!ITAD_KEY) return null
     try {
@@ -134,14 +147,17 @@ async function runPriceScan() {
         }).limit(60).lean()
 
         for (const pw of needsLookup) {
-            const id = await itadLookupByTitle(pw.gameName)
+            // Prefer appid lookup (exact) over title lookup (fuzzy)
+            const id = pw.steamAppId
+                ? await itadLookupByAppId(pw.steamAppId)
+                : await itadLookupByTitle(pw.gameName)
             if (id) {
                 await PriceWatch.updateOne(
                     { _id: pw._id },
                     { $set: { itadId: id, itadCachedAt: now } }
                 )
             }
-            await sleep(200) // gentle rate limiting on title lookups
+            await sleep(200)
         }
 
         // 2. Get all entries that have a resolved ITAD UUID
@@ -234,9 +250,40 @@ async function fetchSteamNews(appId: number): Promise<Array<{ gid: number; title
     }
 }
 
+async function resolveMissingSteamAppIds() {
+    if (!process.env.RAWG_API) return
+    const noAppId = await EventWatch.find({ steamAppId: null }).limit(50).lean()
+    for (const ew of noAppId) {
+        try {
+            const { data } = await axios.get(
+                `https://api.rawg.io/api/games/${ew.gameId}`,
+                { params: { key: process.env.RAWG_API }, timeout: 8000 }
+            )
+            const steamStore = (data.stores as Array<{ store: { slug: string }; url: string }> | undefined)
+                ?.find(s => s.store?.slug === "steam")
+            if (steamStore?.url) {
+                const match = steamStore.url.match(/\/app\/(\d+)/)
+                if (match) {
+                    const steamAppId = parseInt(match[1], 10)
+                    await Promise.all([
+                        EventWatch.updateOne({ _id: ew._id }, { $set: { steamAppId } }),
+                        PriceWatch.updateOne({ userId: ew.userId, gameId: ew.gameId }, { $set: { steamAppId } }),
+                    ])
+                }
+            }
+        } catch {
+            // RAWG unavailable for this game — will retry next event scan run
+        }
+        await sleep(300)
+    }
+}
+
 async function runEventScan() {
     console.log("[notify-cron] event scan started")
     try {
+        // Resolve steamAppId for any EventWatch entries that don't have one yet
+        await resolveMissingSteamAppIds()
+
         // Get distinct steamAppIds (non-null)
         const distinctAppIds = await EventWatch.distinct("steamAppId", { steamAppId: { $ne: null } }) as number[]
 

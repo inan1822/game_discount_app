@@ -86,16 +86,32 @@ export const sendVerificationEmail = async (to: string, code: string): Promise<v
         console.log(error, "Email didn't send")
     }
 }
-export const sendResetPasswordEmail = async (to: string, code: string): Promise<void> => {
+export const sendResetPasswordEmail = async (to: string, token: string): Promise<void> => {
+    const clientUrl = process.env.CLIENT_URL || "http://localhost:3000"
+    const resetLink = `${clientUrl}/reset-password?token=${token}`
     try {
         await transporter.sendMail({
-            from: `"My App" <${process.env.EMAIL_USER}>`,
+            from: `"DisLow" <${process.env.EMAIL_USER}>`,
             to: to,
-            subject: "Your verification code to reset your password",
-            text: `Your verification code is: ${code}`,
+            subject: "Reset your DisLow password",
+            text: `Click the link to reset your password: ${resetLink}\n\nThis link expires in 1 hour.\n\nIf you didn't request this, you can safely ignore this email.`,
             html: `
-                <h1>Your verification code is: ${code}</h1>
-                <p>If you didn't request this, please secure your account.</p>
+                <div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:32px 24px;background:#12131a;border-radius:12px;color:#fff;">
+                  <h1 style="font-size:22px;font-weight:800;margin-bottom:8px;">Reset your password</h1>
+                  <p style="color:#9fa0a1;font-size:14px;margin-bottom:24px;">
+                    We received a request to reset the password for your DisLow account.
+                    Click the button below to set a new password.
+                  </p>
+                  <a href="${resetLink}"
+                     style="display:inline-block;background:#6475D1;color:#fff;text-decoration:none;
+                            padding:12px 28px;border-radius:10px;font-weight:700;font-size:15px;margin-bottom:24px;">
+                    Reset Password →
+                  </a>
+                  <p style="color:#9fa0a1;font-size:12px;margin-top:24px;">
+                    This link expires in <strong style="color:#fff;">1 hour</strong>.<br/>
+                    If you didn't request a password reset, you can safely ignore this email.
+                  </p>
+                </div>
             `
         })
         console.log("Email sent successfully")

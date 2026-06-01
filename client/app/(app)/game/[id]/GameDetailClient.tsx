@@ -3,9 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from "react"
 import { useParams, useRouter } from "next/navigation"
 import { motion, AnimatePresence } from "framer-motion"
-import {
-  ArrowLeft, Heart, ExternalLink, Tag, Zap, Calendar, Monitor, ShoppingCart, Gift,
-} from "lucide-react"
+import { ExternalLink, Tag, Zap, Calendar, Monitor, ShoppingCart, Gift } from "@/shared/icons"
 import { getGameById, getGameDeals, getGameDlcDeals, getGameGiveaways, getGameEvents, getGameManualLinks } from "@/features/products/services/games"
 import { addToWishlist, removeFromWishlist, checkWishlist } from "@/features/wishlist/services/wishlist"
 import { fetchStoreProductsByGame } from "@/shared/services/shop"
@@ -1280,12 +1278,12 @@ export default function GameDetailPage() {
               </div>
             )}
 
-            {/* Back button — glassmorphism, top of left panel (design spec) */}
+            {/* Back button — bottom of left panel */}
             <motion.button
               onClick={() => router.back()}
               whileHover={{ x: -3 }}
               whileTap={{ scale: 0.95 }}
-              className="self-start flex items-center gap-2 text-[13px] font-medium mb-4 order-first"
+              className="self-start flex items-center gap-2 text-[13px] font-medium mt-6"
               style={{
                 background:           "rgba(28,30,42,0.60)",
                 backdropFilter:       "blur(6px)",

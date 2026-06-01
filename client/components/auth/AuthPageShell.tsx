@@ -1,8 +1,18 @@
 "use client"
 
 import { useState, useEffect, ReactNode } from "react"
-import { BackgroundGradientAnimation } from "@/shared/components/BackgroundGradientAnimation"
-import { CircularGallery, GalleryItem } from "@/shared/components/CircularGallery"
+import dynamic from "next/dynamic"
+import type { GalleryItem } from "@/shared/components/CircularGallery"
+
+// Lazy-load WebGL/canvas components — form renders immediately, animations load after
+const BackgroundGradientAnimation = dynamic(
+  () => import("@/shared/components/BackgroundGradientAnimation").then(m => ({ default: m.BackgroundGradientAnimation })),
+  { ssr: false },
+)
+const CircularGallery = dynamic(
+  () => import("@/shared/components/CircularGallery").then(m => ({ default: m.CircularGallery })),
+  { ssr: false },
+)
 
 // Steam CDN library portrait covers — 600×900
 const COVERS = [

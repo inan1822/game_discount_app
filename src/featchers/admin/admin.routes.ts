@@ -13,6 +13,7 @@ import {
   deleteManualLink,
 } from "../games/manualLinks.controller.js"
 import { adminLLMChat, analyzeLink } from "./llm.controller.js"
+import { backfillWatches } from "./backfill.controller.js"
 import {
   adminListTickets,
   adminGetTicket,
@@ -53,6 +54,9 @@ adminRouter.delete("/game-links/:id", deleteManualLink)
 // ── AI Assistant (Claude-powered, streaming SSE) ──────────────────────────────
 adminRouter.post("/llm/chat",         adminLLMChat)
 adminRouter.post("/llm/analyze-link", analyzeLink)
+
+// ── One-time migrations ───────────────────────────────────────────────────────
+adminRouter.post("/backfill-watches", backfillWatches)
 
 // ── Support tickets ───────────────────────────────────────────────────────────
 adminRouter.get("/tickets",                   adminListTickets)

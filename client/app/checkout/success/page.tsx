@@ -2,7 +2,7 @@
 import { useEffect, useState, useRef, Suspense } from "react"
 import { useSearchParams } from "next/navigation"
 import PageBackground from "@/shared/components/PageBackground"
-import { CheckCircle, Mail, ShoppingBag, Key, Copy, Check, Loader2 } from "lucide-react"
+import { CheckCircle, Mail, ShoppingBag, Key, Copy, Check, Loader2 } from "@/shared/icons"
 import Link from "next/link"
 import { fetchOrderKey } from "@/features/friends/services/support"
 

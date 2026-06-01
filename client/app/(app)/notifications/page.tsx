@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useCallback, useLayoutEffect } from "react"
 import { useRouter } from "next/navigation"
-import { BellRing, CheckCheck } from "lucide-react"
+import { BellRing, CheckCheck } from "@/shared/icons"
 import { useAuth } from "@/features/auth/state/AuthContext"
 import { useChat } from "@/features/chat/state/ChatContext"
 import { useUnreadCount } from "@/features/chat/utils/useUnreadCount"

@@ -1,6 +1,6 @@
 "use client"
 
-import { Search } from "lucide-react"
+import { Search } from "@/shared/icons"
 
 interface Props {
   value: string

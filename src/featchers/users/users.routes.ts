@@ -2,7 +2,7 @@ import { Router } from "express"
 import rateLimit from "express-rate-limit"
 import { authMiddleware } from "../../shared/middlewares/shared.middlewares.js"
 import { isAdmin } from "../../shared/middlewares/shared.admin.js"
-import { getUser, getAll, deleteUser, updateUser, promoteToAdmin, deleteMyUser, getMyStats, getAvatarGallery, updateAvatar, updateNotificationPrefs, updatePrivacy, editProfile, confirmPendingEmail, changePassword, disconnectProvider, deleteAccount } from "./users.controller.js"
+import { getAll, deleteUser, promoteToAdmin, getMyStats, getAvatarGallery, updateAvatar, updateNotificationPrefs, updatePrivacy, editProfile, confirmPendingEmail, changePassword, disconnectProvider, deleteAccount } from "./users.controller.js"
 import { uploadAvatarSingle } from "./avatar.middleware.js"
 import { validateRequest } from "../../shared/middlewares/validateRequst.js"
 import { editProfileSchema, changePasswordSchema, confirmPendingEmailSchema, deleteAccountSchema } from "../../shared/validators/profile.schemas.js"
@@ -138,19 +138,10 @@ userRouter.delete(
     declineRequest,
 )
 
-// Get user by id (public)
-userRouter.get("/:id", getUser)
-
 // Admin: delete any user
 userRouter.delete("/admin/:id", authMiddleware, isAdmin, deleteUser)
 
-// User: delete own account (requires password confirmation)
-userRouter.delete("/:id", authMiddleware, deleteMyUser)
-
 // Admin: promote user to admin
 userRouter.patch("/role/:id", authMiddleware, isAdmin, promoteToAdmin)
-
-// User: update own profile
-userRouter.patch("/:id", authMiddleware, updateUser)
 
 export default userRouter

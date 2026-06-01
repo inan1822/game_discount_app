@@ -1,6 +1,7 @@
 import { Server as SocketIOServer, Socket } from "socket.io"
 import type { Server as HttpServer } from "http"
 import jwt from "jsonwebtoken"
+import userModel from "../../featchers/users/User.model.js"
 import { registerChatHandlers } from "../../featchers/chat/chat.socket.js"
 
 let io: SocketIOServer | null = null
@@ -21,7 +22,7 @@ export function initSocket(httpServer: HttpServer, allowedOrigins: string[]): So
         },
     })
 
-    io.use((socket, next) => {
+    io.use(async (socket, next) => {
         // Token may arrive in handshake.auth.token or the dislow_token cookie
         let token: string | undefined
         const authToken = socket.handshake.auth?.token
@@ -38,7 +39,12 @@ export function initSocket(httpServer: HttpServer, allowedOrigins: string[]): So
 
         try {
             const payload = jwt.verify(token, process.env.JWT_SECRET!) as SocketUser
-            socket.data.user = payload
+            // Mirror authMiddleware: a valid JWT alone is not enough. Logout clears
+            // user.token in DB; without this check, stolen JWTs keep working over
+            // sockets until the 2h expiry.
+            const dbUser = await userModel.findById(payload.id).select("token role").lean()
+            if (!dbUser || dbUser.token !== token) return next(new Error("Unauthorized"))
+            socket.data.user = { id: payload.id, role: dbUser.role }
             next()
         } catch {
             next(new Error("Invalid token"))

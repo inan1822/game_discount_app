@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from "react"
 import { useRouter, useParams } from "next/navigation"
 import { motion } from "framer-motion"
-import { ArrowLeft, Bell } from "lucide-react"
+import { ArrowLeft, Bell } from "@/shared/icons"
 import { useAuth } from "@/features/auth/state/AuthContext"
 import GameCard from "@/features/products/components/GameCard"
 import { getPopularGames, getNewGames, getTrendedGames, getForYouGames, getCardPrices } from "@/features/products/services/games"

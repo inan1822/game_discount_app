@@ -1,76 +1,87 @@
 "use client"
 
-import { useState } from "react"
-import { useRouter } from "next/navigation"
+import { useState, useEffect, Suspense } from "react"
+import { useRouter, useSearchParams } from "next/navigation"
 import { toast } from "react-toastify"
 import axios from "axios"
-import { Eye, EyeOff, Shield, Loader2 } from "lucide-react"
+import { Eye, EyeOff } from "lucide-react"
+import dynamic from "next/dynamic"
+import { SparkleButton } from "@/components/ui/SparkleButton"
+import type { GalleryItem } from "@/components/ui/CircularGallery"
+
+const PageBackground = dynamic(() => import("@/components/ui/PageBackground"), { ssr: false })
+const CircularGallery = dynamic(
+  () => import("@/components/ui/CircularGallery").then(m => ({ default: m.CircularGallery })),
+  { ssr: false },
+)
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:5000"
 
-const PANEL: React.CSSProperties = {
-  background:           "rgba(28,30,42,0.80)",
-  backdropFilter:       "blur(12px)",
-  WebkitBackdropFilter: "blur(12px)",
-  border:               "1px solid rgba(100,117,209,0.25)",
-  borderRadius:         16,
-  padding:              "40px 44px",
-  width:                "100%",
-  maxWidth:             440,
+// Same game covers as storefront login
+const COVERS = [
+  "https://cdn.akamai.steamstatic.com/steam/apps/1245620/library_600x900.jpg",
+  "https://cdn.akamai.steamstatic.com/steam/apps/1174180/library_600x900.jpg",
+  "https://cdn.akamai.steamstatic.com/steam/apps/1091500/library_600x900.jpg",
+  "https://cdn.akamai.steamstatic.com/steam/apps/1145360/library_600x900.jpg",
+  "https://cdn.akamai.steamstatic.com/steam/apps/814380/library_600x900.jpg",
+  "https://cdn.akamai.steamstatic.com/steam/apps/1190460/library_600x900.jpg",
+  "https://cdn.akamai.steamstatic.com/steam/apps/870780/library_600x900.jpg",
+  "https://cdn.akamai.steamstatic.com/steam/apps/632470/library_600x900.jpg",
+  "https://cdn.akamai.steamstatic.com/steam/apps/1326470/library_600x900.jpg",
+  "https://cdn.akamai.steamstatic.com/steam/apps/1551360/library_600x900.jpg",
+  "https://cdn.akamai.steamstatic.com/steam/apps/1938090/library_600x900.jpg",
+  "https://cdn.akamai.steamstatic.com/steam/apps/2358720/library_600x900.jpg",
+]
+
+function shuffle<T>(arr: T[]): T[] {
+  const a = [...arr]
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]]
+  }
+  return a
 }
 
-const INPUT: React.CSSProperties = {
-  width:        "100%",
-  background:   "#1c1e2a",
-  border:       "1px solid rgba(188,188,201,0.18)",
-  borderRadius: 10,
-  color:        "#fff",
-  fontSize:     14,
-  padding:      "11px 14px",
-  outline:      "none",
-}
+const fadeUp = (delay = 0) => ({
+  initial: { opacity: 0, y: 14 },
+  animate: { opacity: 1, y: 0 },
+  transition: { duration: 0.5, ease: "easeOut", delay },
+})
 
-const BTN: React.CSSProperties = {
-  width:         "100%",
-  background:    "#6475D1",
-  color:         "#fff",
-  border:        "none",
-  borderRadius:  10,
-  padding:       "12px 0",
-  fontSize:      15,
-  fontWeight:    700,
-  cursor:        "pointer",
-  display:       "flex",
-  alignItems:    "center",
-  justifyContent: "center",
-  gap:           8,
-  marginTop:     8,
-}
-
-export default function CRMLoginPage() {
+// ─── Inner login form (needs useSearchParams → must be inside Suspense) ────────
+function CRMLoginInner() {
   const router = useRouter()
+  const searchParams = useSearchParams()
 
-  const [step,        setStep]        = useState<"creds" | "otp">("creds")
-  const [email,       setEmail]       = useState("")
-  const [password,    setPassword]    = useState("")
-  const [otp,         setOtp]         = useState("")
-  const [showPass,    setShowPass]    = useState(false)
-  const [loading,     setLoading]     = useState(false)
+  // If redirected from storefront after credentials step, pre-fill email + jump to OTP
+  const paramEmail = searchParams.get("email") ?? ""
+  const paramStep  = searchParams.get("step")  ?? "creds"
 
-  // Step 1 — email + password
+  const [step,         setStep]         = useState<"creds" | "otp">(paramStep === "otp" ? "otp" : "creds")
+  const [email,        setEmail]        = useState(paramEmail)
+  const [password,     setPassword]     = useState("")
+  const [otp,          setOtp]          = useState("")
+  const [showPassword, setShowPassword] = useState(false)
+  const [loading,      setLoading]      = useState(false)
+
+  // Gallery — shuffle after mount to avoid SSR mismatch
+  const [galleryItems, setGalleryItems] = useState<GalleryItem[]>(
+    COVERS.map(url => ({ common: "", binomial: "", photo: { url, text: "", by: "", pos: "center" } }))
+  )
+  useEffect(() => {
+    setGalleryItems(
+      shuffle(COVERS).map(url => ({ common: "", binomial: "", photo: { url, text: "", by: "", pos: "center" } }))
+    )
+  }, [])
+
+  // Step 1 — credentials
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
     try {
-      const { data } = await axios.post(
-        `${API}/api/v1/auth/login`,
-        { email, password },
-        { withCredentials: true },
-      )
-      // Admin accounts: backend returns no userID — 2FA code sent
+      const { data } = await axios.post(`${API}/api/v1/auth/login`, { email, password }, { withCredentials: true })
       const requiresTwoFactor = !data?.data?.userID
       if (!requiresTwoFactor) {
-        // Regular user trying to log in — reject
         toast.error("This panel is for admins only.")
         return
       }
@@ -89,11 +100,7 @@ export default function CRMLoginPage() {
     e.preventDefault()
     setLoading(true)
     try {
-      await axios.post(
-        `${API}/api/v1/auth/admin`,
-        { email, code: otp },
-        { withCredentials: true },
-      )
+      await axios.post(`${API}/api/v1/auth/admin`, { email, code: otp }, { withCredentials: true })
       toast.success("Welcome, admin")
       router.replace("/")
     } catch (err: unknown) {
@@ -106,93 +113,143 @@ export default function CRMLoginPage() {
 
   return (
     <main
-      style={{
-        minHeight:       "100vh",
-        display:         "flex",
-        alignItems:      "center",
-        justifyContent:  "center",
-        padding:         "24px 16px",
-        background:      "radial-gradient(ellipse at 60% 0%, rgba(100,117,209,0.18) 0%, transparent 60%), #1E2532",
-      }}
+      className="relative flex flex-col h-screen w-screen overflow-hidden"
+      style={{ background: "#1E2532" }}
     >
-      <div style={PANEL}>
-        {/* Logo row */}
-        <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 28 }}>
-          <div style={{ width: 40, height: 40, borderRadius: 10, background: "rgba(100,117,209,0.18)", border: "1px solid rgba(100,117,209,0.35)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-            <Shield size={20} color="#6475D1" />
-          </div>
-          <div>
-            <p style={{ color: "#fff", fontSize: 17, fontWeight: 800, margin: 0, lineHeight: 1 }}>DisLow Admin</p>
-            <p style={{ color: "#9fa0a1", fontSize: 11, margin: "3px 0 0", letterSpacing: "0.06em" }}>INTERNAL CRM PANEL</p>
-          </div>
-        </div>
+      <PageBackground />
 
-        {step === "creds" ? (
-          <form onSubmit={handleLogin}>
-            <p style={{ color: "#fff", fontSize: 20, fontWeight: 700, marginBottom: 6 }}>Sign in</p>
-            <p style={{ color: "#9fa0a1", fontSize: 13, marginBottom: 22 }}>Admin accounts require 2FA verification.</p>
+      {/* Login card — same layout as storefront */}
+      <div
+        className="relative flex-1 flex items-center justify-center px-4"
+        style={{ zIndex: 3, paddingBottom: 80 }}
+      >
+        <div className="w-full" style={{ maxWidth: 467 }}>
 
-            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-              <input
-                type="email"
-                placeholder="Email address"
-                value={email}
-                onChange={e => setEmail(e.target.value)}
-                required
-                style={INPUT}
-              />
-              <div style={{ position: "relative" }}>
-                <input
-                  type={showPass ? "text" : "password"}
-                  placeholder="Password"
-                  value={password}
-                  onChange={e => setPassword(e.target.value)}
-                  required
-                  style={{ ...INPUT, paddingRight: 42 }}
-                />
-                <button type="button" onClick={() => setShowPass(v => !v)} tabIndex={-1}
-                  style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", color: "#9fa0a1" }}>
-                  {showPass ? <EyeOff size={16} /> : <Eye size={16} />}
-                </button>
-              </div>
+          {/* Logo + wordmark */}
+          <div className="flex flex-col items-center mb-6">
+            <div className="flex items-center gap-4">
+              <img src="/icons/logo.svg"      alt=""        style={{ width: 54, height: 54 }} />
+              <img src="/icons/logo-text.svg" alt="DisLow"  style={{ height: 52, width: "auto" }} />
+            </div>
+            <p style={{ fontSize: 13, color: "rgba(255,255,255,0.40)", marginTop: 8 }}>
+              Admin Panel — internal access only
+            </p>
+          </div>
+
+          {/* Glass card */}
+          <div style={{
+            background:           "rgba(43, 48, 89, 0.70)",
+            backdropFilter:       "blur(6px)",
+            WebkitBackdropFilter: "blur(6px)",
+            borderRadius:         10,
+            padding:              "40px 44px",
+          }}>
+            {/* Title */}
+            <div className="mb-6">
+              <h1 style={{ fontSize: 28, fontWeight: 800, color: "#fff", marginBottom: 4 }}>
+                {step === "creds" ? "Admin sign in" : "Verify it's you"}
+              </h1>
+              <p style={{ fontSize: 13, color: "#9fa0a1" }}>
+                {step === "creds"
+                  ? "Sign in to the DisLow admin panel"
+                  : <span>We sent a 6-digit code to <span style={{ color: "#fff" }}>{email}</span></span>}
+              </p>
             </div>
 
-            <button type="submit" disabled={loading} style={{ ...BTN, opacity: loading ? 0.6 : 1 }}>
-              {loading ? <Loader2 size={16} className="animate-spin" /> : <Shield size={16} />}
-              Continue
-            </button>
-          </form>
-        ) : (
-          <form onSubmit={handleVerify}>
-            <p style={{ color: "#fff", fontSize: 20, fontWeight: 700, marginBottom: 6 }}>Verify it&apos;s you</p>
-            <p style={{ color: "#9fa0a1", fontSize: 13, marginBottom: 22 }}>
-              6-digit code sent to <strong style={{ color: "#fff" }}>{email}</strong>
-            </p>
+            {step === "creds" ? (
+              <form onSubmit={handleLogin} className="space-y-4">
+                <input
+                  type="email"
+                  placeholder="Admin email address"
+                  value={email}
+                  onChange={e => setEmail(e.target.value)}
+                  required
+                  className="auth-input"
+                />
+                <div className="relative">
+                  <input
+                    type={showPassword ? "text" : "password"}
+                    placeholder="Password"
+                    value={password}
+                    onChange={e => setPassword(e.target.value)}
+                    required
+                    className="auth-input pr-12"
+                  />
+                  <button
+                    type="button"
+                    tabIndex={-1}
+                    onClick={() => setShowPassword(v => !v)}
+                    className="absolute right-4 top-1/2 -translate-y-1/2 text-[#9fa0a1] hover:text-white transition-colors"
+                  >
+                    {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
+                </div>
 
-            <input
-              type="text"
-              inputMode="numeric"
-              autoComplete="one-time-code"
-              maxLength={6}
-              placeholder="6-digit code"
-              value={otp}
-              onChange={e => setOtp(e.target.value.replace(/\D/g, "").slice(0, 6))}
-              required
-              style={{ ...INPUT, textAlign: "center", letterSpacing: "0.5em", fontSize: 20 }}
-            />
+                <div className="pt-1">
+                  <SparkleButton label="Sign in to Admin" type="submit" loading={loading} />
+                </div>
+              </form>
+            ) : (
+              <form onSubmit={handleVerify} className="space-y-4">
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  maxLength={6}
+                  placeholder="6-digit code"
+                  value={otp}
+                  onChange={e => setOtp(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                  required
+                  autoFocus
+                  className="auth-input"
+                  style={{ textAlign: "center", letterSpacing: "0.4em", fontSize: 18 }}
+                />
 
-            <button type="submit" disabled={loading} style={{ ...BTN, opacity: loading ? 0.6 : 1 }}>
-              {loading ? <Loader2 size={16} className="animate-spin" /> : <Shield size={16} />}
-              Verify &amp; Enter
-            </button>
+                <div className="pt-1">
+                  <SparkleButton label="Verify &amp; Enter" type="submit" loading={loading} />
+                </div>
 
-            <button type="button" onClick={() => { setStep("creds"); setOtp("") }}
-              style={{ display: "block", margin: "12px auto 0", background: "none", border: "none", color: "#9fa0a1", fontSize: 13, cursor: "pointer" }}>
-              ← back
-            </button>
-          </form>
-        )}
+                <div className="text-center">
+                  <button
+                    type="button"
+                    onClick={() => { setStep("creds"); setOtp("") }}
+                    className="text-xs transition-colors hover:text-white"
+                    style={{ color: "rgba(255,255,255,0.45)" }}
+                  >
+                    ← back to login
+                  </button>
+                </div>
+              </form>
+            )}
+          </div>
+        </div>
       </div>
+
+      {/* Circular game gallery — same as storefront */}
+      <div
+        className="relative flex-shrink-0 w-full"
+        style={{ height: 260, zIndex: 1 }}
+      >
+        <CircularGallery
+          items={galleryItems}
+          radius={620}
+          autoRotateSpeed={0.012}
+          showOverlay={false}
+        />
+      </div>
+
+      <div className="flex-shrink-0" style={{ height: 120 }} />
     </main>
+  )
+}
+
+// Suspense wrapper required for useSearchParams in Next.js App Router
+export default function CRMLoginPage() {
+  return (
+    <Suspense fallback={
+      <div className="h-screen w-screen" style={{ background: "#1E2532" }} />
+    }>
+      <CRMLoginInner />
+    </Suspense>
   )
 }

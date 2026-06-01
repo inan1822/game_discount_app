@@ -3,7 +3,7 @@
 import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { toast } from "react-toastify"
-import { Trash2, AlertTriangle } from "lucide-react"
+import { Trash2, AlertTriangle } from "@/shared/icons"
 import { useAuth } from "@/features/auth/state/AuthContext"
 import ProfileSubLayout from "@/components/profile/ProfileSubLayout"
 import { deleteAccount } from "@/features/profile/services/users"

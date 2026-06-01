@@ -9,10 +9,14 @@ import {
 import { AppError } from "../../shared/utils/AppError.js"
 import mongoose from "mongoose"
 
+// 6-digit OTP for 2FA / email verify (user types it manually)
 const generateCode = () => crypto.randomInt(100000, 1000000).toString()
 
-// SHA-256 one-way hash for OTP/reset codes stored in DB.
-// We email the plain code, store only the hash — breach-safe.
+// 64-char hex token for password reset links (unguessable — 2^256 space)
+const generateResetToken = () => crypto.randomBytes(32).toString("hex")
+
+// SHA-256 one-way hash for OTP/reset tokens stored in DB.
+// We email the plain value, store only the hash — breach-safe.
 function hashCode(code: string): string {
     return crypto.createHash("sha256").update(code).digest("hex")
 }
@@ -193,7 +197,7 @@ export const requestPasswordResetService = async (email: string) => {
     // Anti-enumeration: always return the same vague response
     if (!user) return { message: "If that email is registered, a reset link was sent" }
 
-    const resetToken = generateCode()
+    const resetToken = generateResetToken()          // 64-char hex — not guessable
     user.resetPasswordToken = hashCode(resetToken)  // store hash, email plain token
     user.resetPasswordExpiry = new Date(Date.now() + 60 * 60 * 1000)
     await user.save()

@@ -1,7 +1,7 @@
 "use client"
 
 import { useRouter } from "next/navigation"
-import { ArrowLeft } from "lucide-react"
+import { ArrowLeft } from "@/shared/icons"
 
 interface Props {
   title: string

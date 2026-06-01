@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react"
 import { motion, useMotionValue, useDragControls } from "framer-motion"
-import { X, ChevronLeft } from "lucide-react"
+import { X, ChevronLeft } from "@/shared/icons"
 import Avatar from "@/components/friends/Avatar"
 import { useChat } from "@/features/chat/state/ChatContext"
 import ConversationList from "./ConversationList"

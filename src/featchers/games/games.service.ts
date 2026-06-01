@@ -94,7 +94,7 @@ interface ItadRawDeal {
  */
 const MAX_RETRY_WAIT = 8_000   // ms — never wait longer than 8 s per retry
 
-const withRetry = async <T>(
+export const withRetry = async <T>(
     fn: () => Promise<T>,
     retries = 3,
     delayMs = 500,
@@ -926,7 +926,7 @@ const EDITION_KEYWORDS = ["edition", "enhanced", "remastered", "deluxe", "comple
 
 /** Returns true only when `foundTitle` is a console/platform edition of `originalTitle`
  *  (e.g. "Hollow Knight: Voidheart Edition") and NOT a different game or sequel. */
-function isConsoleEdition(foundTitle: string, originalTitle: string): boolean {
+export function isConsoleEdition(foundTitle: string, originalTitle: string): boolean {
     const ft = foundTitle.toLowerCase()
     const ot = originalTitle.toLowerCase()
     if (!ft.startsWith(ot)) return false
@@ -981,7 +981,7 @@ const ITAD_TITLE_TTL = 7 * 24 * 60 * 60 * 1000   // 7 days — IDs are permanent
  *   "NieR:Automata"        →  ITAD has "NieR: Automata"
  * We try the base name (strip subtitle) and vice versa (add nothing — already tried).
  */
-function nameVariants(title: string): string[] {
+export function nameVariants(title: string): string[] {
     const variants = new Set<string>()
 
     // Strip subtitle after ": " — "Game: Subtitle" → "Game"
@@ -1443,7 +1443,7 @@ async function fetchPriceForGames(
  *   - If only one source returned a price, return that
  *   - If neither returned a price, return null (Unknown)
  */
-function mergeCardPrices(
+export function mergeCardPrices(
     itad: CardPrice | undefined,
     cs:   CardPrice | undefined,
 ): CardPrice | null {

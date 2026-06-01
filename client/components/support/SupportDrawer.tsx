@@ -5,7 +5,7 @@ import {
   X, ChevronRight, Send, MessageCircle,
   AlertCircle, Key, RefreshCw, ShoppingBag,
   Package, HelpCircle, Globe,
-} from "lucide-react"
+} from "@/shared/icons"
 import { createTicket, addTicketMessage } from "@/features/friends/services/support"
 import type { Ticket, TicketSubject } from "@/shared/types/support"
 import { SUBJECT_LABELS, STATUS_LABELS, STATUS_COLORS } from "@/shared/types/support"

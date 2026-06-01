@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useRef, useEffect } from "react"
-import { Send, Check, CheckCheck, AlertCircle } from "lucide-react"
+import { Send, Check, CheckCheck, AlertCircle } from "@/shared/icons"
 import { useChat } from "@/features/chat/state/ChatContext"
 
 export default function ChatThread() {

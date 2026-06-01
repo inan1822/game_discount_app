@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { toast } from "react-toastify"
-import { Download } from "lucide-react"
+import { Download } from "@/shared/icons"
 import { useAuth } from "@/features/auth/state/AuthContext"
 import ProfileSubLayout from "@/components/profile/ProfileSubLayout"
 import { exportMyData } from "@/features/friends/services/support"

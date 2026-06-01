@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation"
 import { useState, useRef, useMemo, useEffect } from "react"
 import { AnimatePresence, motion } from "framer-motion"
 import { useAppSelector, useAppDispatch } from "@/shared/store/hooks"
-import { fetchWishlist, removeWishlistItem } from "@/features/wishlist/slices/wishlistSlice"
+import { fetchWishlist, removeWishlistItem, clearWishlist } from "@/features/wishlist/slices/wishlistSlice"
 import { useAuth } from "@/features/auth/state/AuthContext"
 import { useCardPrice } from "@/features/products/utils/useCardPrice"
 import { getGameById } from "@/features/products/services/games"
@@ -204,6 +204,7 @@ export default function WishlistPage() {
 
   useEffect(() => {
     if (user) dispatch(fetchWishlist())
+    else      dispatch(clearWishlist())   // clear on logout so the next user starts fresh
   }, [user, dispatch])
 
   const [pendingIds, setPendingIds] = useState<Set<string>>(new Set())

@@ -4,12 +4,20 @@ import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { motion } from "framer-motion"
-import { Eye, EyeOff } from "lucide-react"
+import { Eye, EyeOff } from "@/shared/icons"
 import { toast } from "react-toastify"
 import { useAuth } from "@/features/auth/state/AuthContext"
 import { SparkleButton } from "@/shared/components/SparkleButton"
-import PageBackground from "@/shared/components/PageBackground"
-import { CircularGallery, GalleryItem } from "@/shared/components/CircularGallery"
+import dynamic from "next/dynamic"
+import type { GalleryItem } from "@/shared/components/CircularGallery"
+
+// Lazy-load heavy WebGL/canvas components so the login form renders immediately.
+// ssr:false → these are canvas animations that don't work server-side anyway.
+const PageBackground = dynamic(() => import("@/shared/components/PageBackground"), { ssr: false })
+const CircularGallery = dynamic(
+  () => import("@/shared/components/CircularGallery").then(m => ({ default: m.CircularGallery })),
+  { ssr: false },
+)
 
 // ─── Game covers for the circular gallery ────────────────────────────────────
 // Steam CDN library portrait covers — 600×900, always available
@@ -112,8 +120,12 @@ export default function LoginPage() {
     try {
       const { requiresTwoFactor } = await login(form.email, form.password)
       if (requiresTwoFactor) {
-        setStep("otp")
-        toast.info("Verification code sent to your email")
+        // Admin account — redirect to CRM login to complete 2FA there
+        toast.info("Verification code sent — redirecting to Admin Panel…")
+        const crmUrl = process.env.NEXT_PUBLIC_CRM_URL ?? "http://localhost:3001"
+        setTimeout(() => {
+          window.location.href = `${crmUrl}/login?email=${encodeURIComponent(form.email)}&step=otp`
+        }, 1000)
       } else {
         toast.success("Welcome back! 🎮")
         router.push(returnTo)

@@ -530,7 +530,7 @@ export function ProductForm({ mode, product }: { mode: "create" | "edit"; produc
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label style={LABEL_STYLE}>Category *</label>
-              <Select value={form.category} onValueChange={val => set("category", val)}>
+              <Select value={form.category} onValueChange={val => { if (typeof val === "string") set("category", val) }}>
                 <SelectTrigger style={{ ...INPUT_STYLE, height: 38 }}>
                   <SelectValue />
                 </SelectTrigger>
@@ -553,7 +553,7 @@ export function ProductForm({ mode, product }: { mode: "create" | "edit"; produc
 
             <div>
               <label style={LABEL_STYLE}>Platform *</label>
-              <Select value={form.platform} onValueChange={val => set("platform", val)}>
+              <Select value={form.platform} onValueChange={val => { if (typeof val === "string") set("platform", val) }}>
                 <SelectTrigger style={{ ...INPUT_STYLE, height: 38 }}>
                   <SelectValue />
                 </SelectTrigger>

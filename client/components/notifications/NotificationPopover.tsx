@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
 import { AnimatePresence, motion } from "framer-motion"
-import { BellRing, Tag, Zap, CheckCheck } from "lucide-react"
+import { BellRing, Tag, Zap, CheckCheck } from "@/shared/icons"
 import { getNotifications, markRead, markAllRead } from "@/features/notifications/services/notifications"
 import { useChat } from "@/features/chat/state/ChatContext"
 import Avatar from "@/components/friends/Avatar"

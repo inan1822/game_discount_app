@@ -5,7 +5,7 @@ import {
   useStripe,
   useElements,
 } from "@stripe/react-stripe-js"
-import { ShieldCheck } from "lucide-react"
+import { ShieldCheck } from "@/shared/icons"
 
 interface Props {
   orderId: string

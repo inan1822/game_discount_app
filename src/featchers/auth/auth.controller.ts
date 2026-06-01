@@ -14,10 +14,13 @@ import { getErrorInfo } from "../../shared/utils/AppError.js"
 
 /** Write the JWT into an httpOnly cookie so JS can never read it. */
 function setAuthCookie(res: Response, token: string): void {
+    const isProd = process.env.NODE_ENV === "production"
     res.cookie("dislow_token", token, {
         httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
-        sameSite: "lax",
+        secure: isProd,
+        // "none" is required for cross-origin cookies (frontend and backend on different domains).
+        // "none" mandates secure:true, which is already set in production.
+        sameSite: isProd ? "none" : "lax",
         maxAge: 2 * 60 * 60 * 1000,  // 2 h — matches JWT expiry
     })
 }
@@ -109,7 +112,8 @@ export const verifyTwoFactor = async (req: Request, res: Response): Promise<void
 export const logout = async (req: Request, res: Response): Promise<void> => {
     try {
         await logoutService(req.user!.id)
-        res.clearCookie("dislow_token")
+        const isProd = process.env.NODE_ENV === "production"
+        res.clearCookie("dislow_token", { httpOnly: true, secure: isProd, sameSite: isProd ? "none" : "lax" })
         res.status(200).json({
             status: "200",
             message: "Logged out successfully",

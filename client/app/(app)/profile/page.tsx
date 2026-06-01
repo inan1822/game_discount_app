@@ -8,7 +8,7 @@ import {
   ChevronRight, Pencil, Lock, Link2,
   HelpCircle, MessageSquare, Bug, FileText, ScrollText, Download, Trash2,
   LogOut,
-} from "lucide-react"
+} from "@/shared/icons"
 import { useAuth } from "@/features/auth/state/AuthContext"
 import StatsRow from "@/components/profile/StatsRow"
 import AvatarPicker from "@/components/profile/AvatarPicker"

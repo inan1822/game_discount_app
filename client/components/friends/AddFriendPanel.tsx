@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useRef, useState } from "react"
-import { Search } from "lucide-react"
+import { Search } from "@/shared/icons"
 import { toast } from "react-toastify"
 import { useDebouncedCallback } from "use-debounce"
 import { searchUsers, follow, acceptRequest } from "@/features/profile/services/users"

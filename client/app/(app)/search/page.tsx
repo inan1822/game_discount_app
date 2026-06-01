@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useRef, useCallback } from "react"
-import { Search, X } from "lucide-react"
+import { Search, X } from "@/shared/icons"
 import { motion, AnimatePresence } from "framer-motion"
 import { useRouter } from "next/navigation"
 import Fuse from "fuse.js"

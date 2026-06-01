@@ -4,7 +4,7 @@ import { usePathname, useRouter } from "next/navigation"
 import { motion } from "framer-motion"
 import {
   LayoutDashboard, ShoppingCart, Package, Users, BarChart2,
-  Megaphone, Settings, Menu, X, UserCircle, Link2,
+  Megaphone, Menu, X, UserCircle, Link2,
 } from "lucide-react"
 import api from "@/lib/api/axios"
 import { AIAssistant } from "@/components/admin/AIAssistant"
@@ -30,12 +30,6 @@ const SECTIONS: NavSection[] = [
     items: [
       { href: "/analytics", label: "Analytics", icon: BarChart2 },
       { href: "/marketing", label: "Marketing", icon: Megaphone },
-    ],
-  },
-  {
-    label: "SYSTEM",
-    items: [
-      { href: "/settings", label: "Settings", icon: Settings },
     ],
   },
 ]

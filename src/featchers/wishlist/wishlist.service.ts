@@ -121,7 +121,10 @@ async function seedWatchesAsync(userId: string, gameId: string, gameName: string
                 const match = steamStore.url.match(/\/app\/(\d+)/)
                 if (match) {
                     const steamAppId = parseInt(match[1], 10)
-                    await EventWatch.updateOne({ userId, gameId }, { $set: { steamAppId } })
+                    await Promise.all([
+                        EventWatch.updateOne({ userId, gameId }, { $set: { steamAppId } }),
+                        PriceWatch.updateOne({ userId, gameId }, { $set: { steamAppId } }),
+                    ])
                 }
             }
         } catch {

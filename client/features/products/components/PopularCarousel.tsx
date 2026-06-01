@@ -2,6 +2,7 @@
 
 import {
   motion,
+  AnimatePresence,
   useScroll,
   useTransform,
   useMotionTemplate,
@@ -263,6 +264,7 @@ function NavBtn({ dir, onClick }: { dir: "prev" | "next"; onClick: () => void })
           cx="56" cy="56" r="16"
           fill="#3594E2"
           filter={`url(#${filterId})`}
+          initial={{ opacity: 0.65 }}
           animate={{ opacity: hovered ? 1 : 0.65 }}
           transition={{ duration: 0.2 }}
         />
@@ -270,9 +272,10 @@ function NavBtn({ dir, onClick }: { dir: "prev" | "next"; onClick: () => void })
         {/* Arrow — stroke only by default, fills on hover */}
         <motion.path
           d={ARROW_PATH}
+          initial={{ fill: "transparent", stroke: "#3396E6", strokeOpacity: 0.85 }}
           animate={{
-            fill:         hovered ? "#3396E6" : "transparent",
-            stroke:       "#3396E6",
+            fill:          hovered ? "#3396E6" : "transparent",
+            stroke:        "#3396E6",
             strokeOpacity: hovered ? 0 : 0.85,
           }}
           transition={{ duration: 0.18 }}
@@ -369,9 +372,17 @@ export default function PopularCarousel({
           sit OUTSIDE the masked div and are never faded by maskImage. */}
       <div className="relative" style={{ paddingTop: 8 }}>
 
-        {/* Prev / Next — outside the masked div so mask never clips them */}
-        {currentIndex > 0 && <NavBtn dir="prev" onClick={() => scrollTo(currentIndex - 1)} />}
-        {currentIndex < games.length - 1 && <NavBtn dir="next" onClick={() => scrollTo(currentIndex + 1)} />}
+        {/* Prev / Next — AnimatePresence enables the exit fade when reaching the ends */}
+        <AnimatePresence>
+          {currentIndex > 0 && (
+            <NavBtn key="prev" dir="prev" onClick={() => scrollTo(currentIndex - 1)} />
+          )}
+        </AnimatePresence>
+        <AnimatePresence>
+          {currentIndex < games.length - 1 && (
+            <NavBtn key="next" dir="next" onClick={() => scrollTo(currentIndex + 1)} />
+          )}
+        </AnimatePresence>
 
         {/* Masked carousel — overflow:hidden + edge fade, does NOT contain nav btns */}
         <div

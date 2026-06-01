@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState, use, useMemo } from "react"
 import { useRouter } from "next/navigation"
 import { motion } from "framer-motion"
-import { ArrowLeft, Lock } from "lucide-react"
+import { ArrowLeft, Lock } from "@/shared/icons"
 import { toast } from "react-toastify"
 import { useAuth } from "@/features/auth/state/AuthContext"
 import Avatar from "@/components/friends/Avatar"
