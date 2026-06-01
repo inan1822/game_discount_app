@@ -70,11 +70,12 @@ app.use(morgan(process.env.NODE_ENV === "production" ? "combined" : "dev"))
 app.use("/api/v1/webhooks", express.raw({ type: "application/json" }), webhookRouter)
 
 const allowedOrigins = [
-    "http://localhost:3000",
-    "http://localhost:3001",
+    "http://localhost:3000",   // storefront
+    "http://localhost:3001",   // CRM (separate app)
     "http://127.0.0.1:3000",
     "http://127.0.0.1:3001",
-    ...(process.env.CLIENT_URL ? [process.env.CLIENT_URL] : []),
+    ...(process.env.CLIENT_URL     ? [process.env.CLIENT_URL]     : []),
+    ...(process.env.CRM_URL        ? [process.env.CRM_URL]        : []),
 ]
 
 app.use(cors({

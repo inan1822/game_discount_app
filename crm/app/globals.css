@@ -1,0 +1,303 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+/* ─── GlowCard spotlight properties ───────────────────────────────────────
+   Register --base (HSL hue), --xp (x position 0..1), --yp (y position 0..1)
+   as animatable <number> properties so transitions on these vars actually
+   interpolate frame-by-frame instead of snapping. Used by the GlowCard
+   component (spotlight-card.tsx) and any consumer that wants a smooth
+   color/position fade — e.g. the notifications page tab spotlight.
+*/
+@property --base {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 220;
+}
+@property --xp {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 0.5;
+}
+@property --yp {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 0.5;
+}
+@property --x {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 0;
+}
+@property --y {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 0;
+}
+
+/* ─── DisLow Design Tokens (from Figma) ──────────────────────────────────── */
+:root {
+  /* shadcn required vars */
+  --background:          #12131a;
+  --foreground:          #FFFFFF;
+  --card:                #1c1e2a;
+  --card-foreground:     #FFFFFF;
+  --popover:             #1c1e2a;
+  --popover-foreground:  #FFFFFF;
+  --primary:             #AE3BD6;
+  --primary-foreground:  #FFFFFF;
+  --secondary:           #2a2d32;
+  --secondary-foreground:#b3bade;
+  --muted:               #2a2d32;
+  --muted-foreground:    #9fa0a1;
+  --accent:              #6475D1;
+  --accent-foreground:   #FFFFFF;
+  --destructive:         #ef4444;
+  --border:              rgba(188,188,201,0.25);
+  --input:               rgba(255,255,255,0.07);
+  --ring:                #AE3BD6;
+  --radius:              0.75rem;
+
+  /* DisLow brand tokens */
+  --color-purple:        #AE3BD6;
+  --color-purple-light:  #999FFA;
+  --color-blue:          #6475D1;
+  --color-cyan:          #2ab7e6;
+  --color-green:         #44d62c;
+  --text-secondary:      #b3bade;
+  --text-muted:          #9fa0a1;
+  --border-subtle:       rgba(188,188,201,0.25);
+  --shadow-card:         6px 4px 49px 0px rgba(0,0,0,0.7);
+  --shadow-purple:       0px 0px 20px 0px rgba(165,33,211,0.69);
+  --shadow-blue:         0px 0px 20px 0px rgba(100,117,209,0.69);
+}
+
+@theme inline {
+  /* Required shadcn mappings — must all be here for @apply to work */
+  --color-background:          var(--background);
+  --color-foreground:          var(--foreground);
+  --color-card:                var(--card);
+  --color-card-foreground:     var(--card-foreground);
+  --color-popover:             var(--popover);
+  --color-popover-foreground:  var(--popover-foreground);
+  --color-primary:             var(--primary);
+  --color-primary-foreground:  var(--primary-foreground);
+  --color-secondary:           var(--secondary);
+  --color-secondary-foreground:var(--secondary-foreground);
+  --color-muted:               var(--muted);
+  --color-muted-foreground:    var(--muted-foreground);
+  --color-accent:              var(--accent);
+  --color-accent-foreground:   var(--accent-foreground);
+  --color-destructive:         var(--destructive);
+  --color-border:              var(--border);
+  --color-input:               var(--input);
+  --color-ring:                var(--ring);
+
+  /* Radius */
+  --radius-sm:   calc(var(--radius) * 0.6);
+  --radius-md:   calc(var(--radius) * 0.8);
+  --radius-lg:   var(--radius);
+  --radius-xl:   calc(var(--radius) * 1.4);
+
+  /* DisLow brand colors — available as Tailwind classes */
+  --color-brand-purple:   var(--color-purple);
+  --color-brand-light:    var(--color-purple-light);
+  --color-brand-blue:     var(--color-blue);
+  --color-brand-cyan:     var(--color-cyan);
+  --color-brand-green:    var(--color-green);
+  --color-text-secondary: var(--text-secondary);
+  --color-text-muted:     var(--text-muted);
+
+  /* Font */
+  --font-sans: 'Nunito', system-ui, sans-serif;
+}
+
+@layer base {
+  * {
+    border-color: var(--border);
+  }
+  body {
+    background-color: var(--background);
+    color: var(--foreground);
+    font-family: 'Nunito', system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* Scrollbar styling */
+  ::-webkit-scrollbar       { width: 4px; height: 4px; }
+  ::-webkit-scrollbar-track { background: var(--background); }
+  ::-webkit-scrollbar-thumb { background: var(--color-purple); border-radius: 4px; }
+}
+
+/* ─── Utilities ───────────────────────────────────────────────────────────── */
+@layer utilities {
+  .glow-purple { box-shadow: var(--shadow-purple); }
+  .glow-blue   { box-shadow: var(--shadow-blue); }
+
+  .blob-purple {
+    background: var(--color-purple);
+    filter: blur(315px);
+    opacity: 0.25;
+    border-radius: 50%;
+    position: absolute;
+    pointer-events: none;
+    z-index: 0;
+  }
+  .blob-blue {
+    background: var(--color-blue);
+    filter: blur(352px);
+    opacity: 0.2;
+    border-radius: 50%;
+    position: absolute;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .text-gradient {
+    background: linear-gradient(135deg, var(--color-purple), var(--color-purple-light));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .glass {
+    background: rgba(28, 30, 42, 0.8);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    border: 1px solid var(--border-subtle);
+  }
+
+  .discount-badge {
+    background: var(--color-green);
+    color: #000;
+    font-weight: 700;
+    border-radius: 6px;
+    padding: 2px 6px;
+    font-size: 12px;
+    line-height: 1.4;
+  }
+
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .scrollbar-hide::-webkit-scrollbar { display: none; }
+
+  /* ─── SparkleButton ────────────────────────────────────────────────────────── */
+  .glow-btn {
+    width: 100%;
+    padding: 14px 24px;
+    border-radius: 10px;
+    font-weight: 700;
+    font-size: 1rem;
+    color: #fff;
+    background: linear-gradient(90deg, #2AB7E6 0%, #484FE6 100%);
+    border: none;
+    cursor: pointer;
+    position: relative;
+    overflow: hidden;
+    transition: box-shadow 0.3s ease, transform 0.15s ease;
+    box-shadow: 0 0 20px rgba(42, 183, 230, 0.35);
+  }
+
+  .glow-btn:hover {
+    box-shadow:
+      0 0 32px rgba(42, 183, 230, 0.55),
+      0 0 64px rgba(72, 79, 230, 0.35);
+    transform: translateY(-1px);
+  }
+
+  .glow-btn[data-state="clicked"] {
+    transform: scale(0.97);
+    box-shadow: 0 0 14px rgba(174, 59, 214, 0.4);
+  }
+
+  .glow-btn:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+    transform: none !important;
+  }
+
+  /* shimmer sweep on hover */
+  .glow-btn::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+      105deg,
+      transparent 35%,
+      rgba(255, 255, 255, 0.18) 50%,
+      transparent 65%
+    );
+    transform: translateX(-100%);
+    transition: transform 0.55s ease;
+  }
+  .glow-btn:hover::before { transform: translateX(100%); }
+
+  /* ─── Background Gradient Animation blobs ─────────────────────────────────── */
+  @keyframes moveVertical {
+    0%   { transform: translateY(-50%); }
+    50%  { transform: translateY(50%); }
+    100% { transform: translateY(-50%); }
+  }
+  @keyframes moveInCircle {
+    0%   { transform: rotate(0deg); }
+    50%  { transform: rotate(180deg); }
+    100% { transform: rotate(360deg); }
+  }
+  @keyframes moveHorizontal {
+    0%   { transform: translateX(-50%) translateY(-10%); }
+    50%  { transform: translateX(50%)  translateY(10%); }
+    100% { transform: translateX(-50%) translateY(-10%); }
+  }
+
+  .animate-bg-first  { animation: moveVertical   30s ease infinite; }
+  .animate-bg-second { animation: moveInCircle   20s reverse infinite; }
+  .animate-bg-third  { animation: moveInCircle   40s linear infinite; }
+  .animate-bg-fourth { animation: moveHorizontal 40s ease infinite; }
+  .animate-bg-fifth  { animation: moveInCircle   20s ease infinite; }
+
+  /* ─── Game Slider ──────────────────────────────────────────────────────────── */
+  @keyframes slideLeft {
+    from { transform: translateX(0); }
+    to   { transform: translateX(-50%); }
+  }
+
+  /* Container — sits at the TOP of the left panel, 560px tall */
+  .slider-row-container {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 560px;
+    overflow: hidden;
+  }
+
+  .slider-track {
+    display: flex;
+    gap: 0;
+    width: max-content;
+    height: 560px;
+    animation: slideLeft 120s linear infinite;
+  }
+
+  /* ─── Auth glass input ─────────────────────────────────────────────────────── */
+  .auth-input {
+    width: 100%;
+    background: rgba(255, 255, 255, 0.07);
+    border: 1px solid rgba(188, 188, 201, 0.15);
+    border-radius: 10px;
+    padding: 14px 18px;
+    color: #fff;
+    font-size: 0.95rem;
+    outline: none;
+    transition: border-color 0.2s ease, background 0.2s ease;
+  }
+  .auth-input::placeholder { color: #9fa0a1; }
+  .auth-input:focus {
+    border-color: rgba(174, 59, 214, 0.55);
+    background: rgba(255, 255, 255, 0.10);
+  }
+}
+
