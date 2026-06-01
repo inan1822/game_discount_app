@@ -8,7 +8,7 @@ import { useAuth } from "@/features/auth/state/AuthContext"
 import type { Order } from "@/shared/types/admin"
 import type { Ticket } from "@/shared/types/support"
 import { SUBJECT_LABELS, STATUS_LABELS, STATUS_COLORS } from "@/shared/types/support"
-import { StatusBadge } from "@/components/admin/StatusBadge"
+import { StatusBadge } from "@/shared/components/StatusBadge"
 import SupportDrawer from "@/components/support/SupportDrawer"
 import {
   ShoppingBag, ChevronLeft, ChevronRight, Key, Copy, Check,
