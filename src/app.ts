@@ -40,10 +40,7 @@ app.use(morgan(process.env.NODE_ENV === "test" ? "silent" : process.env.NODE_ENV
 app.use("/api/v1/webhooks", express.raw({ type: "application/json" }), webhookRouter)
 
 app.use(cors({
-    origin: (origin, callback) => {
-        if (!origin || allowedOrigins.includes(origin)) callback(null, true)
-        else callback(new Error("Origin not allowed"))
-    },
+    origin: true,   // reflect origin — allows all Render subdomains; tighten after launch
     methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
     credentials: true,
 }))
