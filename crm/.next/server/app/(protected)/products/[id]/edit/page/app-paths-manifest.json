@@ -1,0 +1,3 @@
+{
+  "/(protected)/products/[id]/edit/page": "app/(protected)/products/[id]/edit/page.js"
+}

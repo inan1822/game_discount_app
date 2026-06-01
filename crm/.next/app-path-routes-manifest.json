@@ -1,0 +1,18 @@
+{
+  "/(protected)/analytics/page": "/analytics",
+  "/(protected)/game-links/page": "/game-links",
+  "/(protected)/marketing/page": "/marketing",
+  "/(protected)/orders/[id]/page": "/orders/[id]",
+  "/(protected)/orders/page": "/orders",
+  "/(protected)/page": "/",
+  "/(protected)/products/[id]/edit/page": "/products/[id]/edit",
+  "/(protected)/products/[id]/keys/page": "/products/[id]/keys",
+  "/(protected)/products/[id]/page": "/products/[id]",
+  "/(protected)/products/new/page": "/products/new",
+  "/(protected)/products/page": "/products",
+  "/(protected)/users/[id]/page": "/users/[id]",
+  "/(protected)/users/page": "/users",
+  "/_global-error/page": "/_global-error",
+  "/_not-found/page": "/_not-found",
+  "/login/page": "/login"
+}

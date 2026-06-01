@@ -1,0 +1,18 @@
+{
+  "/(protected)/analytics/page": "app/(protected)/analytics/page.js",
+  "/(protected)/game-links/page": "app/(protected)/game-links/page.js",
+  "/(protected)/marketing/page": "app/(protected)/marketing/page.js",
+  "/(protected)/orders/[id]/page": "app/(protected)/orders/[id]/page.js",
+  "/(protected)/orders/page": "app/(protected)/orders/page.js",
+  "/(protected)/page": "app/(protected)/page.js",
+  "/(protected)/products/[id]/edit/page": "app/(protected)/products/[id]/edit/page.js",
+  "/(protected)/products/[id]/keys/page": "app/(protected)/products/[id]/keys/page.js",
+  "/(protected)/products/[id]/page": "app/(protected)/products/[id]/page.js",
+  "/(protected)/products/new/page": "app/(protected)/products/new/page.js",
+  "/(protected)/products/page": "app/(protected)/products/page.js",
+  "/(protected)/users/[id]/page": "app/(protected)/users/[id]/page.js",
+  "/(protected)/users/page": "app/(protected)/users/page.js",
+  "/_global-error/page": "app/_global-error/page.js",
+  "/_not-found/page": "app/_not-found/page.js",
+  "/login/page": "app/login/page.js"
+}
