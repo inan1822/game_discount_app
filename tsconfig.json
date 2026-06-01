@@ -37,6 +37,8 @@
         "node_modules",
         "dist",
         "client",
-        "crm"
+        "crm",
+        "src/tests",
+        "vitest.config.ts"
     ]
 }
