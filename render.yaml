@@ -1,0 +1,27 @@
+services:
+  # ── Express API backend ──────────────────────────────────────────────────────
+  - type: web
+    name: game-discount-app
+    runtime: node
+    rootDir: .
+    buildCommand: npm install && npm run build
+    startCommand: node dist/server.js
+    envVars:
+      - key: NODE_ENV
+        value: production
+
+  # ── Next.js storefront ───────────────────────────────────────────────────────
+  - type: web
+    name: game-discount-app-1
+    runtime: node
+    rootDir: client
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+
+  # ── Next.js CRM ──────────────────────────────────────────────────────────────
+  - type: web
+    name: crm-dislow
+    runtime: node
+    rootDir: crm
+    buildCommand: pnpm install && pnpm run build
+    startCommand: pnpm start
