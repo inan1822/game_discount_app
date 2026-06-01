@@ -1,5 +1,5 @@
 "use client"
-import { useState, useEffect } from "react"
+import { useState, useEffect, Suspense } from "react"
 import { useSearchParams, useRouter } from "next/navigation"
 import { loadStripe } from "@stripe/stripe-js"
 import { Elements } from "@stripe/react-stripe-js"
@@ -22,7 +22,7 @@ const PANEL: React.CSSProperties = {
   borderRadius: 10,
 }
 
-export default function CheckoutPage() {
+function CheckoutInner() {
   const searchParams = useSearchParams()
   const router = useRouter()
   const { user, isLoading: authLoading } = useAuth()
@@ -418,5 +418,16 @@ export default function CheckoutPage() {
         )}
       </div>
     </div>
+  )
+}
+
+// useSearchParams() must be inside a Suspense boundary for static prerender.
+export default function CheckoutPage() {
+  return (
+    <Suspense fallback={
+      <div className="relative min-h-screen" style={{ background: "#1E2532" }} />
+    }>
+      <CheckoutInner />
+    </Suspense>
   )
 }

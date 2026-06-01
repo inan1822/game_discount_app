@@ -2,7 +2,7 @@ import type { Metadata } from "next"
 import { Nunito } from "next/font/google"
 import "./globals.css"
 import { AuthProvider } from "@/context/AuthContext"
-import { WishlistProvider } from "@/context/WishlistContext"
+import { ReduxProvider } from "@/store/ReduxProvider"
 import { ToastContainer } from "react-toastify"
 import "react-toastify/dist/ReactToastify.css"
 
@@ -12,9 +12,33 @@ const nunito = Nunito({
   variable: "--font-nunito"
 })
 
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"
+
 export const metadata: Metadata = {
-  title: "DisLow — Find the Best Game Deals",
-  description: "Compare game prices across Steam, Epic, GOG, and more.",
+  metadataBase: new URL(SITE_URL),
+  title: {
+    default:  "DisLow — Find the Best Game Deals",
+    template: "%s — DisLow",
+  },
+  description:
+    "Compare game prices across Steam, Epic, GOG, PlayStation, Xbox and more. Track discounts, in-game events, and never miss a deal.",
+  keywords: [
+    "game deals", "game prices", "cheap games", "Steam deals", "Epic Games deals",
+    "GOG discounts", "price comparison", "game discounts", "DisLow",
+  ],
+  applicationName: "DisLow",
+  openGraph: {
+    type:        "website",
+    siteName:    "DisLow",
+    title:       "DisLow — Find the Best Game Deals",
+    description: "Compare game prices across every major store and track discounts in real time.",
+    url:         SITE_URL,
+  },
+  twitter: {
+    card:        "summary_large_image",
+    title:       "DisLow — Find the Best Game Deals",
+    description: "Compare game prices across every major store and track discounts in real time.",
+  },
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -22,7 +46,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en" className="dark">
       <body className={`${nunito.variable} font-sans antialiased bg-[#12131a] text-white`}>
         <AuthProvider>
-          <WishlistProvider>
+          <ReduxProvider>
             <div className="min-h-screen">
               {children}
             </div>
@@ -37,7 +61,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 borderRadius: "12px"
               }}
             />
-          </WishlistProvider>
+          </ReduxProvider>
         </AuthProvider>
       </body>
     </html>
