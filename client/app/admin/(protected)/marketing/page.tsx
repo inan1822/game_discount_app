@@ -1,7 +1,7 @@
 import { fetchServerPromos, fetchServerBroadcastHistory } from "@/lib/api/admin.server"
 import { PromosTable } from "@/components/admin/PromosTable"
 import { BroadcastForm } from "@/components/admin/BroadcastForm"
-import { SectionHeading } from "@/components/ui/SectionHeading"
+import { SectionHeading } from "@/shared/components/SectionHeading"
 
 const PAGE: React.CSSProperties = {
   width: "min(calc(100% - 192px), 1600px)",

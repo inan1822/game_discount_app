@@ -6,10 +6,10 @@ import Link from "next/link"
 import { motion } from "framer-motion"
 import { Eye, EyeOff } from "lucide-react"
 import { toast } from "react-toastify"
-import { useAuth } from "@/context/AuthContext"
-import { SparkleButton } from "@/components/ui/SparkleButton"
-import PageBackground from "@/components/ui/PageBackground"
-import { CircularGallery, GalleryItem } from "@/components/ui/CircularGallery"
+import { useAuth } from "@/features/auth/state/AuthContext"
+import { SparkleButton } from "@/shared/components/SparkleButton"
+import PageBackground from "@/shared/components/PageBackground"
+import { CircularGallery, GalleryItem } from "@/shared/components/CircularGallery"
 
 // ─── Game covers for the circular gallery ────────────────────────────────────
 // Steam CDN library portrait covers — 600×900, always available

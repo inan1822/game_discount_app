@@ -6,9 +6,9 @@ import Link from "next/link"
 import { motion } from "framer-motion"
 import { Eye, EyeOff } from "lucide-react"
 import { toast } from "react-toastify"
-import { SparkleButton } from "@/components/ui/SparkleButton"
+import { SparkleButton } from "@/shared/components/SparkleButton"
 import { AuthPageShell } from "@/components/auth/AuthPageShell"
-import apiClient from "@/lib/api/axios"
+import apiClient from "@/shared/services/axios"
 
 const fadeUp = (delay = 0) => ({
   initial: { opacity: 0, y: 14 },

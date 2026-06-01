@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react"
 import Image from "next/image"
 import { toast } from "react-toastify"
-import { getAvatarGallery, updateAvatar } from "@/lib/api/users"
+import { getAvatarGallery, updateAvatar } from "@/features/profile/services/users"
 
 interface Props {
   currentAvatar?: string

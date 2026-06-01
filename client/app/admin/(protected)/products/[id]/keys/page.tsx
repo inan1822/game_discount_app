@@ -1,7 +1,7 @@
 import { fetchProduct, fetchProductKeys } from "@/lib/api/admin.server"
 import { KeysTable } from "@/components/admin/KeysTable"
 import { KeyUploader } from "@/components/admin/KeyUploader"
-import { SectionHeading } from "@/components/ui/SectionHeading"
+import { SectionHeading } from "@/shared/components/SectionHeading"
 import { notFound } from "next/navigation"
 import Link from "next/link"
 import { ArrowLeft } from "lucide-react"

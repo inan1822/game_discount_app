@@ -3,12 +3,12 @@ import { useState, useTransition } from "react"
 import { useRouter, useSearchParams, usePathname } from "next/navigation"
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
-} from "@/components/ui/table"
+} from "@/shared/components/table"
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from "@/components/ui/select"
+} from "@/shared/components/select"
 import { deleteProduct, updateProduct } from "@/lib/api/admin.client"
-import type { Product, ProductsPage } from "@/types/admin"
+import type { Product, ProductsPage } from "@/shared/types/admin"
 import { Plus, Search, Edit, Key, Trash2, ChevronLeft, ChevronRight } from "lucide-react"
 import { toast } from "react-toastify"
 import Link from "next/link"

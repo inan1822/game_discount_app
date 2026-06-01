@@ -1,5 +1,5 @@
 "use client"
-import type { OrderStatus } from "@/types/admin"
+import type { OrderStatus } from "@/shared/types/admin"
 
 const STYLE: Record<OrderStatus, { bg: string; color: string; label: string }> = {
   pending:   { bg: "rgba(245,158,11,0.15)",  color: "#f59e0b", label: "Pending"   },

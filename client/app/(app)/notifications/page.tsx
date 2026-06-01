@@ -3,15 +3,15 @@
 import { useEffect, useRef, useState, useCallback, useLayoutEffect } from "react"
 import { useRouter } from "next/navigation"
 import { BellRing, CheckCheck } from "lucide-react"
-import { useAuth } from "@/context/AuthContext"
-import { useChat } from "@/context/ChatContext"
-import { useUnreadCount } from "@/hooks/useUnreadCount"
+import { useAuth } from "@/features/auth/state/AuthContext"
+import { useChat } from "@/features/chat/state/ChatContext"
+import { useUnreadCount } from "@/features/chat/utils/useUnreadCount"
 import {
   getNotifications, markRead, markAllRead, deleteNotification,
-} from "@/lib/api/notifications"
-import type { Notification } from "@/types/notification"
-import { GlowCard } from "@/components/ui/spotlight-card"
-import { SectionHeading } from "@/components/ui/SectionHeading"
+} from "@/features/notifications/services/notifications"
+import type { Notification } from "@/shared/types/notification"
+import { GlowCard } from "@/shared/components/spotlight-card"
+import { SectionHeading } from "@/shared/components/SectionHeading"
 import Avatar from "@/components/friends/Avatar"
 
 type Tab = "all" | "events" | "discounts" | "messages"

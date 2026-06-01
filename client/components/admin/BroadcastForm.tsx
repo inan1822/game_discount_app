@@ -2,7 +2,7 @@
 import { useState } from "react"
 import { Send, Clock, Users, Mail } from "lucide-react"
 import { sendBroadcast, fetchBroadcastHistory } from "@/lib/api/admin.client"
-import type { BroadcastHistory } from "@/types/admin"
+import type { BroadcastHistory } from "@/shared/types/admin"
 
 const PANEL: React.CSSProperties = {
   background: "rgba(28,30,42,0.70)",

@@ -2,7 +2,7 @@
 import { useState } from "react"
 import { Tag, ToggleLeft, ToggleRight, Trash2, Plus } from "lucide-react"
 import { createPromo, togglePromo, deletePromo } from "@/lib/api/admin.client"
-import type { PromoCode } from "@/types/admin"
+import type { PromoCode } from "@/shared/types/admin"
 
 const currency = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" })
 

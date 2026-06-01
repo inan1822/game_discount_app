@@ -1,6 +1,6 @@
 "use client"
 import { useState } from "react"
-import { Textarea } from "@/components/ui/textarea"
+import { Textarea } from "@/shared/components/textarea"
 import { importKeys } from "@/lib/api/admin.client"
 import { toast } from "react-toastify"
 import { Upload, CheckCircle } from "lucide-react"

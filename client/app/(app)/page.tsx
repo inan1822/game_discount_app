@@ -9,25 +9,25 @@ import {
   SlidersHorizontal, Search, Bell,
   Star, X,
 } from "lucide-react"
-import { useAuth } from "@/context/AuthContext"
-import { useChat } from "@/context/ChatContext"
-import GameCard from "@/components/game/GameCard"
-import PopularCarousel from "@/components/game/PopularCarousel"
-import NewBentoGrid from "@/components/game/NewBentoGrid"
-import FavoritesShelf from "@/components/game/FavoritesShelf"
-import { SectionHeading } from "@/components/ui/SectionHeading"
-import ScrollableRow from "@/components/ui/ScrollableRow"
+import { useAuth } from "@/features/auth/state/AuthContext"
+import { useChat } from "@/features/chat/state/ChatContext"
+import GameCard from "@/features/products/components/GameCard"
+import PopularCarousel from "@/features/products/components/PopularCarousel"
+import NewBentoGrid from "@/features/products/components/NewBentoGrid"
+import FavoritesShelf from "@/features/products/components/FavoritesShelf"
+import { SectionHeading } from "@/shared/components/SectionHeading"
+import ScrollableRow from "@/shared/components/ScrollableRow"
 import {
   getPopularGames, getNewGames, getTrendedGames, getForYouGames, searchGames, getGameById,
   getFreeToPlayGames, getHiddenGemsGames, getCardPrices,
   getDisLowGames,
-} from "@/lib/api/games"
-import { primeCache } from "@/hooks/useCardPrice"
-import { DualRangeSlider } from "@/components/ui/DualRangeSlider"
-import { getWishlist, addToWishlist, removeFromWishlist } from "@/lib/api/wishlist"
-import { useUnreadCount } from "@/hooks/useUnreadCount"
+} from "@/features/products/services/games"
+import { primeCache } from "@/features/products/utils/useCardPrice"
+import { DualRangeSlider } from "@/shared/components/DualRangeSlider"
+import { getWishlist, addToWishlist, removeFromWishlist } from "@/features/wishlist/services/wishlist"
+import { useUnreadCount } from "@/features/chat/utils/useUnreadCount"
 import NotificationPopover from "@/components/notifications/NotificationPopover"
-import type { Game, WishlistItem, CardPrice } from "@/types/game"
+import type { Game, WishlistItem, CardPrice } from "@/shared/types/game"
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 

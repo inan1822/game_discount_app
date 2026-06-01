@@ -1,7 +1,7 @@
 import { Suspense } from "react"
 import { DashboardContent } from "./DashboardContent"
 import { DashboardSkeleton } from "@/components/admin/DashboardSkeleton"
-import { SectionHeading } from "@/components/ui/SectionHeading"
+import { SectionHeading } from "@/shared/components/SectionHeading"
 
 const PAGE: React.CSSProperties = {
   width: "min(calc(100% - 192px), 1600px)",

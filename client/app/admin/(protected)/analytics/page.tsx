@@ -6,8 +6,8 @@ import {
 } from "recharts"
 import { TrendingUp, ShoppingCart, Users, Package } from "lucide-react"
 import { fetchAnalytics } from "@/lib/api/admin.client"
-import { SectionHeading } from "@/components/ui/SectionHeading"
-import type { AnalyticsData } from "@/types/admin"
+import { SectionHeading } from "@/shared/components/SectionHeading"
+import type { AnalyticsData } from "@/shared/types/admin"
 
 const PAGE: React.CSSProperties = {
   width: "min(calc(100% - 192px), 1600px)",

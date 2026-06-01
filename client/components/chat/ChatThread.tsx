@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from "react"
 import { Send, Check, CheckCheck, AlertCircle } from "lucide-react"
-import { useChat } from "@/context/ChatContext"
+import { useChat } from "@/features/chat/state/ChatContext"
 
 export default function ChatThread() {
   const {

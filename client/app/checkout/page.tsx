@@ -4,11 +4,11 @@ import { useSearchParams, useRouter } from "next/navigation"
 import { loadStripe } from "@stripe/stripe-js"
 import { Elements } from "@stripe/react-stripe-js"
 import { CheckoutForm } from "@/components/shop/CheckoutForm"
-import { createCheckout, fetchStoreProduct, validatePromo } from "@/lib/api/shop"
-import PageBackground from "@/components/ui/PageBackground"
-import type { Product, PromoValidation } from "@/types/admin"
+import { createCheckout, fetchStoreProduct, validatePromo } from "@/shared/services/shop"
+import PageBackground from "@/shared/components/PageBackground"
+import type { Product, PromoValidation } from "@/shared/types/admin"
 import { ArrowLeft, ShoppingBag, Tag, X, Check, Key, Copy, PartyPopper } from "lucide-react"
-import { useAuth } from "@/context/AuthContext"
+import { useAuth } from "@/features/auth/state/AuthContext"
 
 const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || "")
 

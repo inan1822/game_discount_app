@@ -1,4 +1,4 @@
-import PageBackground from "@/components/ui/PageBackground"
+import PageBackground from "@/shared/components/PageBackground"
 
 // Outer /admin layout — same animated gradient + SVG overlay used on every
 // other page. All admin content sits at z-index >= 3 (see [[feedback-admin-design-system]]).

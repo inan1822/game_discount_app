@@ -1,6 +1,6 @@
 import { fetchProduct } from "@/lib/api/admin.server"
 import { ProductForm } from "@/components/admin/ProductForm"
-import { SectionHeading } from "@/components/ui/SectionHeading"
+import { SectionHeading } from "@/shared/components/SectionHeading"
 import { notFound } from "next/navigation"
 
 const PAGE: React.CSSProperties = {

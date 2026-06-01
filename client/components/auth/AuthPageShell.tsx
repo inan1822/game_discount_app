@@ -1,8 +1,8 @@
 "use client"
 
 import { useState, useEffect, ReactNode } from "react"
-import { BackgroundGradientAnimation } from "@/components/ui/BackgroundGradientAnimation"
-import { CircularGallery, GalleryItem } from "@/components/ui/CircularGallery"
+import { BackgroundGradientAnimation } from "@/shared/components/BackgroundGradientAnimation"
+import { CircularGallery, GalleryItem } from "@/shared/components/CircularGallery"
 
 // Steam CDN library portrait covers — 600×900
 const COVERS = [

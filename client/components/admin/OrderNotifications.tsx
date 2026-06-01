@@ -2,7 +2,7 @@
 import { useEffect } from "react"
 import { io, type Socket } from "socket.io-client"
 import { toast } from "react-toastify"
-import type { NewOrderEvent } from "@/types/admin"
+import type { NewOrderEvent } from "@/shared/types/admin"
 
 export function OrderNotifications() {
   useEffect(() => {

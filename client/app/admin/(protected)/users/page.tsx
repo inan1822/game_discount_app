@@ -1,6 +1,6 @@
 import { fetchAdminUsers } from "@/lib/api/admin.server"
 import { UsersTable } from "@/components/admin/UsersTable"
-import { SectionHeading } from "@/components/ui/SectionHeading"
+import { SectionHeading } from "@/shared/components/SectionHeading"
 
 const PAGE: React.CSSProperties = {
   width: "min(calc(100% - 192px), 1600px)",

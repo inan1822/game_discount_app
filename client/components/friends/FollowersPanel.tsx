@@ -2,8 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { toast } from "react-toastify"
-import { listFollowing, listFollowers, follow } from "@/lib/api/users"
-import type { FriendListItem } from "@/types/user"
+import { listFollowing, listFollowers, follow } from "@/features/profile/services/users"
+import type { FriendListItem } from "@/shared/types/user"
 import FriendRow, { ActionButton } from "./FriendRow"
 import FriendSearchBar from "./FriendSearchBar"
 import { ListSkeleton, EmptyState, GroupHeader } from "./PanelChrome"

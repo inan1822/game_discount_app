@@ -1,10 +1,10 @@
 "use client"
 import { useEffect, useState, useRef, Suspense } from "react"
 import { useSearchParams } from "next/navigation"
-import PageBackground from "@/components/ui/PageBackground"
+import PageBackground from "@/shared/components/PageBackground"
 import { CheckCircle, Mail, ShoppingBag, Key, Copy, Check, Loader2 } from "lucide-react"
 import Link from "next/link"
-import { fetchOrderKey } from "@/lib/api/support"
+import { fetchOrderKey } from "@/features/friends/services/support"
 
 const PANEL: React.CSSProperties = {
   background: "rgba(28,30,42,0.70)",

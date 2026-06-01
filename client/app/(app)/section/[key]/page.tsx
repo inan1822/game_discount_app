@@ -4,11 +4,11 @@ import { useState, useEffect, useRef, useCallback } from "react"
 import { useRouter, useParams } from "next/navigation"
 import { motion } from "framer-motion"
 import { ArrowLeft, Bell } from "lucide-react"
-import { useAuth } from "@/context/AuthContext"
-import GameCard from "@/components/game/GameCard"
-import { getPopularGames, getNewGames, getTrendedGames, getForYouGames, getCardPrices } from "@/lib/api/games"
-import { getWishlist, addToWishlist, removeFromWishlist } from "@/lib/api/wishlist"
-import type { Game, WishlistItem, CardPrice } from "@/types/game"
+import { useAuth } from "@/features/auth/state/AuthContext"
+import GameCard from "@/features/products/components/GameCard"
+import { getPopularGames, getNewGames, getTrendedGames, getForYouGames, getCardPrices } from "@/features/products/services/games"
+import { getWishlist, addToWishlist, removeFromWishlist } from "@/features/wishlist/services/wishlist"
+import type { Game, WishlistItem, CardPrice } from "@/shared/types/game"
 
 // ─── Section metadata ─────────────────────────────────────────────────────────
 const SLUG_META: Record<string, { label: string; paginated: boolean }> = {

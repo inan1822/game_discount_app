@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react"
 import { motion, useMotionValue, useDragControls } from "framer-motion"
 import { X, ChevronLeft } from "lucide-react"
 import Avatar from "@/components/friends/Avatar"
-import { useChat } from "@/context/ChatContext"
+import { useChat } from "@/features/chat/state/ChatContext"
 import ConversationList from "./ConversationList"
 import ChatThread from "./ChatThread"
 

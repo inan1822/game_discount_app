@@ -1,5 +1,5 @@
 import { ProductForm } from "@/components/admin/ProductForm"
-import { SectionHeading } from "@/components/ui/SectionHeading"
+import { SectionHeading } from "@/shared/components/SectionHeading"
 
 const PAGE: React.CSSProperties = {
   width: "min(calc(100% - 192px), 1600px)",
