@@ -183,7 +183,7 @@ export function UsersTable({ initial }: Props) {
                 {/* User */}
                 <td style={{ padding: "12px 16px" }}>
                   <Link
-                    href={`/admin/users/${user._id}`}
+                    href={`/users/${user._id}`}
                     className="flex items-center gap-3 hover:opacity-80 transition-opacity"
                     style={{ textDecoration: "none" }}
                   >

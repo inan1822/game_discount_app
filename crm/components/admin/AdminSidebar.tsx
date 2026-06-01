@@ -285,7 +285,7 @@ export function AdminSidebar() {
         {/* Switch to User view */}
         <div className="px-3 pb-2">
           <motion.button
-            onClick={() => { setOpen(false); router.push("/") }}
+            onClick={() => { setOpen(false); window.location.href = process.env.NEXT_PUBLIC_STOREFRONT_URL ?? "http://localhost:3000" }}
             whileHover={{ x: 2 }}
             whileTap={{ scale: 0.97 }}
             className="w-full flex items-center gap-3 px-6 py-2.5 text-[18px] font-medium"

@@ -222,7 +222,7 @@ export function OrdersTable({ initialData }: Props) {
                 <TableRow
                   key={o._id}
                   style={{ borderColor: "rgba(188,188,201,0.08)", cursor: "pointer" }}
-                  onClick={() => router.push(`/admin/orders/${o._id}`)}
+                  onClick={() => router.push(`/orders/${o._id}`)}
                 >
                   <TableCell style={{ color: "#9fa0a1", fontSize: 12, fontFamily: "monospace" }}>
                     {o._id.slice(-8)}

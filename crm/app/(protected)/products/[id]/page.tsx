@@ -34,7 +34,7 @@ export default async function ProductDetailPage({ params }: Props) {
           )}
         </div>
         <div className="flex gap-2">
-          <Link href={`/admin/products/${id}/edit`} style={{
+          <Link href={`/products/${id}/edit`} style={{
             display: "flex", alignItems: "center", gap: 6,
             background: "rgba(100,117,209,0.20)", color: "#6475D1",
             border: "1px solid rgba(100,117,209,0.30)", borderRadius: 10,
@@ -42,7 +42,7 @@ export default async function ProductDetailPage({ params }: Props) {
           }}>
             <Edit className="w-4 h-4" /> Edit
           </Link>
-          <Link href={`/admin/products/${id}/keys`} style={{
+          <Link href={`/products/${id}/keys`} style={{
             display: "flex", alignItems: "center", gap: 6,
             background: "rgba(68,214,44,0.12)", color: "#44d62c",
             border: "1px solid rgba(68,214,44,0.25)", borderRadius: 10,

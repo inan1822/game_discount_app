@@ -3,6 +3,7 @@ import { Nunito } from "next/font/google"
 import "./globals.css"
 import { ToastContainer } from "react-toastify"
 import "react-toastify/dist/ReactToastify.css"
+import PageBackground from "@/components/ui/PageBackground"
 
 const nunito = Nunito({
   subsets: ["latin"],
@@ -18,8 +19,17 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className="dark">
-      <body className={`${nunito.variable} font-sans antialiased`} style={{ background: "#1E2532", color: "#fff" }}>
-        {children}
+      <body
+        className={`${nunito.variable} font-sans antialiased`}
+        style={{ background: "#1E2532", color: "#fff" }}
+      >
+        {/* Same atmospheric background as the storefront */}
+        <div className="relative min-h-screen overflow-hidden">
+          <PageBackground />
+          <div className="relative" style={{ zIndex: 3 }}>
+            {children}
+          </div>
+        </div>
         <ToastContainer
           position="bottom-center"
           autoClose={3000}

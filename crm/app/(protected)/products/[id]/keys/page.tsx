@@ -27,7 +27,7 @@ export default async function ProductKeysPage({ params }: Props) {
   return (
     <div style={PAGE}>
       <Link
-        href={`/admin/products/${id}`}
+        href={`/products/${id}`}
         style={{
           display: "inline-flex", alignItems: "center", gap: 6,
           background: "rgba(28,30,42,0.60)", backdropFilter: "blur(6px)",

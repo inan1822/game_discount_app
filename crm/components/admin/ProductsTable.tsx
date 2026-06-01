@@ -262,11 +262,11 @@ export function ProductsTable({ initialData }: { initialData: ProductsPage }) {
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-2">
-                      <Link href={`/admin/products/${p._id}/edit`} title="Edit"
+                      <Link href={`/products/${p._id}/edit`} title="Edit"
                         style={{ color: "#6475D1", display: "flex" }}>
                         <Edit className="w-4 h-4" />
                       </Link>
-                      <Link href={`/admin/products/${p._id}/keys`} title="Keys"
+                      <Link href={`/products/${p._id}/keys`} title="Keys"
                         style={{ color: "#9fa0a1", display: "flex" }}>
                         <Key className="w-4 h-4" />
                       </Link>
