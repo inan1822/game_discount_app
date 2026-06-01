@@ -1,5 +1,5 @@
 "use client"
-import { useEffect, useState, useRef } from "react"
+import { useEffect, useState, useRef, Suspense } from "react"
 import { useSearchParams } from "next/navigation"
 import PageBackground from "@/components/ui/PageBackground"
 import { CheckCircle, Mail, ShoppingBag, Key, Copy, Check, Loader2 } from "lucide-react"
@@ -17,7 +17,7 @@ const PANEL: React.CSSProperties = {
 const POLL_INTERVAL_MS = 2000
 const MAX_ATTEMPTS     = 15  // ≈ 30 seconds total
 
-export default function CheckoutSuccessPage() {
+function CheckoutSuccessInner() {
   const searchParams = useSearchParams()
   const orderId = searchParams.get("orderId") || ""
 
@@ -194,5 +194,16 @@ export default function CheckoutSuccessPage() {
         </div>
       </div>
     </div>
+  )
+}
+
+// useSearchParams() must be inside a Suspense boundary for static prerender.
+export default function CheckoutSuccessPage() {
+  return (
+    <Suspense fallback={
+      <div className="relative min-h-screen" style={{ background: "#1E2532" }} />
+    }>
+      <CheckoutSuccessInner />
+    </Suspense>
   )
 }
