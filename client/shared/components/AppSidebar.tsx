@@ -190,6 +190,7 @@ export default function AppSidebar() {
   }
 
   function handleClick(label: string, href: string) {
+    if (isLoading) return
     if (!isLoggedIn && AUTH_ITEMS.has(label)) {
       router.push("/login")
       return
