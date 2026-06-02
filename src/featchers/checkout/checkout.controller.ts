@@ -94,7 +94,7 @@ export const createCheckout = async (req: Request, res: Response, next: NextFunc
         { productId: product._id, status: "available" },
         { status: "sold", soldAt: new Date() },
         { new: true }
-      )
+      ).select("+code")   // code is select:false — include it for delivery/email
       if (!claimedKey) {
         return res.status(409).json({ status: "409", message: "Out of stock — no keys available", data: null })
       }

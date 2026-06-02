@@ -27,35 +27,52 @@ export const handleStripeWebhook = async (req: Request, res: Response) => {
     return res.status(400).send("Webhook signature verification failed")
   }
 
-  // ── Idempotency: drop duplicate deliveries from Stripe ─────────────────────
-  // Stripe retries on any 5xx and occasionally re-delivers under normal
-  // network conditions. Unique index on stripeEventId → second insert throws.
+  // ── Idempotency guard ──────────────────────────────────────────────────────
+  // We record the event id ONLY AFTER it is processed successfully (below).
+  // Recording it up-front (the previous approach) meant a transient DB error
+  // during fulfillment would throw → 500 → Stripe retries → the retry hits the
+  // already-recorded id and 200-skips, permanently stranding a *paid* order.
+  const alreadyProcessed = await WebhookEvent.exists({ stripeEventId: event.id })
+  if (alreadyProcessed) {
+    console.log(`[Webhook] Duplicate event ${event.id} ignored`)
+    return res.status(200).json({ received: true, duplicate: true })
+  }
+
+  // ── Process ────────────────────────────────────────────────────────────────
+  // On a thrown (transient) error we return 500 so Stripe retries, and we do NOT
+  // record the id — so the retry actually re-processes. fulfillOrder and
+  // releaseReservation are both idempotent, so a concurrent duplicate that slips
+  // past the guard above is harmless.
+  try {
+    if (event.type === "payment_intent.succeeded") {
+      const intent = event.data.object as Stripe.PaymentIntent
+      const order = await Order.findOne({ paymentRef: intent.id }).select("_id").lean()
+      if (order) {
+        const result = await fulfillOrder(order._id.toString())
+        if (!result.ok) {
+          // Business failure (e.g. out_of_stock) — a retry won't conjure a key.
+          // This is an oversell needing admin attention; log loudly, don't 500.
+          console.error(`[Webhook] Fulfillment incomplete for order ${order._id} (reason: ${result.reason ?? "unknown"})`)
+        }
+      } else {
+        console.warn(`[Webhook] No order found for paymentRef=${intent.id}`)
+      }
+    } else if (event.type === "payment_intent.payment_failed" || event.type === "payment_intent.canceled") {
+      await releaseReservation(event.data.object as Stripe.PaymentIntent)
+    }
+  } catch (err) {
+    console.error(`[Webhook] Processing failed for event ${event.id}:`, err)
+    return res.status(500).json({ received: false, error: "processing failed" })
+  }
+
+  // ── Record (only after success) ────────────────────────────────────────────
   try {
     await WebhookEvent.create({ stripeEventId: event.id })
   } catch (err) {
-    const dupKey = (err as { code?: number }).code === 11000
-    if (dupKey) {
-      console.log(`[Webhook] Duplicate event ${event.id} ignored`)
-      return res.status(200).json({ received: true, duplicate: true })
+    // 11000 = a concurrent delivery already recorded it — expected, non-fatal.
+    if ((err as { code?: number }).code !== 11000) {
+      console.error("[Webhook] Failed to record processed event id (non-fatal):", err)
     }
-    // Storage error — fall through and process; better to double-process
-    // than to drop a payment confirmation entirely.
-    console.error("[Webhook] Failed to record event id:", err)
-  }
-
-  if (event.type === "payment_intent.succeeded") {
-    const intent = event.data.object as Stripe.PaymentIntent
-    const order = await Order.findOne({ paymentRef: intent.id }).select("_id").lean()
-    if (order) {
-      await fulfillOrder(order._id.toString())
-    } else {
-      console.warn(`[Webhook] No order found for paymentRef=${intent.id}`)
-    }
-  }
-
-  if (event.type === "payment_intent.payment_failed" || event.type === "payment_intent.canceled") {
-    const intent = event.data.object as Stripe.PaymentIntent
-    await releaseReservation(intent)
   }
 
   return res.status(200).json({ received: true })
