@@ -1,3 +1,8 @@
 .env
 node_modules
 dist
+
+# Runtime-written caches — the app regenerates these at startup (see
+# games.service.ts). Committing them causes constant working-tree churn, since
+# every dev/test run rewrites them, and ships stale data to production.
+src/cache/
