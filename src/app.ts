@@ -25,10 +25,11 @@ const allowedOrigins = [
     "http://127.0.0.1:3000",
     "http://127.0.0.1:3001",
     // Production URLs — hardcoded as fallback in case env vars aren't picked up
-    "https://game-discount-app-1.onrender.com",
-    "https://crm-dislow.onrender.com",
-    ...(process.env.CLIENT_URL ? [process.env.CLIENT_URL] : []),
-    ...(process.env.CRM_URL    ? [process.env.CRM_URL]    : []),
+    "https://dislow-front-end.onrender.com",   // storefront
+    "https://crm-dislow-gba8.onrender.com",    // CRM admin panel
+    ...(process.env.CLIENT_URL   ? [process.env.CLIENT_URL]   : []),
+    ...(process.env.FRONTEND_URL ? [process.env.FRONTEND_URL] : []),
+    ...(process.env.CRM_URL      ? [process.env.CRM_URL]      : []),
 ]
 
 const app = express()
@@ -41,7 +42,14 @@ app.use(morgan(ENV === "test" ? "silent" : ENV === "production" ? "combined" : "
 app.use("/api/v1/webhooks", express.raw({ type: "application/json" }), webhookRouter)
 
 app.use(cors({
-    origin: true,   // reflect origin — allows all Render subdomains; tighten after launch
+    // Allowlist — never reflect an arbitrary Origin while credentials:true is set,
+    // or ANY website a logged-in user visits could make authenticated requests and
+    // read the response cross-origin. Mirrors the socket.io check in shared/socket/io.ts.
+    // No Origin header (server-to-server, curl, Next RSC fetchers) → allow.
+    origin: (origin, callback) => {
+        if (!origin || allowedOrigins.includes(origin)) return callback(null, true)
+        return callback(null, false)
+    },
     methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
     credentials: true,

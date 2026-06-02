@@ -40,7 +40,9 @@ export interface IUser extends mongoose.Document {
 }
 
 const userSchema = new mongoose.Schema<IUser>({
-    token: { type: String, default: null },
+    // select:false — the live JWT must never serialize into an API response
+    // (e.g. /auth/me, admin user list). Read paths that need it use .select("+token").
+    token: { type: String, default: null, select: false },
     name: {
         type: String,
         required: true,

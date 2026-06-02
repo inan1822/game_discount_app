@@ -96,6 +96,8 @@ describe("GET /api/v1/auth/me", () => {
         expect(res.body.data).toHaveProperty("email", "me@test.com")
         // Password hash must never appear in the response data
         expect(res.body.data).not.toHaveProperty("password")
+        // The live JWT must never be serialized back to the client (P1 fix)
+        expect(res.body.data).not.toHaveProperty("token")
     })
 
     it("returns 401 without cookie", async () => {

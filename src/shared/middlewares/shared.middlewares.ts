@@ -26,9 +26,16 @@ export const authMiddleware = async (req: Request, res: Response, next: NextFunc
         }
 
         const decoded = jwt.verify(inputToken, process.env.JWT_SECRET!) as { id: string, role: string }
-        const user = await userModel.findById(decoded.id)
+        // token is select:false on the schema — add it back explicitly for the
+        // single-session check below.
+        const user = await userModel.findById(decoded.id).select("+token")
         if (!user || user.token !== inputToken) {
             return res.status(401).json({ message: "Token is invalid or expired" })
+        }
+        // Reject suspended accounts — a ban takes effect on the very next request
+        // even if the user still holds a valid (unexpired) JWT.
+        if (user.isBanned) {
+            return res.status(403).json({ status: "403", message: "Account suspended", data: null })
         }
         // Always use the DB role — allows admin promotions to take effect
         // without requiring the user to log out and back in.

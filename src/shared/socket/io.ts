@@ -42,8 +42,9 @@ export function initSocket(httpServer: HttpServer, allowedOrigins: string[]): So
             // Mirror authMiddleware: a valid JWT alone is not enough. Logout clears
             // user.token in DB; without this check, stolen JWTs keep working over
             // sockets until the 2h expiry.
-            const dbUser = await userModel.findById(payload.id).select("token role").lean()
+            const dbUser = await userModel.findById(payload.id).select("token role isBanned").lean()
             if (!dbUser || dbUser.token !== token) return next(new Error("Unauthorized"))
+            if (dbUser.isBanned) return next(new Error("Account suspended"))
             socket.data.user = { id: payload.id, role: dbUser.role }
             next()
         } catch {

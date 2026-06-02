@@ -104,6 +104,11 @@ export const loginService = async ({ email, password }: { email: string, passwor
         throw new AppError("User not verified", 403)
     }
 
+    // Suspended accounts cannot authenticate at all
+    if (user.isBanned) {
+        throw new AppError("Your account has been suspended", 403)
+    }
+
     // admin needs 2FA
     if (user.role === "admin") {
         const code = generateCode()
@@ -223,6 +228,7 @@ export const resetPasswordService = async ({ token, newPassword }: { token: stri
     user.password = newPassword
     user.resetPasswordToken = undefined
     user.resetPasswordExpiry = undefined
+    user.token = null   // revoke any active session — a reset must log out a thief
     await user.save()
 
     return { message: "Password reset successfully" }
