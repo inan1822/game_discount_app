@@ -42,7 +42,8 @@ app.use("/api/v1/webhooks", express.raw({ type: "application/json" }), webhookRo
 
 app.use(cors({
     origin: true,   // reflect origin — allows all Render subdomains; tighten after launch
-    methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
+    methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
     credentials: true,
 }))
 

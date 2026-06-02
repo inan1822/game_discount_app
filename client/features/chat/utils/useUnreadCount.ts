@@ -32,9 +32,14 @@ export function useUnreadCount() {
     fetchCounts()
     timerRef.current = setInterval(fetchCounts, POLL_INTERVAL)
 
-    // Connect to Socket.io using the httpOnly cookie (no token needed in auth)
+    // Connect to Socket.io — pass JWT in handshake auth (cookie fallback for same-origin)
     const apiBase = process.env.NEXT_PUBLIC_API_URL?.replace(/\/api\/v1$/, "") ?? "http://localhost:5000"
-    const socket = io(apiBase, { withCredentials: true, transports: ["websocket", "polling"] })
+    const token = typeof window !== "undefined" ? localStorage.getItem("dislow_token") : null
+    const socket = io(apiBase, {
+      withCredentials: true,
+      transports: ["websocket", "polling"],
+      auth: token ? { token } : undefined,
+    })
     socketRef.current = socket
 
     socket.on("notification:new", () => {

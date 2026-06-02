@@ -26,7 +26,12 @@ export function useChatSocket(handlers: Handlers) {
     if (!handlers.enabled) return
 
     const apiBase = process.env.NEXT_PUBLIC_API_URL?.replace(/\/api\/v1$/, "") ?? "http://localhost:5000"
-    const socket = io(apiBase, { withCredentials: true, transports: ["websocket", "polling"] })
+    const token = typeof window !== "undefined" ? localStorage.getItem("dislow_token") : null
+    const socket = io(apiBase, {
+      withCredentials: true,
+      transports: ["websocket", "polling"],
+      auth: token ? { token } : undefined,
+    })
     socketRef.current = socket
 
     socket.on("chat:message:new", (e: ChatMessageEvent) => ref.current.onMessage(e))
