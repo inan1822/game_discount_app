@@ -100,7 +100,21 @@ function CRMLoginInner() {
     e.preventDefault()
     setLoading(true)
     try {
-      await axios.post(`${API}/api/v1/auth/admin`, { email, code: otp }, { withCredentials: true })
+      const { data } = await axios.post(`${API}/api/v1/auth/admin`, { email, code: otp }, { withCredentials: true })
+      const token = data?.data?.token
+      if (!token) throw new Error("No token returned from server")
+
+      // The backend sets its cookie on crm-dislow.onrender.com (backend domain).
+      // The CRM's RSC runs on crm-dislow-gba8.onrender.com and can't read a cookie
+      // from another domain.  POST the token to our own route handler so it gets
+      // stored as an httpOnly cookie on THIS domain — admin.server.ts can then
+      // read it via cookies() on every server-side fetch.
+      await fetch("/api/set-token", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token }),
+      })
+
       toast.success("Welcome, admin")
       router.replace("/")
     } catch (err: unknown) {
