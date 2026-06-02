@@ -6,10 +6,11 @@ import { getErrorInfo } from "../../shared/utils/AppError.js"
 const FRONTEND = process.env.FRONTEND_URL ?? "http://localhost:3000"
 
 function setAuthCookie(res: Response, token: string): void {
+    const isProd = process.env.NODE_ENV === "production"
     res.cookie("dislow_token", token, {
         httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
-        sameSite: "lax",
+        secure: isProd,
+        sameSite: isProd ? "none" : "lax",
         maxAge: 2 * 60 * 60 * 1000,
     })
 }
