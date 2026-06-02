@@ -3,6 +3,7 @@
 import { useEffect } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { toast } from "react-toastify"
+import { setAuthMarker } from "@/shared/utils/authMarker"
 
 /**
  * Inner component that reads search params from the OAuth redirect.
@@ -20,6 +21,7 @@ export default function AuthCallbackInner() {
     if (!error) {
       // Store token for cross-domain Bearer auth (cookie may be blocked by browser)
       if (token) localStorage.setItem("dislow_token", token)
+      setAuthMarker()   // let server-side middleware know a session exists
       toast.success("Logged in! 🎮")
       router.replace("/")
     } else {

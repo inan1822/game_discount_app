@@ -15,7 +15,10 @@ const AUTH_ONLY = ["/login", "/register", "/forgot-password"]
 
 export function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl
-  const hasSession = !!req.cookies.get("dislow_token")?.value
+  // Auth lives in localStorage (cross-domain Bearer); the frontend sets a
+  // non-sensitive "dislow_auth" marker cookie on this domain so middleware —
+  // which cannot read localStorage — knows a session exists. See authMarker.ts.
+  const hasSession = !!req.cookies.get("dislow_auth")?.value
 
   if (!hasSession && PROTECTED.some(p => pathname.startsWith(p))) {
     const url = req.nextUrl.clone()

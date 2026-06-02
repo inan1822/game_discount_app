@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from "react"
 import api from "@/shared/services/axios"
+import { setAuthMarker, clearAuthMarker } from "@/shared/utils/authMarker"
 import type { User } from "@/shared/types/user"
 
 interface LoginResult {
@@ -35,17 +36,23 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     try {
       const { data } = await api.get("/auth/me")
       setUser(data.data)
+      setAuthMarker()   // keep the middleware marker in sync with a valid session
     } catch {
       setUser(null)
+      // Token missing/invalid → drop the marker so middleware stops allowing routes
+      if (!localStorage.getItem("dislow_token")) clearAuthMarker()
     } finally {
       setIsLoading(false)
     }
   }, [])
 
-  // Restore session on mount — the httpOnly cookie is sent automatically
+  // Restore session on mount — Bearer token from localStorage is sent by axios.
+  // Set the marker synchronously first so a hard-reload of a protected page
+  // isn't bounced by middleware before fetchMe resolves.
   useEffect(() => {
     const guest = localStorage.getItem("dislow_guest") === "true"
     setIsGuest(guest)
+    if (localStorage.getItem("dislow_token")) setAuthMarker()
     fetchMe()
   }, [fetchMe])
 
@@ -55,15 +62,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     if (!requiresTwoFactor) {
       // Store token in localStorage so axios can send it as Bearer on cross-domain requests
       if (data?.data?.token) localStorage.setItem("dislow_token", data.data.token)
+      setAuthMarker()   // let server-side middleware know a session exists
       await fetchMe()
     }
     return { requiresTwoFactor }
   }, [fetchMe])
 
   const verifyTwoFactor = useCallback(async (email: string, code: string): Promise<User | null> => {
-    await api.post("/auth/admin", { email, code })
-    // Cookie is set server-side. Pull /me to populate the context with the
-    // admin user, then return it so callers can branch on user.role.
+    const { data: verifyData } = await api.post("/auth/admin", { email, code })
+    // Store token for cross-domain Bearer auth, then pull /me to populate context.
+    if (verifyData?.data?.token) localStorage.setItem("dislow_token", verifyData.data.token)
+    setAuthMarker()
     const { data } = await api.get("/auth/me")
     setUser(data.data)
     return data.data
@@ -92,6 +101,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
     localStorage.removeItem("dislow_guest")
     localStorage.removeItem("dislow_token")
+    clearAuthMarker()
     setUser(null)
     setIsGuest(false)
   }, [])
