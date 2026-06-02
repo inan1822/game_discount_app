@@ -37,10 +37,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       const { data } = await api.get("/auth/me")
       setUser(data.data)
       setAuthMarker()   // keep the middleware marker in sync with a valid session
-    } catch {
+    } catch (err: any) {
       setUser(null)
-      // Token missing/invalid → drop the marker so middleware stops allowing routes
-      if (!localStorage.getItem("dislow_token")) clearAuthMarker()
+      if (err?.response?.status === 401) {
+        // Token expired or rejected — remove it so the middleware cookie
+        // doesn't keep blocking navigation to /login.
+        localStorage.removeItem("dislow_token")
+        clearAuthMarker()
+      } else if (!localStorage.getItem("dislow_token")) {
+        clearAuthMarker()
+      }
     } finally {
       setIsLoading(false)
     }
