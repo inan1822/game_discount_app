@@ -65,10 +65,18 @@ export async function discordCallback(code: string): Promise<string> {
         id: string
         username: string
         email?: string
+        verified?: boolean
         avatar?: string
     }
 
-    const email  = profile.email ?? `discord_${profile.id}@placeholder.dislow`
+    // SECURITY: only trust Discord's email if Discord says it's verified. Otherwise an
+    // attacker could set a victim's email (left unverified) on their own Discord account
+    // and hijack the victim's DisLow account via the email-linking branch below. For
+    // unverified emails we fall back to a per-ID placeholder that can never match a victim.
+    const emailVerified = profile.verified === true
+    const email  = profile.email && emailVerified
+        ? profile.email.toLowerCase()
+        : `discord_${profile.id}@placeholder.dislow`
     const avatar = profile.avatar
         ? `https://cdn.discordapp.com/avatars/${profile.id}/${profile.avatar}.png`
         : undefined
@@ -77,7 +85,8 @@ export async function discordCallback(code: string): Promise<string> {
     let user = await userModel.findOne({ discordId: profile.id })
 
     if (!user) {
-        // If an account with that email already exists — link discord to it
+        // Link to an existing account only via a verified, real email.
+        // (A placeholder email from the unverified branch above can't match here.)
         user = await userModel.findOne({ email })
         if (user) {
             user.discordId = profile.id
@@ -149,14 +158,22 @@ export async function googleCallback(code: string): Promise<string> {
         id: string
         name: string
         email: string
+        verified_email?: boolean
         picture?: string
     }
+
+    // SECURITY: mirror the Discord rule — only trust the email for linking to an existing
+    // account when Google asserts it's verified. Normalize casing to the stored lowercase.
+    const emailVerified = profile.verified_email === true
+    const email = profile.email && emailVerified
+        ? profile.email.toLowerCase()
+        : `google_${profile.id}@placeholder.dislow`
 
     // 3. Find or create user
     let user = await userModel.findOne({ googleId: profile.id })
 
     if (!user) {
-        user = await userModel.findOne({ email: profile.email })
+        user = await userModel.findOne({ email })
         if (user) {
             user.googleId = profile.id
             if (profile.picture) user.avatar = profile.picture
@@ -164,7 +181,7 @@ export async function googleCallback(code: string): Promise<string> {
         } else {
             user = await userModel.create({
                 name:       profile.name,
-                email:      profile.email,
+                email,
                 password:   randomPassword(),
                 googleId:   profile.id,
                 avatar:     profile.picture,

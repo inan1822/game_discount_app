@@ -15,6 +15,16 @@ function setAuthCookie(res: Response, token: string): void {
     })
 }
 
+/** Hand the freshly minted JWT back to the frontend callback page.
+ *  The token rides in the query string because cross-domain cookies are unreliable
+ *  here, so set Referrer-Policy: no-referrer to stop it leaking via the Referer header
+ *  on the redirect hop. The callback page sets the same policy for its own subresources. */
+function redirectToFrontendWithToken(res: Response, token: string): void {
+    setAuthCookie(res, token)
+    res.setHeader("Referrer-Policy", "no-referrer")
+    res.redirect(`${FRONTEND}/auth/callback?token=${encodeURIComponent(token)}`)
+}
+
 // ─── OAuth CSRF state ────────────────────────────────────────────────────────
 // Bind a request's outbound OAuth redirect to its inbound callback via a
 // short-lived httpOnly cookie. Without this, an attacker can forge a callback
@@ -81,8 +91,7 @@ export const discordCallbackHandler = async (req: Request, res: Response) => {
         }
         clearStateCookie(res)
         const token = await discordCallback(code)
-        setAuthCookie(res, token)
-        res.redirect(`${FRONTEND}/auth/callback?token=${encodeURIComponent(token)}`)
+        redirectToFrontendWithToken(res, token)
     } catch (error) {
         const { message } = getErrorInfo(error)
         console.error("Discord callback error:", message)
@@ -112,8 +121,7 @@ export const googleCallbackHandler = async (req: Request, res: Response) => {
         }
         clearStateCookie(res)
         const token = await googleCallback(code)
-        setAuthCookie(res, token)
-        res.redirect(`${FRONTEND}/auth/callback?token=${encodeURIComponent(token)}`)
+        redirectToFrontendWithToken(res, token)
     } catch (error) {
         const { message } = getErrorInfo(error)
         console.error("Google callback error:", message)
@@ -145,8 +153,7 @@ export const steamCallbackHandler = async (req: Request, res: Response) => {
         }
         clearStateCookie(res)
         const token = await steamCallback(query)
-        setAuthCookie(res, token)
-        res.redirect(`${FRONTEND}/auth/callback?token=${encodeURIComponent(token)}`)
+        redirectToFrontendWithToken(res, token)
     } catch (error) {
         const { message } = getErrorInfo(error)
         console.error("Steam callback error:", message)

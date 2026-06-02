@@ -1,5 +1,15 @@
+import type { Metadata } from "next"
 import { Suspense } from "react"
 import AuthCallbackInner from "./AuthCallbackInner"
+
+/**
+ * The OAuth token briefly rides in this page's URL (?token=…). no-referrer stops it
+ * leaking via the Referer header on any subresource request before AuthCallbackInner
+ * scrubs the URL with router.replace(). Renders <meta name="referrer" content="no-referrer">.
+ */
+export const metadata: Metadata = {
+  referrer: "no-referrer",
+}
 
 /**
  * OAuth callback landing page.
