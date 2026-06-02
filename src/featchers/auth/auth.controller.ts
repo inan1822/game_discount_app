@@ -83,7 +83,7 @@ export const login = async (req: Request, res: Response): Promise<void> => {
         res.status(200).json({
             status: "200",
             message: "Logged in",
-            data: { userID: result.userID }
+            data: { userID: result.userID, token: result.token }
         })
     } catch (error) {
         const { status, message } = getErrorInfo(error)

@@ -82,7 +82,7 @@ export const discordCallbackHandler = async (req: Request, res: Response) => {
         clearStateCookie(res)
         const token = await discordCallback(code)
         setAuthCookie(res, token)
-        res.redirect(`${FRONTEND}/auth/callback`)
+        res.redirect(`${FRONTEND}/auth/callback?token=${encodeURIComponent(token)}`)
     } catch (error) {
         const { message } = getErrorInfo(error)
         console.error("Discord callback error:", message)
@@ -113,7 +113,7 @@ export const googleCallbackHandler = async (req: Request, res: Response) => {
         clearStateCookie(res)
         const token = await googleCallback(code)
         setAuthCookie(res, token)
-        res.redirect(`${FRONTEND}/auth/callback`)
+        res.redirect(`${FRONTEND}/auth/callback?token=${encodeURIComponent(token)}`)
     } catch (error) {
         const { message } = getErrorInfo(error)
         console.error("Google callback error:", message)
@@ -146,7 +146,7 @@ export const steamCallbackHandler = async (req: Request, res: Response) => {
         clearStateCookie(res)
         const token = await steamCallback(query)
         setAuthCookie(res, token)
-        res.redirect(`${FRONTEND}/auth/callback`)
+        res.redirect(`${FRONTEND}/auth/callback?token=${encodeURIComponent(token)}`)
     } catch (error) {
         const { message } = getErrorInfo(error)
         console.error("Steam callback error:", message)

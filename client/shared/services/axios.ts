@@ -3,8 +3,17 @@ import axios from "axios"
 const api = axios.create({
   baseURL: process.env.NEXT_PUBLIC_API_URL + "/api/v1",
   headers: { "Content-Type": "application/json" },
-  // Required so the browser sends the httpOnly auth cookie on cross-origin requests
   withCredentials: true,
+})
+
+// Attach stored JWT as Bearer token — fallback for cross-domain envs where
+// the httpOnly cookie is blocked by third-party cookie restrictions.
+api.interceptors.request.use((config) => {
+  if (typeof window !== "undefined") {
+    const token = localStorage.getItem("dislow_token")
+    if (token) config.headers.Authorization = `Bearer ${token}`
+  }
+  return config
 })
 
 // On 401 → redirect to login, with these exceptions:

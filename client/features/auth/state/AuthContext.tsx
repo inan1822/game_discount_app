@@ -51,11 +51,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const login = useCallback(async (email: string, password: string): Promise<LoginResult> => {
     const { data } = await api.post("/auth/login", { email, password })
-    // Admin accounts: backend returns `{ message: "2FA code sent to your email" }`
-    // with no cookie set. The caller must collect the OTP and call verifyTwoFactor.
-    // Regular users: backend sets the httpOnly cookie and returns userID.
     const requiresTwoFactor = !data?.data?.userID
     if (!requiresTwoFactor) {
+      // Store token in localStorage so axios can send it as Bearer on cross-domain requests
+      if (data?.data?.token) localStorage.setItem("dislow_token", data.data.token)
       await fetchMe()
     }
     return { requiresTwoFactor }
@@ -92,6 +91,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       // Ignore — proceed with local cleanup regardless
     }
     localStorage.removeItem("dislow_guest")
+    localStorage.removeItem("dislow_token")
     setUser(null)
     setIsGuest(false)
   }, [])

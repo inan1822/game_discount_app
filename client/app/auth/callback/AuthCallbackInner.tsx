@@ -15,10 +15,11 @@ export default function AuthCallbackInner() {
 
   useEffect(() => {
     const error = searchParams.get("error")
+    const token = searchParams.get("token")
 
     if (!error) {
-      // Cookie was set by the server on the redirect — just go home.
-      // AuthContext will call /auth/me and populate the user on mount.
+      // Store token for cross-domain Bearer auth (cookie may be blocked by browser)
+      if (token) localStorage.setItem("dislow_token", token)
       toast.success("Logged in! 🎮")
       router.replace("/")
     } else {
