@@ -101,7 +101,7 @@ function FriendsContent() {
               key={tab}
               onClick={() => handleTabClick(tab)}
               whileTap={{ scale: 0.96 }}
-              className="flex-1 relative z-10 after:absolute after:inset-[-60px] after:content-['']"
+              className="flex-1 relative z-10"
               style={{
                 display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
                 borderRadius: 9, padding: "8px 0",
