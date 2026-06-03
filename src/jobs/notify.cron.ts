@@ -61,7 +61,10 @@ async function itadOverview(ids: string[]): Promise<Map<string, { cut: number; p
             headers: { "Content-Type": "application/json" },
             timeout: 15000,
         })
-        for (const entry of (data ?? [])) {
+        // ITAD /games/overview/v2 returns { prices: [...], bundles: [...] } — NOT a
+        // bare array. Iterating `data` directly threw "not iterable", which the catch
+        // below swallowed, so NO discount was ever detected. Read data.prices.
+        for (const entry of (data?.prices ?? [])) {
             const cur = entry.current
             if (cur?.cut > 0) {
                 result.set(entry.id, {
