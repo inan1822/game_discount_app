@@ -101,6 +101,10 @@ export interface PriceResult {
   discountExpiresAt?: string | null
   /** True when admin has flagged this as limited stock. */
   isLimitedStock?: boolean
+  /** ISO currency code for the price fields (undefined → USD / "$"). */
+  currency?: string
+  /** True when this row is a live reseller "from" price (e.g. Driffle). */
+  isReseller?: boolean
 }
 
 /** Admin-curated manual store/website link for a game (GET /games/:rawgId/manual-links). */
@@ -119,4 +123,6 @@ export interface ManualLink {
   discountExpiresAt: string | null
   isLimitedStock:    boolean
   isActive:          boolean
+  /** Live price auto-fetched server-side for supported reseller URLs (e.g. Driffle). */
+  liveOffer?:        { price: number; currency: string; inStock: boolean; url: string }
 }

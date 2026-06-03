@@ -18,6 +18,7 @@ import {
     getByGenre,
     batchPrices,
     cardPrices,
+    resellerPrices,
     getGameGiveaways,
     getGameEvents,
 } from "./games.controller.js"
@@ -50,6 +51,10 @@ gamesRouter.post("/batch-prices", authMiddleware, batchPrices)
 
 // POST /api/v1/games/card-prices → body: { games: [{id,name,steamAppId?}] } → { [id]: CardPrice | null }
 gamesRouter.post("/card-prices", cardPrices)
+
+// POST /api/v1/games/reseller-prices → body: { urls: string[] } → { [url]: ResellerOffer | null }
+// Live prices for known reseller product URLs (Driffle/G2A/Kinguin) — e.g. manual links.
+gamesRouter.post("/reseller-prices", resellerPrices)
 
 // GET /api/v1/games/deals?title=TITLE  → all store deals (game detail page)
 gamesRouter.get("/deals", getGameDeals)

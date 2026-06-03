@@ -151,21 +151,28 @@ export const getGameManualLinks = async (rawgId: string): Promise<PriceResult[]>
   try {
     const { data } = await api.get(`/games/${rawgId}/manual-links`)
     const links = (data.data ?? []) as ManualLink[]
-    return links.map(l => ({
-      storeID:          `manual-${l._id}`,
-      storeName:        l.label,
-      storeIcon:        l.storeIcon ?? "",
-      salePrice:        l.price != null ? l.price.toFixed(2) : "N/A",
-      normalPrice:      "N/A",
-      savings:          0,
-      dealID:           l._id,
-      dealLink:         l.url,
-      isManual:         true,
-      manualPlatform:   l.platform,
-      subscriptionName: l.subscriptionName ?? null,
-      discountExpiresAt: l.discountExpiresAt ?? null,
-      isLimitedStock:   l.isLimitedStock ?? false,
-    }))
+    return links.map(l => {
+      // Live reseller price (e.g. Driffle) wins over the admin's manual price,
+      // and we click through the affiliate-tagged URL when present.
+      const live = l.liveOffer
+      return {
+        storeID:          `manual-${l._id}`,
+        storeName:        l.label,
+        storeIcon:        l.storeIcon ?? "",
+        salePrice:        live ? live.price.toFixed(2) : (l.price != null ? l.price.toFixed(2) : "N/A"),
+        normalPrice:      "N/A",
+        savings:          0,
+        dealID:           l._id,
+        dealLink:         live?.url ?? l.url,
+        isManual:         true,
+        isReseller:       !!live,
+        currency:         live?.currency,
+        manualPlatform:   l.platform,
+        subscriptionName: l.subscriptionName ?? null,
+        discountExpiresAt: l.discountExpiresAt ?? null,
+        isLimitedStock:   l.isLimitedStock ?? false,
+      }
+    })
   } catch {
     return []
   }

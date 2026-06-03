@@ -254,6 +254,15 @@ function resolveStoreIcon(storeName: string, storeIcon: string): string {
 // For Steam fallback: direct store.steampowered.com/app/{id}/ link.
 // For CheapShark (non-Steam only): cheapshark.com/redirect?dealID=xxx.
 
+const CURRENCY_SYMBOL: Record<string, string> = {
+  USD: "$", EUR: "€", GBP: "£", ILS: "₪", PLN: "zł", BRL: "R$", CAD: "$", AUD: "$",
+}
+/** Format a price string with its currency (defaults to USD "$"). */
+function money(amount: string, currency?: string): string {
+  if (!currency || currency === "USD") return `$${amount}`
+  return `${CURRENCY_SYMBOL[currency] ?? currency + " "}${amount}`
+}
+
 function DiscountRow({ deal, isCheapest }: { deal: PriceResult; isCheapest: boolean }) {
   const isFree    = parseFloat(deal.salePrice) === 0
   const hasSaving = deal.savings > 0
@@ -338,6 +347,11 @@ function DiscountRow({ deal, isCheapest }: { deal: PriceResult; isCheapest: bool
             </span>
           )}
         </div>
+        {deal.isReseller && (
+          <span className="text-[11px]" style={{ color: "rgba(255,255,255,0.3)" }}>
+            Third-party marketplace · from cheapest seller
+          </span>
+        )}
         {/* Discount expiry countdown */}
         {deal.discountExpiresAt && (() => {
           const daysLeft = Math.ceil((new Date(deal.discountExpiresAt).getTime() - Date.now()) / 86_400_000)
@@ -426,8 +440,10 @@ function DiscountRow({ deal, isCheapest }: { deal: PriceResult; isCheapest: bool
             : deal.salePrice === "N/A" || deal.salePrice === "0.00"
             ? <span style={{ color: "rgba(255,255,255,0.35)", fontWeight: 500, fontSize: 11 }}>View →</span>
             : hasRange
-            ? <span className="text-xs font-bold" style={{ color: "rgba(255,255,255,0.9)", letterSpacing: "-0.01em" }}>${deal.salePrice} — ${deal.normalPrice}</span>
-            : `$${deal.salePrice}`}
+            ? <span className="text-xs font-bold" style={{ color: "rgba(255,255,255,0.9)", letterSpacing: "-0.01em" }}>{money(deal.salePrice, deal.currency)} — {money(deal.normalPrice, deal.currency)}</span>
+            : deal.isReseller
+            ? <span className="whitespace-nowrap"><span style={{ color: "rgba(255,255,255,0.5)", fontWeight: 500, fontSize: 11 }}>from </span>{money(deal.salePrice, deal.currency)}</span>
+            : money(deal.salePrice, deal.currency)}
         </span>
         <ExternalLink
           size={13}

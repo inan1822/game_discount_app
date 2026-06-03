@@ -1,7 +1,14 @@
 import { Request, Response, NextFunction } from "express"
 import { GameManualLink, ManualLinkPlatform } from "./GameManualLink.model.js"
+import { getResellerOffer, isSupportedResellerUrl } from "../resellers/resellers.service.js"
 
 const PLATFORMS: ManualLinkPlatform[] = ["pc", "ps", "xbox", "switch", "all"]
+
+/** Resolve to `fallback` if `p` doesn't settle within `ms` — keeps the response
+ *  snappy on a cold cache; the real value still lands in the cache for next load. */
+function withTimeout<T>(p: Promise<T>, ms: number, fallback: T): Promise<T> {
+  return Promise.race([p, new Promise<T>(resolve => setTimeout(() => resolve(fallback), ms))])
+}
 
 // ── Admin: list manual links (optional ?rawgId= filter) ──────────────────────
 export async function listManualLinks(req: Request, res: Response, next: NextFunction) {
@@ -99,6 +106,25 @@ export async function getManualLinksForGame(req: Request, res: Response, next: N
         { discountExpiresAt: { $gt: now } },
       ],
     }).sort({ createdAt: -1 }).lean()
-    res.json({ status: "200", message: "OK", data: links })
+
+    // Enrich supported reseller links (Driffle) with a live, auto-refreshing price.
+    // Cached in the service; soft-timeout per link so a slow reseller fetch never
+    // blocks the response (the value still populates the cache for the next load).
+    const enriched = await Promise.all(links.map(async (link) => {
+      if (!isSupportedResellerUrl(link.url)) return link
+      const offer = await withTimeout(getResellerOffer(link.url), 3000, null)
+      if (!offer) return link
+      return {
+        ...link,
+        liveOffer: {
+          price:    offer.price,
+          currency: offer.currency,
+          inStock:  offer.inStock,
+          url:      offer.url,   // affiliate-tagged when AWIN ids are set
+        },
+      }
+    }))
+
+    res.json({ status: "200", message: "OK", data: enriched })
   } catch (err) { next(err) }
 }

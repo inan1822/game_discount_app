@@ -19,6 +19,7 @@ import {
     getGameEventsService,
     getCardPricesService,
 } from "./games.service.js"
+import { getResellerOffer } from "../resellers/resellers.service.js"
 
 const getString = (val: unknown): string => {
     if (Array.isArray(val)) return String(val[0])
@@ -292,6 +293,42 @@ export const cardPrices = async (req: Request, res: Response): Promise<void> => 
             games.slice(0, 50) as Array<{ id: number; name: string; steamAppId?: string; released?: string }>
         )
         res.status(200).json({ status: "200", message: "OK", data: prices })
+    } catch (error) {
+        const { status, message } = getErrorInfo(error)
+        res.status(status).json({ status: String(status), message, data: null })
+    }
+}
+
+/**
+ * POST /api/v1/games/reseller-prices
+ * Body: { urls: string[] }  — known reseller product URLs (max 10)
+ * Returns: { [url]: ResellerOffer | null }
+ * Public — the service domain-allowlists the URLs (only known reseller domains are
+ * fetched), so this can't be used as an open proxy/SSRF vector.
+ */
+export const resellerPrices = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const { urls } = req.body as { urls?: unknown }
+        if (!Array.isArray(urls) || urls.length === 0) {
+            res.status(400).json({ status: "400", message: "urls must be a non-empty array", data: null })
+            return
+        }
+        if (urls.length > 10) {
+            res.status(400).json({ status: "400", message: "Maximum 10 URLs per request", data: null })
+            return
+        }
+        if (!urls.every(u => typeof u === "string")) {
+            res.status(400).json({ status: "400", message: "All urls must be strings", data: null })
+            return
+        }
+        const list = urls as string[]
+        const settled = await Promise.allSettled(list.map(u => getResellerOffer(u)))
+        const data: Record<string, unknown> = {}
+        list.forEach((u, i) => {
+            const r = settled[i]
+            data[u] = r.status === "fulfilled" ? r.value : null
+        })
+        res.status(200).json({ status: "200", message: "OK", data })
     } catch (error) {
         const { status, message } = getErrorInfo(error)
         res.status(status).json({ status: String(status), message, data: null })
