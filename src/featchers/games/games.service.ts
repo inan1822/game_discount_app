@@ -1636,11 +1636,33 @@ async function fetchItadDeals(itadId: string): Promise<ItadRawDeal[]> {
             {
                 params: { country: "US" },
                 headers,
+                timeout: 10000,
             },
         )
-        if (!Array.isArray(data) || !data[0]?.deals) return []
-        return data[0].deals as ItadRawDeal[]
-    } catch {
+        const deals = (Array.isArray(data) && data[0]?.deals) ? data[0].deals as ItadRawDeal[] : []
+        // Log the store count so a genuinely Steam-only game (0–1 stores) is
+        // distinguishable from a silent ITAD failure in the catch below.
+        if (deals.length === 0) {
+            console.log(`[ITAD] prices/v3 ${itadId} → 0 stores (ITAD tracks no current price for this game)`)
+        } else {
+            console.log(`[ITAD] prices/v3 ${itadId} → ${deals.length} store(s): ${deals.map(d => d.shop.name).join(", ")}`)
+        }
+        return deals
+    } catch (err) {
+        // Previously `catch { return [] }` — which made a rate-limited/failing ITAD
+        // indistinguishable from a real Steam-only game, because the caller then
+        // synthesizes a single Steam row. Surface the real cause, especially 429s.
+        if (axios.isAxiosError(err)) {
+            const status = err.response?.status
+            if (status === 429) {
+                const retryAfter = err.response?.headers?.["retry-after"]
+                console.warn(`[ITAD] prices/v3 ${itadId} → 429 RATE-LIMITED (retry-after: ${retryAfter ?? "?"}s) — deals will degrade to Steam-only`)
+            } else {
+                console.warn(`[ITAD] prices/v3 ${itadId} → HTTP ${status ?? "network-error"}: ${err.message}`)
+            }
+        } else {
+            console.warn(`[ITAD] prices/v3 ${itadId} failed:`, err instanceof Error ? err.message : String(err))
+        }
         return []
     }
 }
@@ -1991,6 +2013,193 @@ function logDealsToTerminal(title: string, deals: DealResult[]): void {
  *   2. CheapShark title search → exact → edition-variant → acronym
  *   3. Empty list — never returns wrong game's deals
  */
+/** Canonical store key so the same shop from ITAD and CheapShark dedupes to one
+ *  entry despite naming differences ("Epic Game Store" vs "Epic Games Store"). */
+function canonicalStore(name: string): string {
+    return name.toLowerCase().replace(/\b(store|games|game)\b/g, "").replace(/[^a-z0-9]/g, "")
+}
+
+/** Union `additions` into `base`, keeping only stores not already present
+ *  (deduped by canonical name). `base` rows always win. */
+function mergeNewStores(base: DealResult[], additions: DealResult[]): DealResult[] {
+    if (additions.length === 0) return base
+    const have = new Set(base.map(d => canonicalStore(d.storeName)))
+    const out  = [...base]
+    for (const d of additions) {
+        const canon = canonicalStore(d.storeName)
+        if (!canon || have.has(canon)) continue
+        have.add(canon)
+        out.push(d)
+    }
+    return out
+}
+
+/** Steam first, then cheapest. */
+function sortDeals(deals: DealResult[]): DealResult[] {
+    return deals.sort((a, b) => {
+        const steamA = a.storeID === "61" || a.storeName.toLowerCase() === "steam"
+        const steamB = b.storeID === "61" || b.storeName.toLowerCase() === "steam"
+        if (steamA) return -1
+        if (steamB) return 1
+        return parseFloat(a.salePrice) - parseFloat(b.salePrice)
+    })
+}
+
+/** Map a CheapShark deals array to DealResult[], keeping the cheapest per store. */
+function mapCsDeals(rawList: CsDeal[], stores: CsStore[]): DealResult[] {
+    const storeMap = Object.fromEntries(stores.map(s => [s.storeID, s]))
+    const byStore  = new Map<string, DealResult>()
+    for (const d of rawList) {
+        const sale = parseFloat(d.salePrice)
+        if (!Number.isFinite(sale)) continue
+        const store = storeMap[d.storeID]
+        const row: DealResult = {
+            storeID:     `cs:${d.storeID}`,   // namespace so it can't collide with ITAD numeric ids
+            storeName:   store?.storeName ?? `Store ${d.storeID}`,
+            storeIcon:   store ? `https://www.cheapshark.com${store.images.icon}` : "",
+            salePrice:   d.salePrice,
+            normalPrice: d.normalPrice,
+            savings:     parseFloat(d.savings) || 0,
+            dealID:      d.dealID,
+            dealLink:    `https://www.cheapshark.com/redirect?dealID=${d.dealID}`,
+        }
+        const ex = byStore.get(row.storeID)
+        if (!ex || sale < parseFloat(ex.salePrice)) byStore.set(row.storeID, row)
+    }
+    return [...byStore.values()]
+}
+
+/** CheapShark deals by EXACT Steam appid — no fuzzy-match risk, but CheapShark's
+ *  appid linking is sometimes thin (e.g. it misses Hades' GOG listing). */
+async function csDealsBySteamAppId(steamAppId: string): Promise<DealResult[]> {
+    try {
+        const [{ data: rawList }, stores] = await Promise.all([
+            csLimiter.schedule({ expiration: 3000 }, () => withRetry(
+                () => axios.get<CsDeal[]>("https://www.cheapshark.com/api/1.0/deals", {
+                    params: { steamAppID: steamAppId, pageSize: 30 },
+                    timeout: 6000,
+                }),
+                2, 500, false,
+            )),
+            getCsStores(),
+        ])
+        return Array.isArray(rawList) ? mapCsDeals(rawList, stores) : []
+    } catch (err) {
+        if (isBSExpired(err)) return []
+        console.warn(`[GapFill] appid backfill failed for ${steamAppId}:`, err instanceof Error ? err.message : String(err))
+        return []
+    }
+}
+
+/** Deal shape from CheapShark's /games?id= response (note: price/retailPrice,
+ *  NOT salePrice/normalPrice as on the /deals endpoint). */
+interface CsGameInfoDeal { storeID: string; dealID: string; price: string; retailPrice: string; savings: string }
+
+/** CheapShark deals for a specific CheapShark gameID via /games?id=.
+ *  IMPORTANT: the /deals endpoint IGNORES a gameID filter (it only filters by
+ *  storeID/steamAppID/title) and returns GLOBAL deals — so /games?id= is the only
+ *  correct way to get one game's store list by CheapShark id. */
+async function csDealsByGameId(gameID: string): Promise<DealResult[]> {
+    try {
+        const [{ data }, stores] = await Promise.all([
+            csLimiter.schedule({ expiration: 3000 }, () => withRetry(
+                () => axios.get<{ deals?: CsGameInfoDeal[] }>("https://www.cheapshark.com/api/1.0/games", {
+                    params: { id: gameID },
+                    timeout: 6000,
+                }),
+                2, 500, false,
+            )),
+            getCsStores(),
+        ])
+        const rawList = data?.deals
+        if (!Array.isArray(rawList) || rawList.length === 0) return []
+        const storeMap = Object.fromEntries(stores.map(s => [s.storeID, s]))
+        const byStore  = new Map<string, DealResult>()
+        for (const d of rawList) {
+            const sale = parseFloat(d.price)
+            if (!Number.isFinite(sale)) continue
+            const store = storeMap[d.storeID]
+            const row: DealResult = {
+                storeID:     `cs:${d.storeID}`,
+                storeName:   store?.storeName ?? `Store ${d.storeID}`,
+                storeIcon:   store ? `https://www.cheapshark.com${store.images.icon}` : "",
+                salePrice:   sale.toFixed(2),
+                normalPrice: (parseFloat(d.retailPrice) || sale).toFixed(2),
+                savings:     Math.round(parseFloat(d.savings) || 0),
+                dealID:      d.dealID,
+                dealLink:    `https://www.cheapshark.com/redirect?dealID=${d.dealID}`,
+            }
+            const ex = byStore.get(row.storeID)
+            if (!ex || sale < parseFloat(ex.salePrice)) byStore.set(row.storeID, row)
+        }
+        return [...byStore.values()]
+    } catch (err) {
+        if (isBSExpired(err)) return []
+        console.warn(`[GapFill] /games?id=${gameID} failed:`, err instanceof Error ? err.message : String(err))
+        return []
+    }
+}
+
+/** CheapShark deals by TITLE, using the SAME strict exact→edition→acronym matcher
+ *  as Path B so a wrong game is never matched. Recovers stores whose CheapShark
+ *  entry isn't linked to the Steam appid. Returns [] on no confident match/error. */
+async function csDealsByTitle(title: string): Promise<DealResult[]> {
+    try {
+        const { data: candidates } = await csLimiter.schedule({ expiration: 3000 }, () => withRetry(
+            () => axios.get<CsGameCandidate[]>("https://www.cheapshark.com/api/1.0/games", {
+                params: { title, limit: 10 },
+                timeout: 6000,
+            }),
+            2, 500, false,
+        ))
+        if (!Array.isArray(candidates) || candidates.length === 0) return []
+
+        const norm = normTitle(title)
+        // Level 1 — exact normalised match
+        let best: CsGameCandidate | undefined = candidates.find(g => normTitle(g.external) === norm)
+        // Level 2 — edition variant (closest to base game = shortest title)
+        if (!best) {
+            best = candidates
+                .filter(g => isEditionVariant(g.external, title))
+                .sort((a, b) => a.external.length - b.external.length)[0]
+        }
+        // Level 3 — bidirectional acronym ("gta v" ↔ "grand theft auto v")
+        if (!best) best = candidates.find(g => acronymMatch(title, g.external))
+        if (!best?.gameID) return []
+        return csDealsByGameId(best.gameID)
+    } catch (err) {
+        if (isBSExpired(err)) return []
+        console.warn(`[GapFill] title backfill failed for "${title}":`, err instanceof Error ? err.message : String(err))
+        return []
+    }
+}
+
+// Below this many stores after the exact-appid union, also try the (strict-matched)
+// title path to recover stores CheapShark didn't link to the Steam appid.
+const TITLE_BACKFILL_BELOW = 5
+
+/**
+ * Gap-fill ITAD deals with CheapShark so stores ITAD omits (GOG/Humble/Fanatical/
+ * GMG/…) still appear. Two passes, both deduped by canonical store name with ITAD
+ * rows always winning:
+ *   1. exact Steam-appid lookup — safe, no fuzzy risk
+ *   2. strict title match       — only when still thin (< TITLE_BACKFILL_BELOW),
+ *                                 recovers stores not linked to the appid
+ * Never throws — on any failure the ITAD list passes through unchanged.
+ */
+async function backfillFromCheapShark(steamAppId: string, title: string, itadDeals: DealResult[]): Promise<DealResult[]> {
+    let deals = mergeNewStores(itadDeals, await csDealsBySteamAppId(steamAppId))
+    if (deals.length < TITLE_BACKFILL_BELOW) {
+        deals = mergeNewStores(deals, await csDealsByTitle(title))
+    }
+    const added = deals.length - itadDeals.length
+    if (added > 0) {
+        console.log(`[GapFill] ${steamAppId} "${title}": ITAD ${itadDeals.length} +${added} CheapShark = ${deals.length} stores`)
+        return sortDeals(deals)
+    }
+    return itadDeals
+}
+
 export const getGameDealsService = async (
     title: string,
     steamAppId?: string,
@@ -2076,6 +2285,10 @@ export const getGameDealsService = async (
                         })
                     }
 
+                    // Gap-fill: ITAD's per-game coverage is uneven (it may omit GOG/
+                    // Humble/Fanatical/GamersGate). Union in stores CheapShark has via
+                    // exact appid, then a strict title match when still thin.
+                    deals = await backfillFromCheapShark(steamAppId, title, deals)
                     return save(deals)
                 }
             }
@@ -2144,15 +2357,12 @@ export const getGameDealsService = async (
     // concurrency + min-gap + queue-timeout. BSExpired (queue timeout after 3 s)
     // is caught below and degrades to an empty result.
     try {
-        const [{ data: candidates }, stores] = await Promise.all([
-            csLimiter.schedule({ expiration: 3000 }, () => withRetry(
-                () => axios.get("https://www.cheapshark.com/api/1.0/games", {
-                    params: { title, limit: 10 },
-                }),
-                2, 500, false,  // fail-fast on 429
-            )),
-            getCsStores(),
-        ])
+        const { data: candidates } = await csLimiter.schedule({ expiration: 3000 }, () => withRetry(
+            () => axios.get("https://www.cheapshark.com/api/1.0/games", {
+                params: { title, limit: 10 },
+            }),
+            2, 500, false,  // fail-fast on 429
+        ))
 
         if (!Array.isArray(candidates) || candidates.length === 0) return save([])
 
@@ -2190,41 +2400,11 @@ export const getGameDealsService = async (
 
         console.log(`[CheapShark] Path B: "${title}" → "${best.external}" (gameID ${best.gameID})`)
 
-        const { data: rawList } = await csLimiter.schedule({ expiration: 3000 }, () => withRetry(
-            () => axios.get<CsDeal[]>("https://www.cheapshark.com/api/1.0/deals", {
-                params: { gameID: best.gameID, sortBy: "Price", pageSize: 30 },
-            }),
-            2, 500, false,  // fail-fast on 429
-        ))
-
-        const storeMap = Object.fromEntries(stores.map(s => [s.storeID, s]))
-        const rawDeals: DealResult[] = rawList.map(d => {
-            const store = storeMap[d.storeID]
-            return {
-                storeID: d.storeID,
-                storeName: store?.storeName ?? `Store ${d.storeID}`,
-                storeIcon: store ? `https://www.cheapshark.com${store.images.icon}` : "",
-                salePrice: d.salePrice,
-                normalPrice: d.normalPrice,
-                savings: parseFloat(d.savings),
-                dealID: d.dealID,
-                dealLink: `https://www.cheapshark.com/redirect?dealID=${d.dealID}`,
-            }
-        })
-
-        // Deduplicate — cheapest deal per store
-        const byStore = new Map<string, DealResult>()
-        for (const deal of rawDeals) {
-            const ex = byStore.get(deal.storeID)
-            if (!ex || parseFloat(deal.salePrice) < parseFloat(ex.salePrice))
-                byStore.set(deal.storeID, deal)
-        }
-
-        const csDeals = [...byStore.values()].sort(
-            (a, b) => parseFloat(a.salePrice) - parseFloat(b.salePrice)
-        )
-
-        return save(csDeals)
+        // CheapShark's /deals endpoint IGNORES a gameID filter (it only filters by
+        // storeID/steamAppID/title), so the old /deals?gameID= call returned GLOBAL
+        // deals for every game. /games?id= returns THIS game's actual store list.
+        const csDeals = await csDealsByGameId(best.gameID)
+        return save(sortDeals(csDeals))
     } catch (err) {
         if (isBSExpired(err)) return save([])   // queue timeout — degrade silently
         console.error("[GameDeals] CheapShark path failed:", err instanceof Error ? err.message : String(err))
