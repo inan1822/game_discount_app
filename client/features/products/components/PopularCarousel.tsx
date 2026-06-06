@@ -13,13 +13,16 @@ import { useRouter } from "next/navigation"
 import type { Game } from "@/shared/types/game"
 import { StarButton } from "./GameCard"
 import { useCardPrice } from "@/features/products/utils/useCardPrice"
+import { PlatformIcon, hasPlatformIcon } from "@/shared/components/PlatformIcon"
 import { SectionHeading } from "@/shared/components/SectionHeading"
 
 // ─── Layout constants ─────────────────────────────────────────────────────────
 
-const SIDE_PEEK  = 150  // px of the adjacent card visible on each side
-const CARD_HEIGHT = 440 // px
-const GAP         = 20  // px between cards
+const SIDE_PEEK   = 150         // px of the adjacent card visible on each side
+const CARD_MAX_W  = 750         // px — maximum card width
+const CARD_MAX_H  = 440         // px — maximum card height
+const CARD_MIN_W  = Math.round(CARD_MAX_W / 4)  // 188px — quarter size minimum
+const GAP         = 20          // px between cards
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -28,6 +31,7 @@ function platformLabel(p: string): string {
   if (l.includes("playstation") || l.includes("ps5") || l.includes("ps4")) return "PS"
   if (l.includes("xbox"))        return "Xbox"
   if (l.includes("nintendo") || l.includes("switch")) return "Switch"
+  if (l.includes("linux"))       return "Linux"
   if (l.includes("pc") || l.includes("windows"))      return "PC"
   if (l.includes("ios") || l.includes("iphone"))      return "iOS"
   if (l.includes("android"))     return "Android"
@@ -38,7 +42,7 @@ function platformLabel(p: string): string {
 
 function PopularTile({
   game, rank, isFavorited, onToggleFavorite,
-  index, scrollX, cardWidth,
+  index, scrollX, cardWidth, cardHeight,
 }: {
   game:             Game
   rank:             number
@@ -47,6 +51,7 @@ function PopularTile({
   index:            number
   scrollX:          ReturnType<typeof useScroll>["scrollX"]
   cardWidth:        number
+  cardHeight:       number
 }) {
   const router    = useRouter()
   const reduce    = useReducedMotion()
@@ -90,7 +95,7 @@ function PopularTile({
 
   const cardStyle = {
     width:     cardWidth,
-    height:    CARD_HEIGHT,
+    height:    cardHeight,
     flexShrink: 0 as const,
     scrollSnapAlign: "center" as const,
     borderRadius: 14,
@@ -125,7 +130,7 @@ function PopularTile({
         className="relative cursor-pointer group/tile overflow-hidden"
         style={{
           width:        "100%",
-          height:       CARD_HEIGHT,
+          height:       cardHeight,
           borderRadius: 14,
           rotateY,
           z:            tz,
@@ -179,19 +184,30 @@ function TileInfo({ game, price, platforms }: {
         </p>
       )}
       <div className="flex items-center justify-between gap-2">
-        <div className="flex gap-1.5 flex-wrap">
-          {platforms.map(p => (
-            <span key={p} className="text-[11px] font-semibold px-2 py-0.5"
-              style={{ background: "rgba(255,255,255,0.10)", color: "rgba(255,255,255,0.65)", borderRadius: 5 }}>
-              {p}
+        {/* Platforms — console icons (same muted color as text), matching the other sections */}
+        <div className="flex items-center gap-2 flex-wrap">
+          {platforms.length > 0 ? (
+            platforms.map(p =>
+              hasPlatformIcon(p) ? (
+                <PlatformIcon key={p} platform={p} size={16} style={{ color: "rgba(255,255,255,0.60)" }} />
+              ) : (
+                <span key={p} className="text-[13px] font-medium px-2 py-0.5"
+                  style={{ background: "rgba(255,255,255,0.09)", color: "rgba(255,255,255,0.60)", borderRadius: 5 }}>
+                  {p}
+                </span>
+              )
+            )
+          ) : (
+            <span className="text-[13px] font-semibold" style={{ color: "rgba(255,255,255,0.35)" }}>
+              Multi
             </span>
-          ))}
+          )}
         </div>
-        <div className="flex items-center gap-1.5 flex-shrink-0">
+        {/* Price — original (muted) + current, matching the other sections (no % badge) */}
+        <div className="flex items-baseline gap-1.5 flex-shrink-0">
           {price && price.cut > 0 && (
-            <span className="font-bold text-[12px] px-1.5 py-0.5"
-              style={{ background: "rgba(68,214,44,0.15)", color: "#44d62c", borderRadius: 4 }}>
-              -{price.cut}%
+            <span className="text-[13px]" style={{ color: "rgba(180,180,180,0.5)", lineHeight: "1.35" }}>
+              ${price.regular.toFixed(2)}
             </span>
           )}
           <span className="font-bold"
@@ -272,9 +288,9 @@ function NavBtn({ dir, onClick }: { dir: "prev" | "next"; onClick: () => void })
         {/* Arrow — stroke only by default, fills on hover */}
         <motion.path
           d={ARROW_PATH}
-          initial={{ fill: "transparent", stroke: "#3396E6", strokeOpacity: 0.85 }}
+          initial={{ fill: "rgba(0,0,0,0)", stroke: "#3396E6", strokeOpacity: 0.85 }}
           animate={{
-            fill:          hovered ? "#3396E6" : "transparent",
+            fill:          hovered ? "#3396E6" : "rgba(0,0,0,0)",
             stroke:        "#3396E6",
             strokeOpacity: hovered ? 0 : 0.85,
           }}
@@ -298,7 +314,22 @@ export default function PopularCarousel({
 }) {
   const containerRef                        = useRef<HTMLDivElement>(null)
   const [containerWidth, setContainerWidth] = useState(960)
-  const [currentIndex, setCurrentIndex]     = useState(0)
+  const [currentIndex, setCurrentIndex]     = useState(0)   // REAL index (0..n-1)
+
+  const n = games.length
+
+  // ── Infinite loop ──────────────────────────────────────────────────────────
+  // Clone a few cards onto each side so the centred card ALWAYS has neighbours
+  // peeking left AND right — including the first/last real cards. We render
+  //   [ last C ][ …all games… ][ first C ]
+  // and silently jump the scroll position by one full set once the user settles
+  // on a clone (clones are pixel-identical to their real twin → seamless).
+  const CLONES = Math.min(3, n)          // peek depth on each side
+  const loop   = n > CLONES              // only loop when there are enough cards
+  const OFFSET = loop ? CLONES : 0       // real index i ↔ loop index (i + OFFSET)
+  const loopGames = loop
+    ? [...games.slice(n - CLONES), ...games, ...games.slice(0, CLONES)]
+    : games
 
   // Measure the scroll container's BORDER-BOX width (includes padding).
   // CRITICAL: must NOT use contentRect.width — that gives the content-box,
@@ -317,7 +348,8 @@ export default function PopularCarousel({
 
   // Dynamic card width: fills the viewport minus the two side peeks and gaps
   // containerWidth = SIDE_PEEK + GAP + cardWidth + GAP + SIDE_PEEK
-  const cardWidth = Math.min(750, Math.max(240, containerWidth - 2 * (SIDE_PEEK + GAP)))
+  const cardWidth  = Math.min(CARD_MAX_W, Math.max(CARD_MIN_W, containerWidth - 2 * (SIDE_PEEK + GAP)))
+  const cardHeight = Math.round(cardWidth * CARD_MAX_H / CARD_MAX_W)
 
   // Padding ensures card 0 (and last) can be centred even at scroll start/end.
   // CRITICAL: must equal (containerWidth - cardWidth) / 2 so the CSS scroll-snap
@@ -326,36 +358,62 @@ export default function PopularCarousel({
   // SIDE_PEEK+GAP, causing the snapped card to have non-zero progress → it ends
   // up off-center and slightly blurred.
   const sidePadding = Math.max(SIDE_PEEK + GAP, (containerWidth - cardWidth) / 2)
+  const step        = cardWidth + GAP
 
   // scrollX MotionValue from the container's native horizontal scroll
   const { scrollX } = useScroll({ container: containerRef })
 
-  // Keep currentIndex in sync with native scroll (e.g. touch swipe).
+  // Scroll (optionally instant) to a LOOP index.
+  const scrollToLoop = useCallback((loopIdx: number, behavior: ScrollBehavior) => {
+    containerRef.current?.scrollTo({ left: loopIdx * step, behavior })
+  }, [step])
+
+  // Track scroll → REAL index, and seamlessly reposition when settling on a clone.
+  const settleTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   useEffect(() => {
     return scrollX.on("change", (v: number) => {
-      const idx = Math.round(v / (cardWidth + GAP))
-      setCurrentIndex(Math.max(0, Math.min(idx, games.length - 1)))
-    })
-  }, [scrollX, cardWidth, games.length])
+      const loopIdx = Math.round(v / step)
+      setCurrentIndex(((loopIdx - OFFSET) % n + n) % n)
 
-  // Re-snap to current card when container resizes (prevents blur on stretch).
-  useEffect(() => {
+      if (!loop) return
+      // Once the scroll settles on a cloned card, jump to its real twin
+      // instantly. Same image underneath → the wrap is invisible.
+      if (settleTimer.current) clearTimeout(settleTimer.current)
+      settleTimer.current = setTimeout(() => {
+        const el = containerRef.current
+        if (!el) return
+        const idx = Math.round(el.scrollLeft / step)
+        if (idx < OFFSET)           el.scrollTo({ left: (idx + n) * step, behavior: "instant" as ScrollBehavior })
+        else if (idx >= OFFSET + n) el.scrollTo({ left: (idx - n) * step, behavior: "instant" as ScrollBehavior })
+      }, 90)
+    })
+  }, [scrollX, step, OFFSET, n, loop])
+
+  // Initial position + re-snap on resize: land on the current REAL card.
+  // useLayoutEffect so the offset is applied before paint — otherwise the
+  // leading clones would flash at center for one frame on load.
+  useLayoutEffect(() => {
     if (!containerRef.current) return
     containerRef.current.scrollTo({
-      left: currentIndex * (cardWidth + GAP),
+      left: (OFFSET + currentIndex) * step,
       behavior: "instant" as ScrollBehavior,
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cardWidth, sidePadding])
+  }, [cardWidth, sidePadding, OFFSET])
 
-  const scrollTo = useCallback((idx: number) => {
-    if (!containerRef.current) return
-    const clamped = Math.max(0, Math.min(idx, games.length - 1))
-    containerRef.current.scrollTo({
-      left: clamped * (cardWidth + GAP),
-      behavior: "smooth",
-    })
-  }, [cardWidth, games.length])
+  // Jump to a REAL index (used by the dots).
+  const scrollToReal = useCallback((realIdx: number) => {
+    scrollToLoop(OFFSET + realIdx, "smooth")
+  }, [scrollToLoop, OFFSET])
+
+  // Step one card left/right from wherever we are (used by the arrows). Loops
+  // past the ends — the settle handler repositions onto the matching clone.
+  const scrollByCards = useCallback((dir: 1 | -1) => {
+    const el = containerRef.current
+    if (!el) return
+    const cur = Math.round(el.scrollLeft / step)
+    scrollToLoop(cur + dir, "smooth")
+  }, [step, scrollToLoop])
 
   if (games.length === 0) return null
 
@@ -374,13 +432,13 @@ export default function PopularCarousel({
 
         {/* Prev / Next — AnimatePresence enables the exit fade when reaching the ends */}
         <AnimatePresence>
-          {currentIndex > 0 && (
-            <NavBtn key="prev" dir="prev" onClick={() => scrollTo(currentIndex - 1)} />
+          {(loop || currentIndex > 0) && (
+            <NavBtn key="prev" dir="prev" onClick={() => scrollByCards(-1)} />
           )}
         </AnimatePresence>
         <AnimatePresence>
-          {currentIndex < games.length - 1 && (
-            <NavBtn key="next" dir="next" onClick={() => scrollTo(currentIndex + 1)} />
+          {(loop || currentIndex < n - 1) && (
+            <NavBtn key="next" dir="next" onClick={() => scrollByCards(1)} />
           )}
         </AnimatePresence>
 
@@ -406,9 +464,9 @@ export default function PopularCarousel({
             scrollSnapType: "x mandatory",
           }}
         >
-          {games.map((game, i) => (
+          {loopGames.map((game, i) => (
             <PopularTile
-              key={game.id}
+              key={`${game.id}-${i}`}
               game={game}
               rank={i + 1}
               isFavorited={wishlistIds.has(String(game.id))}
@@ -416,6 +474,7 @@ export default function PopularCarousel({
               index={i}
               scrollX={scrollX}
               cardWidth={cardWidth}
+              cardHeight={cardHeight}
             />
           ))}
         </div>
@@ -425,7 +484,7 @@ export default function PopularCarousel({
           {games.map((_, i) => (
             <motion.button
               key={i}
-              onClick={() => scrollTo(i)}
+              onClick={() => scrollToReal(i)}
               animate={{
                 width:      i === currentIndex ? 20 : 6,
                 background: i === currentIndex ? "#3452E5" : "rgba(255,255,255,0.18)",

@@ -1,5 +1,6 @@
 {
   "exec": "tsx server.ts",
+  "ext": "ts,js,json",
   "ignore": ["src/cache/"],
   "env": {
     "NODE_OPTIONS": "--max-old-space-size=4096"

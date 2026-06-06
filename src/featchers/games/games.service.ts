@@ -442,14 +442,15 @@ export const getTrendedGamesService = async (page = 1): Promise<GameSearchResult
 }
 
 /** FREE TO PLAY — cached 10 min */
-export const getFreeToPlayService = async (): Promise<GameSearchResult[]> => {
-    return cachedRawg("free-to-play", async () => {
+export const getFreeToPlayService = async (page = 1): Promise<GameSearchResult[]> => {
+    return cachedRawg(`free-to-play:${page}`, async () => {
         const { data } = await axios.get(`${RAWG_BASE}/games`, {
             params: {
                 key: RAWG_KEY,
                 tags: "free-to-play",
                 ordering: "-added",
                 page_size: 20,
+                page,
                 exclude_additions: true,
                 metacritic: "60,100",
             }
@@ -459,13 +460,14 @@ export const getFreeToPlayService = async (): Promise<GameSearchResult[]> => {
 }
 
 /** HIDDEN GEMS — high rating (≥4.0), lower popularity (sort by rating), cached 10 min */
-export const getHiddenGemsService = async (): Promise<GameSearchResult[]> => {
-    return cachedRawg("hidden-gems", async () => {
+export const getHiddenGemsService = async (page = 1): Promise<GameSearchResult[]> => {
+    return cachedRawg(`hidden-gems:${page}`, async () => {
         const { data } = await axios.get(`${RAWG_BASE}/games`, {
             params: {
                 key: RAWG_KEY,
                 ordering: "-rating",
                 page_size: 40,
+                page,
                 exclude_additions: true,
                 metacritic: "75,100",
             }
@@ -580,12 +582,12 @@ export const getByGenreService = async (genre: string, page = 1): Promise<GameSe
  *   4. Return popular games in that genre, excluding games already on the wishlist.
  *   Fallback: if wishlist is empty → return Popular.
  */
-export const getForYouService = async (userId: string): Promise<GameSearchResult[]> => {
+export const getForYouService = async (userId: string, page = 1): Promise<GameSearchResult[]> => {
     const wishlist = await WishlistModel.find({ userId }).limit(5).lean()
 
     if (wishlist.length === 0) {
         // No saved games yet → fall back to popular
-        return getPopularGamesService()
+        return getPopularGamesService(page)
     }
 
     // Fetch genre info for each wishlisted game in parallel (cached)
@@ -606,16 +608,17 @@ export const getForYouService = async (userId: string): Promise<GameSearchResult
 
     // Top genre by frequency
     const topGenre = Object.entries(genreCount).sort((a, b) => b[1] - a[1])[0]?.[0]
-    if (!topGenre) return getPopularGamesService()
+    if (!topGenre) return getPopularGamesService(page)
 
     // Fetch games in that genre, exclude already-wishlisted games (cached)
-    const { results: genreResults } = await cachedRawg<{ results: RawgGame[] }>(`for-you:${topGenre}`, async () => {
+    const { results: genreResults } = await cachedRawg<{ results: RawgGame[] }>(`for-you:${topGenre}:${page}`, async () => {
         const { data } = await axios.get(`${RAWG_BASE}/games`, {
             params: {
                 key: RAWG_KEY,
                 genres: topGenre,
                 ordering: "-added",
                 page_size: 30,
+                page,
                 exclude_additions: true,
             }
         })

@@ -96,7 +96,9 @@ export const getForYou = async (req: Request, res: Response): Promise<void> => {
             res.status(401).json({ status: "401", message: "Unauthorized", data: null })
             return
         }
-        const games  = await getForYouService(userId)
+        const pageRaw = Number(req.query.page)
+        const page    = Number.isInteger(pageRaw) && pageRaw >= 1 ? pageRaw : 1
+        const games  = await getForYouService(userId, page)
         res.status(200).json({ status: "200", message: "OK", data: games })
     } catch (error) {
         const { status, message } = getErrorInfo(error)
@@ -161,9 +163,11 @@ export const getGamePrice = async (req: Request, res: Response): Promise<void> =
 }
 
 /** Free to Play */
-export const getFreeToPlay = async (_req: Request, res: Response): Promise<void> => {
+export const getFreeToPlay = async (req: Request, res: Response): Promise<void> => {
     try {
-        const games = await getFreeToPlayService()
+        const pageRaw = Number(req.query.page)
+        const page    = Number.isInteger(pageRaw) && pageRaw >= 1 ? pageRaw : 1
+        const games = await getFreeToPlayService(page)
         res.status(200).json({ status: "200", message: "OK", data: games })
     } catch (error) {
         const { status, message } = getErrorInfo(error)
@@ -172,9 +176,11 @@ export const getFreeToPlay = async (_req: Request, res: Response): Promise<void>
 }
 
 /** Hidden Gems */
-export const getHiddenGems = async (_req: Request, res: Response): Promise<void> => {
+export const getHiddenGems = async (req: Request, res: Response): Promise<void> => {
     try {
-        const games = await getHiddenGemsService()
+        const pageRaw = Number(req.query.page)
+        const page    = Number.isInteger(pageRaw) && pageRaw >= 1 ? pageRaw : 1
+        const games = await getHiddenGemsService(page)
         res.status(200).json({ status: "200", message: "OK", data: games })
     } catch (error) {
         const { status, message } = getErrorInfo(error)

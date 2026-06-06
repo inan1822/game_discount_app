@@ -11,12 +11,11 @@ import { useChat } from "@/features/chat/state/ChatContext"
 import GameCard from "@/features/products/components/GameCard"
 import PopularCarousel from "@/features/products/components/PopularCarousel"
 import NewBentoGrid from "@/features/products/components/NewBentoGrid"
-import FavoritesShelf from "@/features/products/components/FavoritesShelf"
 import { SectionHeading } from "@/shared/components/SectionHeading"
 import ScrollableRow from "@/shared/components/ScrollableRow"
 import {
   getPopularGames, getNewGames, getTrendedGames, getForYouGames, searchGames, getGameById,
-  getFreeToPlayGames, getHiddenGemsGames, getCardPrices,
+  getHiddenGemsGames, getCardPrices,
   getDisLowGames,
 } from "@/features/products/services/games"
 import { primeCache } from "@/features/products/utils/useCardPrice"
@@ -34,7 +33,6 @@ const ALL_SECTIONS = [
   { label: "Favorites",    key: "Favorites",    authOnly: true  },
   { label: "For you",      key: "For you",      authOnly: true  },
   { label: "Trended",      key: "Trended",      authOnly: false },
-  { label: "Free to Play", key: "Free to Play", authOnly: false },
   { label: "Hidden Gems",  key: "Hidden Gems",  authOnly: false },
   { label: "DisLow games", key: "DisLow games", authOnly: false },
 ] as const
@@ -326,17 +324,11 @@ export default function HomePage() {
         break
 
       // Lazy data sections — fetch data then prices
-      case "Free to Play":
-        getFreeToPlayGames().then(gs => {
-          const g = gs.slice(0, 10)
-          setSections(prev => ({ ...prev, "Free to Play": g }))
-          fetchPricesFor(g)
-        }).catch(() => {})
         break
 
       case "Hidden Gems":
         getHiddenGemsGames().then(gs => {
-          const g = gs.slice(0, 10)
+          const g = gs.slice(0, 9)
           setSections(prev => ({ ...prev, "Hidden Gems": g }))
           fetchPricesFor(g)
         }).catch(() => {})
@@ -383,11 +375,11 @@ export default function HomePage() {
       setWishlistIds(new Set((wishlist as WishlistItem[]).map(w => w.gameId)))
 
       const built: Record<string, Game[]> = {
-        Favorites:  favGames,
-        "For you":  (forYou as Game[]).slice(0, 10),
+        Favorites:  favGames.slice(0, 9),
+        "For you":  (forYou as Game[]).slice(0, 9),
         Popular:    popular.slice(0, 10),
         New:        newGames.slice(0, 9),
-        Trended:    trended.slice(0, 10),
+        Trended:    trended.slice(0, 9),
       }
       setSections(built)
 
@@ -651,9 +643,7 @@ export default function HomePage() {
           <div ref={contentRef} className="flex-1 overflow-y-auto py-5 space-y-20"
             style={{
               scrollbarWidth: "none",
-              // Use paddingInline instead of shrinking width so the element
-              // stays full-column-width — prevents glow / text clipping on
-              // smaller windows where width-192px collapsed to near zero.
+              width: "100%",
               paddingInline: CONTENT_SIDE_PADDING,
               maxWidth: CONTENT_MAX_WIDTH,
               marginInline: "auto",
@@ -754,20 +744,48 @@ export default function HomePage() {
                   )
                   return (
                     <LazySection key={key} onVisible={() => triggerSection("Favorites")}>
-                      <FavoritesShelf
-                        games={games}
-                        wishlistIds={wishlistIds}
-                        onToggleFavorite={handleToggleFavorite}
-                        onSeeAll={() => router.push("/section/favorites")}
-                        delay={delay}
-                      />
+                      <motion.section data-section={key}
+                        initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay, duration: 0.5, ease: "easeOut" }}>
+                        <SectionHeading title={label} delay={delay} />
+                        <div className="grid grid-cols-2 sm:grid-cols-3 px-3 pt-4 pb-4" style={{ gap: 48 }}>
+                          {games.map((game, i) => (
+                            <motion.div key={game.id}
+                              initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
+                              transition={{ delay: delay + i * 0.035, duration: 0.45, ease: "easeOut" }}>
+                              <GameCard game={game} rank={i + 1}
+                                isFavorited={wishlistIds.has(String(game.id))}
+                                onToggleFavorite={e => handleToggleFavorite(e, game)}
+                                imageSize={{ w: "100%", aspectRatio: "16/9" }}
+                                stretchImage />
+                            </motion.div>
+                          ))}
+                        </div>
+                        {/* See all — centered at the bottom of the section */}
+                        <div className="flex justify-center pt-2 pb-2">
+                          <motion.button
+                            onClick={() => router.push("/section/favorites")}
+                            whileHover={{ scale: 1.04 }}
+                            whileTap={{ scale: 0.97 }}
+                            className="px-6 py-2.5 font-medium"
+                            style={{
+                              color:                "rgba(255,255,255,0.50)",
+                              background:           "transparent",
+                              border:               "none",
+                              fontSize:             15,
+                            }}
+                          >
+                            See all {label} →
+                          </motion.button>
+                        </div>
+                      </motion.section>
                     </LazySection>
                   )
                 }
 
-                // ── Lazy data sections (Free to Play, Hidden Gems, DisLow games) ──
+                // ── Lazy data section (DisLow games) — horizontal scroll ──────────
                 // Always render sentinel so observer can fire even before data arrives
-                if (key === "Free to Play" || key === "Hidden Gems" || key === "DisLow games") return (
+                if (key === "DisLow games") return (
                   <LazySection key={key} onVisible={() => triggerSection(key)}>
                     {games.length > 0 && (
                       <motion.section data-section={key}
@@ -795,7 +813,55 @@ export default function HomePage() {
                   </LazySection>
                 )
 
-                // ── Default lazy sections (Trended, For you) ─────────────────
+                // ── Grid sections (Trended, For you, Hidden Gems) — responsive grid, no scroll ──
+                // LazySection sentinel always renders so the observer can fire and
+                // trigger the lazy data fetch for Hidden Gems.
+                if (key === "Trended" || key === "For you" || key === "Hidden Gems") return (
+                  <LazySection key={key} onVisible={() => triggerSection(key)}>
+                    {games.length > 0 && (
+                      <motion.section data-section={key}
+                        initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay, duration: 0.5, ease: "easeOut" }}>
+                        <SectionHeading
+                          title={label}
+                          delay={delay}
+                        />
+                        <div className="grid grid-cols-2 sm:grid-cols-3 px-3 pt-4 pb-4" style={{ gap: 48 }}>
+                          {games.map((game, i) => (
+                            <motion.div key={game.id}
+                              initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
+                              transition={{ delay: delay + i * 0.035, duration: 0.45, ease: "easeOut" }}>
+                              <GameCard game={game} rank={i + 1}
+                                isFavorited={wishlistIds.has(String(game.id))}
+                                onToggleFavorite={e => handleToggleFavorite(e, game)}
+                                imageSize={{ w: "100%", aspectRatio: "16/9" }}
+                                stretchImage />
+                            </motion.div>
+                          ))}
+                        </div>
+                        {/* See all — centered at the bottom of the section */}
+                        <div className="flex justify-center pt-2 pb-2">
+                          <motion.button
+                            onClick={() => router.push(`/section/${toSlug(key)}`)}
+                            whileHover={{ scale: 1.04 }}
+                            whileTap={{ scale: 0.97 }}
+                            className="px-6 py-2.5 font-medium"
+                            style={{
+                              color:                "rgba(255,255,255,0.50)",
+                              background:           "transparent",
+                              border:               "none",
+                              fontSize:             15,
+                            }}
+                          >
+                            See all {label} →
+                          </motion.button>
+                        </div>
+                      </motion.section>
+                    )}
+                  </LazySection>
+                )
+
+                // ── Generic fallback (any unhandled section) — horizontal scroll ──
                 if (games.length === 0) return null
 
                 return (
@@ -816,7 +882,7 @@ export default function HomePage() {
                             <GameCard game={game} rank={i + 1}
                               isFavorited={wishlistIds.has(String(game.id))}
                               onToggleFavorite={e => handleToggleFavorite(e, game)}
-                              imageSize={key === "Trended" || key === "For you" ? { w: 346, h: 374 } : undefined} />
+                              imageSize={{ w: 346, h: 374 }} />
                           </motion.div>
                         ))}
                       </ScrollableRow>

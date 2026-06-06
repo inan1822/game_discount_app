@@ -25,7 +25,7 @@ export const BackgroundGradientAnimation = ({
 
   // ─── DisLow design tokens ───────────────────────────────────────────────────
   useEffect(() => {
-    document.body.style.setProperty("--gradient-background-start", "rgb(30, 37, 50)")
+    document.body.style.setProperty("--gradient-background-start", "rgb(50, 30, 30)")
     document.body.style.setProperty("--gradient-background-end",   "rgb(24, 29, 40)")
     document.body.style.setProperty("--first-color",   "174, 59, 214")
     document.body.style.setProperty("--second-color",  "100, 117, 209")
@@ -61,11 +61,6 @@ export const BackgroundGradientAnimation = ({
     }
   }
 
-  const [isSafari, setIsSafari] = useState(false)
-  useEffect(() => {
-    setIsSafari(/^((?!chrome|android).)*safari/i.test(navigator.userAgent))
-  }, [])
-
   return (
     <div
       className={cn(
@@ -76,21 +71,6 @@ export const BackgroundGradientAnimation = ({
       style={{ background: "linear-gradient(40deg, #1E2532, #181D28)" }}
       onMouseMove={handleMouseMove}
     >
-      {/* SVG gooey filter */}
-      <svg className="hidden">
-        <defs>
-          <filter id="blurMe">
-            <feGaussianBlur in="SourceGraphic" stdDeviation="10" result="blur" />
-            <feColorMatrix
-              in="blur" mode="matrix"
-              values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 18 -8"
-              result="goo"
-            />
-            <feBlend in="SourceGraphic" in2="goo" />
-          </filter>
-        </defs>
-      </svg>
-
       <div className={cn("", className)} />
 
       {/* ── Animated blobs — inside parallax wrapper ─────────────────────────── */}
@@ -103,12 +83,11 @@ export const BackgroundGradientAnimation = ({
           willChange: "transform",
         }}
       >
-        <div
-          className={cn(
-            "w-full h-full",
-            isSafari ? "blur-2xl" : "[filter:url(#blurMe)_blur(10px)]",
-          )}
-        >
+        {/* Soft blur only (no gooey #blurMe filter): the gooey feColorMatrix
+            hard-snaps alpha, which made off-center blobs render as hard-edged
+            colored rectangles on narrow screens. A plain blur keeps the
+            atmospheric glow without any hard edges, at any viewport size. */}
+        <div className="w-full h-full blur-2xl">
           {/* Blob 1 — purple */}
           <div className="absolute animate-bg-first opacity-30
             [background:radial-gradient(circle_at_center,rgba(174,59,214,0.8)_0,rgba(174,59,214,0)_50%)_no-repeat]

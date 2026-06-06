@@ -1160,15 +1160,17 @@ export default function GameDetailPage() {
       }}
     >
 
-          {/* ── LEFT PANEL ── */}
+          {/* ── LEFT PANEL ──
+              Prefers 594px, but shrinks (with the image) when the row gets tight
+              so the right panel keeps its 475px minimum. Never grows past 594. */}
           <motion.div
             {...fadeUp(0.08)}
-            className="flex flex-col flex-shrink-0 overflow-y-auto pt-2"
-            style={{ width: 594, scrollbarWidth: "none" }}
+            className="flex flex-col overflow-y-auto pt-2"
+            style={{ flex: "0 1 594px", maxWidth: 594, minWidth: 0, scrollbarWidth: "none" }}
           >
 
             {/* Cover card */}
-            <div className="relative rounded-[10px] overflow-hidden mb-4 flex-shrink-0 w-full" style={{ width: 594, height: 334.13 }}>
+            <div className="relative rounded-[10px] overflow-hidden mb-4 flex-shrink-0 w-full" style={{ aspectRatio: "16 / 9" }}>
               {game.cover ? (
                 <img src={game.cover} alt={game.name} className="w-full h-full object-cover" />
               ) : (
@@ -1254,7 +1256,7 @@ export default function GameDetailPage() {
                 rel="noopener noreferrer"
                 whileHover={{ scale: 1.01 }}
                 whileTap={{ scale: 0.98 }}
-                className="flex items-center justify-center gap-2 rounded-[12px] py-3 mb-5 text-white font-semibold text-[15px]"
+                className="flex items-center justify-center gap-2 rounded-[12px] px-6 py-3.5 mb-5 text-white font-semibold text-[15px]"
                 style={{
                   background: "#6475D1",
                   boxShadow:  "0 4px 16px rgba(100,117,209,0.35)",
@@ -1315,10 +1317,14 @@ export default function GameDetailPage() {
             </motion.button>
           </motion.div>
 
-          {/* ── RIGHT PANEL ── */}
+          {/* ── RIGHT PANEL ──
+              Hard floor of 475px (below that the Events/Discounts panel looks bad).
+              grow=1 expands it to fill wide screens; shrink=0 means it never drops
+              below 475 — the left column shrinks instead. */}
           <motion.div
             {...fadeUp(0.15)}
-            className="flex flex-col flex-1 min-w-0 overflow-visible pr-6 pt-[4px]"
+            className="flex flex-col overflow-visible pr-6 pt-[4px]"
+            style={{ flex: "1 0 475px", minWidth: 475 }}
           >
             {/* Tab switcher */}
             <GlowCard

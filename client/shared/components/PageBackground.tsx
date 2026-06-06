@@ -15,7 +15,7 @@ export default function PageBackground() {
         src="/icons/auth-bg-top.svg"
         aria-hidden
         className="absolute inset-0 w-full h-full pointer-events-none object-cover"
-        style={{ zIndex: 2 }}
+        style={{ zIndex: 2  }}
       />
     </>
   )

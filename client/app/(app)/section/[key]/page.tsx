@@ -6,20 +6,31 @@ import { motion } from "framer-motion"
 import { ArrowLeft, Bell } from "@/shared/icons"
 import { useAuth } from "@/features/auth/state/AuthContext"
 import GameCard from "@/features/products/components/GameCard"
-import { getPopularGames, getNewGames, getTrendedGames, getForYouGames, getCardPrices } from "@/features/products/services/games"
+import { getPopularGames, getNewGames, getTrendedGames, getForYouGames, getFreeToPlayGames, getHiddenGemsGames, getCardPrices } from "@/features/products/services/games"
 import { getWishlist, addToWishlist, removeFromWishlist } from "@/features/wishlist/services/wishlist"
 import type { Game, WishlistItem, CardPrice } from "@/shared/types/game"
 
 // ─── Section metadata ─────────────────────────────────────────────────────────
 const SLUG_META: Record<string, { label: string; paginated: boolean }> = {
-  popular:   { label: "Popular",   paginated: true  },
-  new:       { label: "New",       paginated: true  },
-  trended:   { label: "Trended",   paginated: true  },
-  favorites: { label: "Favorites", paginated: false },
-  "for-you": { label: "For you",   paginated: false },
+  popular:        { label: "Popular",      paginated: true  },
+  new:            { label: "New",          paginated: true  },
+  trended:        { label: "Trended",      paginated: true  },
+  favorites:      { label: "Favorites",    paginated: false },
+  "for-you":      { label: "For you",      paginated: true  },
+  "free-to-play": { label: "Free to Play", paginated: true  },
+  "hidden-gems":  { label: "Hidden Gems",  paginated: true  },
 }
 
 const AUTH_SECTIONS = new Set(["favorites", "for-you"])
+
+// How many pages to fetch per infinite-scroll trigger (each RAWG page = 20 games).
+const PAGES_PER_LOAD = 10
+
+// Content sizing — matches the home page (app/(app)/page.tsx).
+const CONTENT_MAX_WIDTH    = 1600
+const CONTENT_SIDE_PADDING = 96
+// Inner width available to the grid (max-width minus the side padding).
+const GRID_INNER_MAX = CONTENT_MAX_WIDTH - CONTENT_SIDE_PADDING * 2  // 1408
 
 const glassStyle = {
   background:           "rgba(30, 38, 51, 0.70)",
@@ -62,7 +73,9 @@ export default function SectionPage() {
       case "popular":   return getPopularGames(p)
       case "new":       return getNewGames(p)
       case "trended":   return getTrendedGames(p)
-      case "for-you":   return getForYouGames()
+      case "for-you":   return getForYouGames(p)
+      case "free-to-play": return getFreeToPlayGames(p)
+      case "hidden-gems":  return getHiddenGemsGames(p)
       case "favorites": {
         const items = (await getWishlist()) as WishlistItem[]
         setWishlistIds(new Set(items.map(w => w.gameId)))
@@ -109,19 +122,27 @@ export default function SectionPage() {
     if (loadingMore || !hasMore || loading) return
     setLoadingMore(true)
     try {
-      const next = page + 1
-      const data = await fetchSection(next)
-      if (data.length === 0) {
+      // Fetch PAGES_PER_LOAD pages at once (in parallel), in order.
+      const start    = page + 1
+      const pageNums = Array.from({ length: PAGES_PER_LOAD }, (_, i) => start + i)
+      const results  = await Promise.all(
+        pageNums.map(p => fetchSection(p).catch(() => [] as Game[]))
+      )
+      const combined = results.flat()
+      // Any page returning fewer than 20 means we've hit the end of the list.
+      const reachedEnd = results.some(r => r.length < 20)
+
+      if (combined.length === 0) {
         setHasMore(false)
       } else {
         setGames(prev => {
           // Deduplicate by id (RAWG can return the same game across pages occasionally)
-          const ids  = new Set(prev.map(g => g.id))
-          const fresh = data.filter(g => !ids.has(g.id))
+          const ids   = new Set(prev.map(g => g.id))
+          const fresh = combined.filter(g => !ids.has(g.id))
           return [...prev, ...fresh]
         })
-        setPage(next)
-        if (data.length < 20) setHasMore(false)
+        setPage(start + PAGES_PER_LOAD - 1)
+        if (reachedEnd) setHasMore(false)
       }
     } catch { /* silent — user can scroll again */ }
     finally  { setLoadingMore(false) }
@@ -185,7 +206,7 @@ export default function SectionPage() {
             initial={{ opacity: 0, y: -18 }} animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, ease: "easeOut", delay: 0.08 }}
             className="flex items-center gap-4 flex-shrink-0"
-            style={{ height: 52, ...glassStyle, borderRadius: 12, margin: "12px 96px 0", position: "relative", zIndex: 100 }}
+            style={{ height: 52, ...glassStyle, borderRadius: 12, marginTop: 12, marginInline: "auto", width: `calc(100% - ${CONTENT_SIDE_PADDING * 2}px)`, maxWidth: GRID_INNER_MAX, position: "relative", zIndex: 100 }}
           >
             {/* Back */}
             <motion.button onClick={() => router.push("/")}
@@ -242,11 +263,11 @@ export default function SectionPage() {
 
             {loading ? (
               /* Initial skeleton */
-              <div className="grid gap-5"
-                style={{ gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))" }}>
-                {[...Array(15)].map((_, i) => (
+              <div className="grid grid-cols-2 md:grid-cols-3 2xl:grid-cols-4"
+                style={{ gap: 32, maxWidth: GRID_INNER_MAX, marginInline: "auto" }}>
+                {[...Array(12)].map((_, i) => (
                   <div key={i} className="animate-pulse"
-                    style={{ height: 308, background: "rgba(255,255,255,0.05)", borderRadius: 10 }} />
+                    style={{ height: 210, background: "rgba(255,255,255,0.05)", borderRadius: 10 }} />
                 ))}
               </div>
             ) : games.length === 0 ? (
@@ -257,8 +278,8 @@ export default function SectionPage() {
             ) : (
               <>
                 {/* Game grid */}
-                <div className="grid gap-5"
-                  style={{ gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))" }}>
+                <div className="grid grid-cols-2 md:grid-cols-3 2xl:grid-cols-4"
+                  style={{ gap: 32, maxWidth: GRID_INNER_MAX, marginInline: "auto" }}>
                   {games.map((game, i) => (
                     <motion.div key={game.id}
                       initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
@@ -268,6 +289,8 @@ export default function SectionPage() {
                         rank={i + 1}
                         isFavorited={wishlistIds.has(String(game.id))}
                         onToggleFavorite={e => handleToggleFavorite(e, game)}
+                        imageSize={{ w: "100%", aspectRatio: "16/9" }}
+                        stretchImage
                       />
                     </motion.div>
                   ))}
@@ -275,7 +298,7 @@ export default function SectionPage() {
                   {/* Loading more skeletons — fill remaining grid cells visually */}
                   {loadingMore && [...Array(5)].map((_, i) => (
                     <div key={`sk-${i}`} className="animate-pulse"
-                      style={{ height: 308, background: "rgba(255,255,255,0.04)", borderRadius: 10 }} />
+                      style={{ height: 210, background: "rgba(255,255,255,0.04)", borderRadius: 10 }} />
                   ))}
                 </div>
 

@@ -40,7 +40,7 @@
 /* ─── DisLow Design Tokens (from Figma) ──────────────────────────────────── */
 :root {
   /* shadcn required vars */
-  --background:          #12131a;
+  --background:          #121a1300;
   --foreground:          #FFFFFF;
   --card:                #1c1e2a;
   --card-foreground:     #FFFFFF;

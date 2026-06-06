@@ -29,7 +29,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           <div className="hidden md:block">
             <AppSidebar />
           </div>
-          <div className="flex-1 min-w-0 h-full pt-4 pl-5" style={{ scrollbarWidth: "none", overflowY: "auto", overflowX: "visible" }}>
+          <div className="flex-1 min-w-0 h-full pt-4 pl-5" style={{ scrollbarWidth: "none", overflowY: "auto", overflowX: "hidden" }}>
             {children}
           </div>
         </div>

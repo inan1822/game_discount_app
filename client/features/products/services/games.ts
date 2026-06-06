@@ -30,8 +30,8 @@ export const getTrendedGames = async (page = 1): Promise<Game[]> => {
 }
 
 /** For You — personalised recommendations based on wishlist genres (auth required) */
-export const getForYouGames = async (): Promise<Game[]> => {
-  const { data } = await api.get("/games/for-you")
+export const getForYouGames = async (page = 1): Promise<Game[]> => {
+  const { data } = await api.get("/games/for-you", { params: { page } })
   return data.data
 }
 
@@ -73,14 +73,14 @@ export const getGameDlcDeals = async (
 }
 
 /** Free to Play */
-export const getFreeToPlayGames = async (): Promise<Game[]> => {
-  const { data } = await api.get("/games/free-to-play")
+export const getFreeToPlayGames = async (page = 1): Promise<Game[]> => {
+  const { data } = await api.get("/games/free-to-play", { params: { page } })
   return data.data ?? []
 }
 
 /** Hidden Gems */
-export const getHiddenGemsGames = async (): Promise<Game[]> => {
-  const { data } = await api.get("/games/hidden-gems")
+export const getHiddenGemsGames = async (page = 1): Promise<Game[]> => {
+  const { data } = await api.get("/games/hidden-gems", { params: { page } })
   return data.data ?? []
 }
 
